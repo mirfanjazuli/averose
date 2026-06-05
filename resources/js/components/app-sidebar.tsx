@@ -6,6 +6,7 @@ import {
     CalendarDays,
     ChevronRight,
     Clock3,
+    ClipboardList,
     GraduationCap,
     LayoutGrid,
     Layers3,
@@ -41,12 +42,14 @@ import { dashboard } from '@/routes';
 
 export function AppSidebar() {
     const { isCurrentUrl } = useCurrentUrl();
-    const isSchedulesOpen = isCurrentUrl('/schedules', undefined, true);
-    const isUsersOpen = isCurrentUrl('/students') || isCurrentUrl('/mentors');
+    const isSchedulesOpen = isCurrentUrl('/scheduling', undefined, true);
+    const isUsersOpen =
+        isCurrentUrl('/users/students') || isCurrentUrl('/users/mentors');
     const isAcademicsOpen =
-        isCurrentUrl('/fields') ||
-        isCurrentUrl('/programs') ||
-        isCurrentUrl('/subjects');
+        isCurrentUrl('/academics/fields') ||
+        isCurrentUrl('/academics/programs') ||
+        isCurrentUrl('/academics/subjects') ||
+        isCurrentUrl('/academics/try-outs');
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -86,10 +89,10 @@ export function AppSidebar() {
                             <CollapsibleTrigger asChild>
                                 <SidebarMenuButton
                                     isActive={isSchedulesOpen}
-                                    tooltip={{ children: 'Schedules' }}
+                                    tooltip={{ children: 'Scheduling' }}
                                 >
                                     <CalendarDays />
-                                    <span>Schedules</span>
+                                    <span>Scheduling</span>
                                     <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                                 </SidebarMenuButton>
                             </CollapsibleTrigger>
@@ -99,12 +102,15 @@ export function AppSidebar() {
                                         <SidebarMenuSubButton
                                             asChild
                                             isActive={isCurrentUrl(
-                                                '/schedules',
+                                                '/scheduling/schedules',
                                             )}
                                         >
-                                            <Link href="/schedules" prefetch>
+                                            <Link
+                                                href="/scheduling/schedules"
+                                                prefetch
+                                            >
                                                 <CalendarClock />
-                                                <span>Schedule</span>
+                                                <span>Schedules</span>
                                             </Link>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
@@ -112,11 +118,11 @@ export function AppSidebar() {
                                         <SidebarMenuSubButton
                                             asChild
                                             isActive={isCurrentUrl(
-                                                '/schedules/mentor-assignments',
+                                                '/scheduling/mentor-assignments',
                                             )}
                                         >
                                             <Link
-                                                href="/schedules/mentor-assignments"
+                                                href="/scheduling/mentor-assignments"
                                                 prefetch
                                             >
                                                 <UsersRound />
@@ -128,11 +134,11 @@ export function AppSidebar() {
                                         <SidebarMenuSubButton
                                             asChild
                                             isActive={isCurrentUrl(
-                                                '/schedules/reschedule-requests',
+                                                '/scheduling/reschedule-requests',
                                             )}
                                         >
                                             <Link
-                                                href="/schedules/reschedule-requests"
+                                                href="/scheduling/reschedule-requests"
                                                 prefetch
                                             >
                                                 <Repeat2 />
@@ -144,11 +150,11 @@ export function AppSidebar() {
                                         <SidebarMenuSubButton
                                             asChild
                                             isActive={isCurrentUrl(
-                                                '/schedules/working-hours',
+                                                '/scheduling/working-hours',
                                             )}
                                         >
                                             <Link
-                                                href="/schedules/working-hours"
+                                                href="/scheduling/working-hours"
                                                 prefetch
                                             >
                                                 <Clock3 />
@@ -160,11 +166,11 @@ export function AppSidebar() {
                                         <SidebarMenuSubButton
                                             asChild
                                             isActive={isCurrentUrl(
-                                                '/schedules/public-holidays',
+                                                '/scheduling/public-holidays',
                                             )}
                                         >
                                             <Link
-                                                href="/schedules/public-holidays"
+                                                href="/scheduling/public-holidays"
                                                 prefetch
                                             >
                                                 <CalendarOff />
@@ -198,9 +204,14 @@ export function AppSidebar() {
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton
                                             asChild
-                                            isActive={isCurrentUrl('/students')}
+                                            isActive={isCurrentUrl(
+                                                '/users/students',
+                                            )}
                                         >
-                                            <Link href="/students" prefetch>
+                                            <Link
+                                                href="/users/students"
+                                                prefetch
+                                            >
                                                 <GraduationCap />
                                                 <span>Students</span>
                                             </Link>
@@ -209,9 +220,14 @@ export function AppSidebar() {
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton
                                             asChild
-                                            isActive={isCurrentUrl('/mentors')}
+                                            isActive={isCurrentUrl(
+                                                '/users/mentors',
+                                            )}
                                         >
-                                            <Link href="/mentors" prefetch>
+                                            <Link
+                                                href="/users/mentors"
+                                                prefetch
+                                            >
                                                 <UserRoundCheck />
                                                 <span>Mentors</span>
                                             </Link>
@@ -243,9 +259,14 @@ export function AppSidebar() {
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton
                                             asChild
-                                            isActive={isCurrentUrl('/fields')}
+                                            isActive={isCurrentUrl(
+                                                '/academics/fields',
+                                            )}
                                         >
-                                            <Link href="/fields" prefetch>
+                                            <Link
+                                                href="/academics/fields"
+                                                prefetch
+                                            >
                                                 <Shapes />
                                                 <span>Fields</span>
                                             </Link>
@@ -254,9 +275,14 @@ export function AppSidebar() {
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton
                                             asChild
-                                            isActive={isCurrentUrl('/programs')}
+                                            isActive={isCurrentUrl(
+                                                '/academics/programs',
+                                            )}
                                         >
-                                            <Link href="/programs" prefetch>
+                                            <Link
+                                                href="/academics/programs"
+                                                prefetch
+                                            >
                                                 <Layers3 />
                                                 <span>Programs</span>
                                             </Link>
@@ -265,11 +291,32 @@ export function AppSidebar() {
                                     <SidebarMenuSubItem>
                                         <SidebarMenuSubButton
                                             asChild
-                                            isActive={isCurrentUrl('/subjects')}
+                                            isActive={isCurrentUrl(
+                                                '/academics/subjects',
+                                            )}
                                         >
-                                            <Link href="/subjects" prefetch>
+                                            <Link
+                                                href="/academics/subjects"
+                                                prefetch
+                                            >
                                                 <LibraryBig />
                                                 <span>Subjects</span>
+                                            </Link>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton
+                                            asChild
+                                            isActive={isCurrentUrl(
+                                                '/academics/try-outs',
+                                            )}
+                                        >
+                                            <Link
+                                                href="/academics/try-outs"
+                                                prefetch
+                                            >
+                                                <ClipboardList />
+                                                <span>Try Out</span>
                                             </Link>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
@@ -281,7 +328,11 @@ export function AppSidebar() {
                     <SidebarMenuItem>
                         <SidebarMenuButton
                             asChild
-                            isActive={isCurrentUrl('/zoom-accounts')}
+                            isActive={isCurrentUrl(
+                                '/zoom-accounts',
+                                undefined,
+                                true,
+                            )}
                             tooltip={{ children: 'Zoom Accounts' }}
                         >
                             <Link href="/zoom-accounts" prefetch>

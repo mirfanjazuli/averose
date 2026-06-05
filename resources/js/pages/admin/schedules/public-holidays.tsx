@@ -115,8 +115,12 @@ export default function PublicHolidays() {
 PublicHolidays.layout = {
     breadcrumbs: [
         {
+            title: 'Scheduling',
+            href: '/scheduling/schedules',
+        },
+        {
             title: 'Public Holidays',
-            href: '/schedules/public-holidays',
+            href: '/scheduling/public-holidays',
         },
     ],
 };

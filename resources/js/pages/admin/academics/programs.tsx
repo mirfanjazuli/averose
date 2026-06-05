@@ -403,8 +403,12 @@ export default function Programs() {
 Programs.layout = {
     breadcrumbs: [
         {
+            title: 'Academics',
+            href: '/academics/fields',
+        },
+        {
             title: 'Programs',
-            href: '/programs',
+            href: '/academics/programs',
         },
     ],
 };

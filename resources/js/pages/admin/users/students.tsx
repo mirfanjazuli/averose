@@ -9,6 +9,7 @@ import {
     UserCheck,
     UsersRound,
 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,15 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Pagination,
+    PaginationButton,
+    PaginationContent,
+    PaginationEllipsis,
+    PaginationItem,
+    PaginationNext,
+    PaginationPrevious,
+} from '@/components/ui/pagination';
 import {
     Select,
     SelectContent,
@@ -68,9 +78,83 @@ const students = [
         status: 'Inactive',
         avatar: 'https://i.pravatar.cc/96?img=31',
     },
+    {
+        name: 'Citra Lestari',
+        email: 'citra@example.com',
+        program: 'Frontend Basics',
+        status: 'Active',
+        avatar: 'https://i.pravatar.cc/96?img=32',
+    },
+    {
+        name: 'Dimas Santoso',
+        email: 'dimas@example.com',
+        program: 'Laravel Starter',
+        status: 'Active',
+        avatar: 'https://i.pravatar.cc/96?img=33',
+    },
+    {
+        name: 'Eka Maharani',
+        email: 'eka@example.com',
+        program: 'React Advanced',
+        status: 'Pending',
+        avatar: 'https://i.pravatar.cc/96?img=34',
+    },
+    {
+        name: 'Fajar Nugroho',
+        email: 'fajar@example.com',
+        program: 'UI Design',
+        status: 'Active',
+        avatar: 'https://i.pravatar.cc/96?img=35',
+    },
+    {
+        name: 'Gita Anindya',
+        email: 'gita@example.com',
+        program: 'Frontend Basics',
+        status: 'Inactive',
+        avatar: 'https://i.pravatar.cc/96?img=36',
+    },
+    {
+        name: 'Hana Syakira',
+        email: 'hana@example.com',
+        program: 'Laravel Starter',
+        status: 'Active',
+        avatar: 'https://i.pravatar.cc/96?img=37',
+    },
+    {
+        name: 'Iqbal Ramadhan',
+        email: 'iqbal@example.com',
+        program: 'React Advanced',
+        status: 'Pending',
+        avatar: 'https://i.pravatar.cc/96?img=38',
+    },
+    {
+        name: 'Jasmine Kirana',
+        email: 'jasmine@example.com',
+        program: 'UI Design',
+        status: 'Active',
+        avatar: 'https://i.pravatar.cc/96?img=39',
+    },
 ];
 
+const studentsPerPage = 4;
+
 export default function Students() {
+    const [currentPage, setCurrentPage] = useState(1);
+    const totalPages = Math.ceil(students.length / studentsPerPage);
+    const firstStudentIndex = (currentPage - 1) * studentsPerPage;
+    const visibleStudents = useMemo(
+        () =>
+            students.slice(
+                firstStudentIndex,
+                firstStudentIndex + studentsPerPage,
+            ),
+        [firstStudentIndex],
+    );
+
+    const goToPage = (page: number) => {
+        setCurrentPage(Math.min(Math.max(page, 1), totalPages));
+    };
+
     return (
         <>
             <Head title="Students" />
@@ -195,7 +279,7 @@ export default function Students() {
                     </CardHeader>
                     <CardContent>
                         <div className="divide-y rounded-2xl border">
-                            {students.map((student) => (
+                            {visibleStudents.map((student) => (
                                 <div
                                     key={student.email}
                                     className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_10rem_7rem_auto]"
@@ -250,6 +334,69 @@ export default function Students() {
                                 </div>
                             ))}
                         </div>
+                        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <p className="text-sm text-muted-foreground">
+                                Showing {firstStudentIndex + 1}-
+                                {Math.min(
+                                    firstStudentIndex + studentsPerPage,
+                                    students.length,
+                                )}{' '}
+                                of {students.length} students
+                            </p>
+                            <Pagination className="mx-0 w-auto justify-start sm:justify-end">
+                                <PaginationContent>
+                                    <PaginationItem>
+                                        <PaginationPrevious
+                                            href="#"
+                                            className={
+                                                currentPage === 1
+                                                    ? 'pointer-events-none opacity-50'
+                                                    : undefined
+                                            }
+                                            onClick={(event) => {
+                                                event.preventDefault();
+                                                goToPage(currentPage - 1);
+                                            }}
+                                        />
+                                    </PaginationItem>
+                                    {Array.from(
+                                        { length: totalPages },
+                                        (_, index) => index + 1,
+                                    ).map((page) => (
+                                        <PaginationItem key={page}>
+                                            <PaginationButton
+                                                type="button"
+                                                isActive={
+                                                    currentPage === page
+                                                }
+                                                onClick={() => goToPage(page)}
+                                            >
+                                                {page}
+                                            </PaginationButton>
+                                        </PaginationItem>
+                                    ))}
+                                    {totalPages > 5 && (
+                                        <PaginationItem>
+                                            <PaginationEllipsis />
+                                        </PaginationItem>
+                                    )}
+                                    <PaginationItem>
+                                        <PaginationNext
+                                            href="#"
+                                            className={
+                                                currentPage === totalPages
+                                                    ? 'pointer-events-none opacity-50'
+                                                    : undefined
+                                            }
+                                            onClick={(event) => {
+                                                event.preventDefault();
+                                                goToPage(currentPage + 1);
+                                            }}
+                                        />
+                                    </PaginationItem>
+                                </PaginationContent>
+                            </Pagination>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
@@ -260,8 +407,12 @@ export default function Students() {
 Students.layout = {
     breadcrumbs: [
         {
+            title: 'Users',
+            href: '/users/students',
+        },
+        {
             title: 'Students',
-            href: '/students',
+            href: '/users/students',
         },
     ],
 };

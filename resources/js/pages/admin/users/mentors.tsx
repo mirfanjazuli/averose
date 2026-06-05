@@ -301,8 +301,12 @@ export default function Mentors() {
 Mentors.layout = {
     breadcrumbs: [
         {
+            title: 'Users',
+            href: '/users/students',
+        },
+        {
             title: 'Mentors',
-            href: '/mentors',
+            href: '/users/mentors',
         },
     ],
 };

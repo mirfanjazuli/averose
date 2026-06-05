@@ -134,8 +134,12 @@ export default function Schedules() {
 Schedules.layout = {
     breadcrumbs: [
         {
+            title: 'Scheduling',
+            href: '/scheduling/schedules',
+        },
+        {
             title: 'Schedules',
-            href: '/schedules',
+            href: '/scheduling/schedules',
         },
     ],
 };

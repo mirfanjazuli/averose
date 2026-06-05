@@ -29,7 +29,7 @@ class StudentTryOutTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page->component('student/try-outs'));
     }
 
-    public function test_admins_cannot_visit_the_try_out_page(): void
+    public function test_admins_cannot_visit_the_student_try_out_page(): void
     {
         $user = User::factory()->admin()->create();
 

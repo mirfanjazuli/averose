@@ -1,28 +1,17 @@
 import { Head } from '@inertiajs/react';
 import { Plus, Shapes, UsersRound } from 'lucide-react';
+import { AcademicFieldForm } from '@/components/academic-field-form';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
-    DialogClose,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 
 const fields = [
     {
@@ -75,61 +64,10 @@ export default function Fields() {
                                     programs and subjects.
                                 </DialogDescription>
                             </DialogHeader>
-                            <form
-                                className="grid gap-4"
-                                onSubmit={(event) => event.preventDefault()}
-                            >
-                                <div className="grid gap-2">
-                                    <Label htmlFor="field-name">Name</Label>
-                                    <Input
-                                        id="field-name"
-                                        name="name"
-                                        placeholder="Field name"
-                                        autoComplete="off"
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="field-description">
-                                        Description
-                                    </Label>
-                                    <Textarea
-                                        id="field-description"
-                                        name="description"
-                                        placeholder="Short field description"
-                                        className="min-h-28 resize-none rounded-2xl bg-background px-4 text-sm"
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="field-status">Status</Label>
-                                    <Select defaultValue="active">
-                                        <SelectTrigger
-                                            id="field-status"
-                                            className="w-full"
-                                        >
-                                            <SelectValue placeholder="Select status" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="active">
-                                                Active
-                                            </SelectItem>
-                                            <SelectItem value="draft">
-                                                Draft
-                                            </SelectItem>
-                                            <SelectItem value="inactive">
-                                                Inactive
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <DialogFooter className="pt-2">
-                                    <DialogClose asChild>
-                                        <Button type="button" variant="outline">
-                                            Cancel
-                                        </Button>
-                                    </DialogClose>
-                                    <Button type="submit">Save field</Button>
-                                </DialogFooter>
-                            </form>
+                            <AcademicFieldForm
+                                idPrefix="field"
+                                submitLabel="Save field"
+                            />
                         </DialogContent>
                     </Dialog>
                 </div>
@@ -203,8 +141,12 @@ export default function Fields() {
 Fields.layout = {
     breadcrumbs: [
         {
+            title: 'Academics',
+            href: '/academics/fields',
+        },
+        {
             title: 'Fields',
-            href: '/fields',
+            href: '/academics/fields',
         },
     ],
 };

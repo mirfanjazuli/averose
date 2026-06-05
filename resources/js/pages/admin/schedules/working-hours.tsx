@@ -121,8 +121,12 @@ export default function WorkingHours() {
 WorkingHours.layout = {
     breadcrumbs: [
         {
+            title: 'Scheduling',
+            href: '/scheduling/schedules',
+        },
+        {
             title: 'Working Hours',
-            href: '/schedules/working-hours',
+            href: '/scheduling/working-hours',
         },
     ],
 };

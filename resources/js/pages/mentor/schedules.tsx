@@ -185,7 +185,7 @@ MentorSchedules.layout = {
     breadcrumbs: [
         {
             title: 'Schedules',
-            href: '/schedules',
+            href: '/scheduling/schedules',
         },
     ],
 };

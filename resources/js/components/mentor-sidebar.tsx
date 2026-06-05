@@ -47,10 +47,10 @@ export function MentorSidebar() {
                     <SidebarMenuItem>
                         <SidebarMenuButton
                             asChild
-                            isActive={isCurrentUrl('/schedules')}
+                            isActive={isCurrentUrl('/scheduling/schedules')}
                             tooltip={{ children: 'Schedules' }}
                         >
-                            <Link href="/schedules" prefetch>
+                            <Link href="/scheduling/schedules" prefetch>
                                 <CalendarDays />
                                 <span>Schedules</span>
                             </Link>

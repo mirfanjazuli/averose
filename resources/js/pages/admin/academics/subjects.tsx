@@ -1,48 +1,17 @@
 import { Head } from '@inertiajs/react';
-import { Check, ChevronsUpDown, Clock3, LibraryBig, Plus } from 'lucide-react';
-import { DynamicIcon, iconNames } from 'lucide-react/dynamic';
-import type { IconName } from 'lucide-react/dynamic';
-import { useMemo, useState } from 'react';
+import { Clock3, LibraryBig, Plus } from 'lucide-react';
+import { AcademicSubjectForm } from '@/components/academic-subject-form';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from '@/components/ui/command';
-import {
     Dialog,
-    DialogClose,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
-import { Textarea } from '@/components/ui/textarea';
-import { cn } from '@/lib/utils';
-
-const iconOptions = iconNames
-    .map((name) => ({
-        value: name,
-        label: name
-            .split('-')
-            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-            .join(' '),
-    }))
-    .sort((first, second) => first.label.localeCompare(second.label));
 
 const subjects = [
     {
@@ -66,15 +35,6 @@ const subjects = [
 ];
 
 export default function Subjects() {
-    const [iconPickerOpen, setIconPickerOpen] = useState(false);
-    const [selectedIcon, setSelectedIcon] =
-        useState<IconName>('book-open-check');
-    const selectedIconOption = useMemo(
-        () =>
-            iconOptions.find((iconOption) => iconOption.value === selectedIcon),
-        [selectedIcon],
-    );
-
     return (
         <>
             <Head title="Subjects" />
@@ -103,126 +63,10 @@ export default function Subjects() {
                                     display icon.
                                 </DialogDescription>
                             </DialogHeader>
-                            <form
-                                className="grid gap-4"
-                                onSubmit={(event) => event.preventDefault()}
-                            >
-                                <div className="grid gap-2">
-                                    <Label htmlFor="subject-name">Name</Label>
-                                    <Input
-                                        id="subject-name"
-                                        name="name"
-                                        placeholder="Subject name"
-                                        autoComplete="off"
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="subject-description">
-                                        Description
-                                    </Label>
-                                    <Textarea
-                                        id="subject-description"
-                                        name="description"
-                                        placeholder="Short subject description"
-                                        className="min-h-28 resize-none rounded-2xl bg-background px-4 text-sm"
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="subject-icon">Icons</Label>
-                                    <input
-                                        type="hidden"
-                                        name="icon"
-                                        value={selectedIcon}
-                                    />
-                                    <Popover
-                                        open={iconPickerOpen}
-                                        onOpenChange={setIconPickerOpen}
-                                    >
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                id="subject-icon"
-                                                type="button"
-                                                variant="outline"
-                                                role="combobox"
-                                                aria-expanded={iconPickerOpen}
-                                                className="h-14 justify-between rounded-2xl px-4 font-normal"
-                                            >
-                                                <span className="flex min-w-0 items-center gap-2">
-                                                    <DynamicIcon
-                                                        name={selectedIcon}
-                                                        fallback={() => (
-                                                            <LibraryBig className="size-4 shrink-0" />
-                                                        )}
-                                                        className="size-4 shrink-0"
-                                                    />
-                                                    <span className="truncate">
-                                                        {
-                                                            selectedIconOption?.label
-                                                        }
-                                                    </span>
-                                                </span>
-                                                <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent
-                                            align="start"
-                                            className="w-(--radix-popover-trigger-width) p-0"
-                                        >
-                                            <Command>
-                                                <CommandInput placeholder="Search lucide icons..." />
-                                                <CommandList>
-                                                    <CommandEmpty>
-                                                        No icon found.
-                                                    </CommandEmpty>
-                                                    <CommandGroup>
-                                                        {iconOptions.map(
-                                                            (item) => (
-                                                                <CommandItem
-                                                                    key={
-                                                                        item.value
-                                                                    }
-                                                                    value={`${item.label} ${item.value}`}
-                                                                    onSelect={() => {
-                                                                        setSelectedIcon(
-                                                                            item.value,
-                                                                        );
-                                                                        setIconPickerOpen(
-                                                                            false,
-                                                                        );
-                                                                    }}
-                                                                >
-                                                                    <span className="truncate">
-                                                                        {
-                                                                            item.label
-                                                                        }
-                                                                    </span>
-                                                                    <Check
-                                                                        className={cn(
-                                                                            'ml-auto size-4',
-                                                                            selectedIcon ===
-                                                                                item.value
-                                                                                ? 'opacity-100'
-                                                                                : 'opacity-0',
-                                                                        )}
-                                                                    />
-                                                                </CommandItem>
-                                                            ),
-                                                        )}
-                                                    </CommandGroup>
-                                                </CommandList>
-                                            </Command>
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
-                                <DialogFooter className="pt-2">
-                                    <DialogClose asChild>
-                                        <Button type="button" variant="outline">
-                                            Cancel
-                                        </Button>
-                                    </DialogClose>
-                                    <Button type="submit">Save subject</Button>
-                                </DialogFooter>
-                            </form>
+                            <AcademicSubjectForm
+                                idPrefix="subject"
+                                submitLabel="Save subject"
+                            />
                         </DialogContent>
                     </Dialog>
                 </div>
@@ -298,8 +142,12 @@ export default function Subjects() {
 Subjects.layout = {
     breadcrumbs: [
         {
+            title: 'Academics',
+            href: '/academics/fields',
+        },
+        {
             title: 'Subjects',
-            href: '/subjects',
+            href: '/academics/subjects',
         },
     ],
 };

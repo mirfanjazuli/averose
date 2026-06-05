@@ -181,8 +181,12 @@ export default function RescheduleRequests() {
 RescheduleRequests.layout = {
     breadcrumbs: [
         {
+            title: 'Scheduling',
+            href: '/scheduling/schedules',
+        },
+        {
             title: 'Reschedule Requests',
-            href: '/schedules/reschedule-requests',
+            href: '/scheduling/reschedule-requests',
         },
     ],
 };

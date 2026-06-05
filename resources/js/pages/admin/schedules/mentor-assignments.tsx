@@ -161,8 +161,12 @@ export default function MentorAssignments() {
 MentorAssignments.layout = {
     breadcrumbs: [
         {
+            title: 'Scheduling',
+            href: '/scheduling/schedules',
+        },
+        {
             title: 'Mentor Assignment',
-            href: '/schedules/mentor-assignments',
+            href: '/scheduling/mentor-assignments',
         },
     ],
 };

@@ -25,21 +25,21 @@ const stats = [
         value: '184',
         trend: '+12 this month',
         icon: GraduationCap,
-        href: '/students',
+        href: '/users/students',
     },
     {
         label: 'Mentors',
         value: '32',
         trend: '+4 available',
         icon: UserRoundCheck,
-        href: '/mentors',
+        href: '/users/mentors',
     },
     {
         label: 'Schedules',
         value: '18',
         trend: '5 today',
         icon: CalendarDays,
-        href: '/schedules',
+        href: '/scheduling/schedules',
     },
 ];
 
@@ -90,7 +90,7 @@ export default function Dashboard() {
                         </p>
                     </div>
                     <Button asChild className="gap-2">
-                        <Link href="/schedules">
+                        <Link href="/scheduling/schedules">
                             View schedules
                             <ArrowUpRight className="size-4" />
                         </Link>
