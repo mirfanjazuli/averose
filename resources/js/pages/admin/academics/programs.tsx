@@ -1,148 +1,131 @@
-import { Head } from '@inertiajs/react';
-import { Layers3, Plus, UsersRound } from 'lucide-react';
+import { Form, Head, Link } from '@inertiajs/react';
+import {
+    Eye,
+    Layers3,
+    MoreVertical,
+    Pencil,
+    Plus,
+    Search,
+    Trash2,
+    UsersRound,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { AcademicProgramForm } from '@/components/academic-program-form';
+import type {
+    AcademicProgramFieldOption,
+    AcademicProgramFormProgram,
+} from '@/components/academic-program-form';
+import {
+    AlertDialog,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
-    DialogClose,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import {
+    Pagination,
+    PaginationButton,
+    PaginationContent,
+    PaginationEllipsis,
+    PaginationItem,
+    PaginationNext,
+    PaginationPrevious,
+} from '@/components/ui/pagination';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 
-const programFieldOptions = [
-    {
-        id: 'technology',
-        label: 'Technology',
-        subjects: [
-            { id: 'react-fundamentals', label: 'React Fundamentals' },
-            { id: 'laravel-backend', label: 'Laravel Backend' },
-            { id: 'database-design', label: 'Database Design' },
-        ],
-        variants: [
-            { id: 'bootcamp', label: 'Bootcamp' },
-            { id: 'private-mentoring', label: 'Private Mentoring' },
-            { id: 'project-based', label: 'Project Based' },
-        ],
-    },
-    {
-        id: 'business',
-        label: 'Business',
-        subjects: [
-            { id: 'business-strategy', label: 'Business Strategy' },
-            { id: 'growth-marketing', label: 'Growth Marketing' },
-            { id: 'financial-planning', label: 'Financial Planning' },
-        ],
-        variants: [
-            { id: 'workshop', label: 'Workshop' },
-            { id: 'cohort', label: 'Cohort' },
-        ],
-    },
-    {
-        id: 'creative',
-        label: 'Creative',
-        subjects: [
-            { id: 'product-design', label: 'Product Design' },
-            { id: 'design-systems', label: 'Design Systems' },
-            { id: 'brand-identity', label: 'Brand Identity' },
-        ],
-        variants: [
-            { id: 'portfolio-review', label: 'Portfolio Review' },
-            { id: 'studio-session', label: 'Studio Session' },
-        ],
-    },
-];
+type Program = AcademicProgramFormProgram & {
+    description?: string | null;
+    field: string;
+    id: number;
+    slug: string;
+    subjects: string;
+    students: string;
+    status: string;
+};
 
-const programs = [
-    {
-        name: 'Frontend Engineering',
-        field: 'Technology',
-        subjects: '9 subjects',
-        students: '42 students',
-        status: 'Active',
-    },
-    {
-        name: 'Laravel Backend',
-        field: 'Technology',
-        subjects: '8 subjects',
-        students: '36 students',
-        status: 'Active',
-    },
-    {
-        name: 'Product Design',
-        field: 'Creative',
-        subjects: '7 subjects',
-        students: '28 students',
-        status: 'Draft',
-    },
-];
-
-export default function Programs() {
-    const [selectedFields, setSelectedFields] = useState<string[]>([]);
-    const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
-    const [selectedVariants, setSelectedVariants] = useState<string[]>([]);
-
-    const availableSubjects = useMemo(
-        () =>
-            programFieldOptions
-                .filter((field) => selectedFields.includes(field.id))
-                .flatMap((field) => field.subjects),
-        [selectedFields],
+export default function Programs({
+    fieldOptions,
+    programs,
+}: {
+    fieldOptions: AcademicProgramFieldOption[];
+    programs: Program[];
+}) {
+    const [addProgramDialogOpen, setAddProgramDialogOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [programsPerPage, setProgramsPerPage] = useState(5);
+    const [editingProgram, setEditingProgram] = useState<Program | null>(null);
+    const [deletingProgram, setDeletingProgram] = useState<Program | null>(
+        null,
     );
 
-    const availableVariants = useMemo(
-        () =>
-            programFieldOptions
-                .filter((field) => selectedFields.includes(field.id))
-                .flatMap((field) => field.variants),
-        [selectedFields],
+    const filteredPrograms = useMemo(() => {
+        const normalizedSearch = searchQuery.trim().toLowerCase();
+
+        if (!normalizedSearch) {
+            return programs;
+        }
+
+        return programs.filter((program) =>
+            [
+                program.name,
+                program.field,
+                program.subjects,
+                program.students,
+                program.status,
+            ].some((value) => value.toLowerCase().includes(normalizedSearch)),
+        );
+    }, [programs, searchQuery]);
+    const totalPages = Math.max(
+        1,
+        Math.ceil(filteredPrograms.length / programsPerPage),
+    );
+    const safeCurrentPage = Math.min(currentPage, totalPages);
+    const firstProgramIndex = (safeCurrentPage - 1) * programsPerPage;
+    const visiblePrograms = filteredPrograms.slice(
+        firstProgramIndex,
+        firstProgramIndex + programsPerPage,
     );
 
-    function toggleField(fieldId: string, checked: boolean) {
-        const nextFields = checked
-            ? [...selectedFields, fieldId]
-            : selectedFields.filter((id) => id !== fieldId);
-
-        const validSubjectIds = programFieldOptions
-            .filter((field) => nextFields.includes(field.id))
-            .flatMap((field) => field.subjects.map((subject) => subject.id));
-        const validVariantIds = programFieldOptions
-            .filter((field) => nextFields.includes(field.id))
-            .flatMap((field) => field.variants.map((variant) => variant.id));
-
-        setSelectedFields(nextFields);
-        setSelectedSubjects((currentSubjects) =>
-            currentSubjects.filter((id) => validSubjectIds.includes(id)),
-        );
-        setSelectedVariants((currentVariants) =>
-            currentVariants.filter((id) => validVariantIds.includes(id)),
-        );
-    }
-
-    function toggleSubject(subjectId: string, checked: boolean) {
-        setSelectedSubjects((currentSubjects) =>
-            checked
-                ? [...currentSubjects, subjectId]
-                : currentSubjects.filter((id) => id !== subjectId),
-        );
-    }
-
-    function toggleVariant(variantId: string, checked: boolean) {
-        setSelectedVariants((currentVariants) =>
-            checked
-                ? [...currentVariants, variantId]
-                : currentVariants.filter((id) => id !== variantId),
-        );
-    }
+    const goToPage = (page: number) => {
+        setCurrentPage(Math.min(Math.max(page, 1), totalPages));
+    };
 
     return (
         <>
@@ -157,14 +140,17 @@ export default function Programs() {
                             Manage learning programs and their academic field.
                         </p>
                     </div>
-                    <Dialog>
+                    <Dialog
+                        open={addProgramDialogOpen}
+                        onOpenChange={setAddProgramDialogOpen}
+                    >
                         <DialogTrigger asChild>
                             <Button className="gap-2">
                                 <Plus className="size-4" />
                                 Add program
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
+                        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-4xl">
                             <DialogHeader>
                                 <DialogTitle>Add program</DialogTitle>
                                 <DialogDescription>
@@ -172,161 +158,23 @@ export default function Programs() {
                                     subjects, and variants.
                                 </DialogDescription>
                             </DialogHeader>
-                            <form
-                                className="grid gap-5"
-                                onSubmit={(event) => event.preventDefault()}
-                            >
-                                <div className="grid gap-2">
-                                    <Label htmlFor="program-name">Name</Label>
-                                    <Input
-                                        id="program-name"
-                                        name="name"
-                                        placeholder="Program name"
-                                        autoComplete="off"
-                                    />
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="program-description">
-                                        Description
-                                    </Label>
-                                    <Textarea
-                                        id="program-description"
-                                        name="description"
-                                        placeholder="Short program description"
-                                        className="min-h-28 resize-none rounded-2xl bg-background px-4 text-sm"
-                                    />
-                                </div>
-
-                                <div className="grid gap-2">
-                                    <Label htmlFor="program-max-reschedule">
-                                        Max reschedule
-                                    </Label>
-                                    <Input
-                                        id="program-max-reschedule"
-                                        name="max_reschedule"
-                                        type="number"
-                                        min={0}
-                                        placeholder="3"
-                                    />
-                                </div>
-
-                                <div className="grid gap-3">
-                                    <Label>Fields</Label>
-                                    <div className="grid gap-2 rounded-2xl border p-3 sm:grid-cols-3">
-                                        {programFieldOptions.map((field) => (
-                                            <label
-                                                key={field.id}
-                                                htmlFor={`program-field-${field.id}`}
-                                                className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm hover:bg-accent"
-                                            >
-                                                <Checkbox
-                                                    id={`program-field-${field.id}`}
-                                                    name="fields[]"
-                                                    value={field.id}
-                                                    checked={selectedFields.includes(
-                                                        field.id,
-                                                    )}
-                                                    onCheckedChange={(
-                                                        checked,
-                                                    ) =>
-                                                        toggleField(
-                                                            field.id,
-                                                            checked === true,
-                                                        )
-                                                    }
-                                                />
-                                                <span>{field.label}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="grid gap-3">
-                                    <Label>Subjects</Label>
-                                    <div className="grid gap-2 rounded-2xl border p-3 sm:grid-cols-2">
-                                        {availableSubjects.length > 0 ? (
-                                            availableSubjects.map((subject) => (
-                                                <label
-                                                    key={subject.id}
-                                                    htmlFor={`program-subject-${subject.id}`}
-                                                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm hover:bg-accent"
-                                                >
-                                                    <Checkbox
-                                                        id={`program-subject-${subject.id}`}
-                                                        name="subjects[]"
-                                                        value={subject.id}
-                                                        checked={selectedSubjects.includes(
-                                                            subject.id,
-                                                        )}
-                                                        onCheckedChange={(
-                                                            checked,
-                                                        ) =>
-                                                            toggleSubject(
-                                                                subject.id,
-                                                                checked ===
-                                                                    true,
-                                                            )
-                                                        }
-                                                    />
-                                                    <span>{subject.label}</span>
-                                                </label>
-                                            ))
-                                        ) : (
-                                            <p className="px-2 py-2 text-sm text-muted-foreground">
-                                                Select fields first.
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="grid gap-3">
-                                    <Label>Variant</Label>
-                                    <div className="grid gap-2 rounded-2xl border p-3 sm:grid-cols-2">
-                                        {availableVariants.length > 0 ? (
-                                            availableVariants.map((variant) => (
-                                                <label
-                                                    key={variant.id}
-                                                    htmlFor={`program-variant-${variant.id}`}
-                                                    className="flex cursor-pointer items-center gap-2 rounded-xl px-2 py-2 text-sm hover:bg-accent"
-                                                >
-                                                    <Checkbox
-                                                        id={`program-variant-${variant.id}`}
-                                                        name="variants[]"
-                                                        value={variant.id}
-                                                        checked={selectedVariants.includes(
-                                                            variant.id,
-                                                        )}
-                                                        onCheckedChange={(
-                                                            checked,
-                                                        ) =>
-                                                            toggleVariant(
-                                                                variant.id,
-                                                                checked ===
-                                                                    true,
-                                                            )
-                                                        }
-                                                    />
-                                                    <span>{variant.label}</span>
-                                                </label>
-                                            ))
-                                        ) : (
-                                            <p className="px-2 py-2 text-sm text-muted-foreground">
-                                                Select fields first.
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <DialogFooter className="pt-2">
-                                    <DialogClose asChild>
-                                        <Button type="button" variant="outline">
-                                            Cancel
-                                        </Button>
-                                    </DialogClose>
-                                    <Button type="submit">Save program</Button>
-                                </DialogFooter>
-                            </form>
+                            <AcademicProgramForm
+                                action="/academics/programs"
+                                fieldOptions={fieldOptions}
+                                idPrefix="program"
+                                method="post"
+                                resetOnSuccess
+                                onSuccess={() => {
+                                    setAddProgramDialogOpen(false);
+                                    toast.success('Program added.');
+                                }}
+                                onError={() => {
+                                    toast.error(
+                                        'Please check the program form.',
+                                    );
+                                }}
+                                submitLabel="Save program"
+                            />
                         </DialogContent>
                     </Dialog>
                 </div>
@@ -362,37 +210,328 @@ export default function Programs() {
                     </Card>
                 </div>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Program list</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {programs.map((program) => (
-                            <div
-                                key={program.name}
-                                className="grid gap-3 rounded-2xl border p-4 md:grid-cols-[minmax(0,1fr)_9rem_8rem_8rem_auto]"
+                <Dialog
+                    open={!!editingProgram}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setEditingProgram(null);
+                        }
+                    }}
+                >
+                    <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-4xl">
+                        <DialogHeader>
+                            <DialogTitle>Edit program</DialogTitle>
+                            <DialogDescription>
+                                Update this program and its academic mapping.
+                            </DialogDescription>
+                        </DialogHeader>
+                        {editingProgram && (
+                            <AcademicProgramForm
+                                key={editingProgram.id}
+                                action={`/academics/programs/${editingProgram.slug}`}
+                                fieldOptions={fieldOptions}
+                                idPrefix="edit-program"
+                                method="put"
+                                program={editingProgram}
+                                onSuccess={() => {
+                                    setEditingProgram(null);
+                                    toast.success('Program updated.');
+                                }}
+                                onError={() => {
+                                    toast.error(
+                                        'Please check the program form.',
+                                    );
+                                }}
+                                submitLabel="Save changes"
+                            />
+                        )}
+                    </DialogContent>
+                </Dialog>
+
+                <AlertDialog
+                    open={!!deletingProgram}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setDeletingProgram(null);
+                        }
+                    }}
+                >
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>
+                                Delete program?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This will remove {deletingProgram?.name} from
+                                the program list.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        {deletingProgram && (
+                            <Form
+                                action={`/academics/programs/${deletingProgram.slug}`}
+                                method="delete"
+                                disableWhileProcessing
+                                onSuccess={() => {
+                                    setDeletingProgram(null);
+                                    toast.success('Program deleted.');
+                                }}
+                                onError={() => {
+                                    toast.error(
+                                        'Unable to delete this program.',
+                                    );
+                                }}
                             >
-                                <h2 className="font-semibold">
-                                    {program.name}
-                                </h2>
-                                <Badge variant="outline">{program.field}</Badge>
-                                <p className="text-sm text-muted-foreground">
-                                    {program.subjects}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                    {program.students}
-                                </p>
-                                <Badge
-                                    variant={
-                                        program.status === 'Active'
-                                            ? 'default'
-                                            : 'secondary'
-                                    }
-                                >
-                                    {program.status}
-                                </Badge>
+                                {({ processing }) => (
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel
+                                            type="button"
+                                            disabled={processing}
+                                        >
+                                            Cancel
+                                        </AlertDialogCancel>
+                                        <Button
+                                            type="submit"
+                                            variant="destructive"
+                                            disabled={processing}
+                                        >
+                                            Delete program
+                                        </Button>
+                                    </AlertDialogFooter>
+                                )}
+                            </Form>
+                        )}
+                    </AlertDialogContent>
+                </AlertDialog>
+
+                <Card>
+                    <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
+                        <CardTitle>Program list</CardTitle>
+                        <div className="flex h-10 min-w-64 items-center gap-2 rounded-2xl border bg-background px-3 text-sm text-muted-foreground">
+                            <Search className="size-4" />
+                            <Input
+                                value={searchQuery}
+                                onChange={(event) => {
+                                    setSearchQuery(event.target.value);
+                                    setCurrentPage(1);
+                                }}
+                                placeholder="Search programs..."
+                                className="h-auto border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0"
+                            />
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        {programs.length === 0 ? (
+                            <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                                No programs added yet.
                             </div>
-                        ))}
+                        ) : filteredPrograms.length === 0 ? (
+                            <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                                No programs match your search.
+                            </div>
+                        ) : (
+                            <>
+                                <div className="rounded-2xl border">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Name</TableHead>
+                                                <TableHead>Field</TableHead>
+                                                <TableHead>Subjects</TableHead>
+                                                <TableHead>Students</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead className="w-12 text-right" />
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {visiblePrograms.map((program) => (
+                                                <TableRow key={program.id}>
+                                                    <TableCell className="font-medium">
+                                                        {program.name}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline">
+                                                            {program.field}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {program.subjects}
+                                                    </TableCell>
+                                                    <TableCell className="text-muted-foreground">
+                                                        {program.students}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge
+                                                            variant={
+                                                                program.status ===
+                                                                'active'
+                                                                    ? 'default'
+                                                                    : 'secondary'
+                                                            }
+                                                        >
+                                                            {program.status}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger
+                                                                asChild
+                                                            >
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon-sm"
+                                                                    className="rounded-full"
+                                                                >
+                                                                    <MoreVertical className="size-4" />
+                                                                    <span className="sr-only">
+                                                                        Open
+                                                                        program
+                                                                        actions
+                                                                    </span>
+                                                                </Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent
+                                                                align="end"
+                                                                className="w-40"
+                                                            >
+                                                                <DropdownMenuItem asChild>
+                                                                    <Link
+                                                                        href={`/academics/programs/${program.slug}`}
+                                                                    >
+                                                                        <Eye className="size-4" />
+                                                                        View
+                                                                    </Link>
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem
+                                                                    onClick={() =>
+                                                                        setEditingProgram(
+                                                                            program,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Pencil className="size-4" />
+                                                                    Edit
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuSeparator />
+                                                                <DropdownMenuItem
+                                                                    variant="destructive"
+                                                                    onClick={() =>
+                                                                        setDeletingProgram(
+                                                                            program,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <Trash2 className="size-4" />
+                                                                    Delete
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                                <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
+                                    <p className="text-sm text-muted-foreground">
+                                        Showing {firstProgramIndex + 1}-
+                                        {Math.min(
+                                            firstProgramIndex +
+                                                programsPerPage,
+                                            filteredPrograms.length,
+                                        )}{' '}
+                                        of {filteredPrograms.length} programs
+                                    </p>
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground lg:justify-center">
+                                        <span>Rows per page</span>
+                                        <Select
+                                            value={String(programsPerPage)}
+                                            onValueChange={(value) => {
+                                                setProgramsPerPage(
+                                                    Number(value),
+                                                );
+                                                setCurrentPage(1);
+                                            }}
+                                        >
+                                            <SelectTrigger className="h-9 w-20 rounded-xl">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="5">
+                                                    5
+                                                </SelectItem>
+                                                <SelectItem value="10">
+                                                    10
+                                                </SelectItem>
+                                                <SelectItem value="20">
+                                                    20
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <Pagination className="mx-0 w-auto justify-start lg:justify-end">
+                                        <PaginationContent>
+                                            <PaginationItem>
+                                                <PaginationPrevious
+                                                    href="#"
+                                                    className={
+                                                        safeCurrentPage === 1
+                                                            ? 'pointer-events-none opacity-50'
+                                                            : undefined
+                                                    }
+                                                    onClick={(event) => {
+                                                        event.preventDefault();
+                                                        goToPage(
+                                                            safeCurrentPage - 1,
+                                                        );
+                                                    }}
+                                                />
+                                            </PaginationItem>
+                                            {Array.from(
+                                                { length: totalPages },
+                                                (_, index) => index + 1,
+                                            ).map((page) => (
+                                                <PaginationItem key={page}>
+                                                    <PaginationButton
+                                                        type="button"
+                                                        isActive={
+                                                            safeCurrentPage ===
+                                                            page
+                                                        }
+                                                        onClick={() =>
+                                                            goToPage(page)
+                                                        }
+                                                    >
+                                                        {page}
+                                                    </PaginationButton>
+                                                </PaginationItem>
+                                            ))}
+                                            {totalPages > 5 && (
+                                                <PaginationItem>
+                                                    <PaginationEllipsis />
+                                                </PaginationItem>
+                                            )}
+                                            <PaginationItem>
+                                                <PaginationNext
+                                                    href="#"
+                                                    className={
+                                                        safeCurrentPage ===
+                                                        totalPages
+                                                            ? 'pointer-events-none opacity-50'
+                                                            : undefined
+                                                    }
+                                                    onClick={(event) => {
+                                                        event.preventDefault();
+                                                        goToPage(
+                                                            safeCurrentPage + 1,
+                                                        );
+                                                    }}
+                                                />
+                                            </PaginationItem>
+                                        </PaginationContent>
+                                    </Pagination>
+                                </div>
+                            </>
+                        )}
                     </CardContent>
                 </Card>
             </div>

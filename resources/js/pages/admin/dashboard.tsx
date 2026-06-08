@@ -19,62 +19,50 @@ import {
 } from '@/components/ui/card';
 import { dashboard } from '@/routes';
 
-const stats = [
-    {
-        label: 'Students',
-        value: '184',
-        trend: '+12 this month',
-        icon: GraduationCap,
-        href: '/users/students',
-    },
-    {
-        label: 'Mentors',
-        value: '32',
-        trend: '+4 available',
-        icon: UserRoundCheck,
-        href: '/users/mentors',
-    },
-    {
-        label: 'Schedules',
-        value: '18',
-        trend: '5 today',
-        icon: CalendarDays,
-        href: '/scheduling/schedules',
-    },
-];
+type DashboardStat = {
+    href: string;
+    label: 'Students' | 'Mentors' | 'Schedules';
+    trend: string;
+    value: string;
+};
 
-const schedules = [
-    {
-        title: 'Product planning',
-        time: '09:00 - 10:30',
-        type: 'Team',
-    },
-    {
-        title: 'Design review',
-        time: '11:00 - 12:00',
-        type: 'Online',
-    },
-    {
-        title: 'Client sync',
-        time: '14:00 - 15:00',
-        type: 'External',
-    },
-];
+type ProgramProgress = {
+    label: string;
+    value: number;
+};
 
-const cohorts = [
-    { label: 'Frontend Basics', value: 84 },
-    { label: 'Laravel Starter', value: 68 },
-    { label: 'React Advanced', value: 52 },
-    { label: 'UI Design', value: 44 },
-];
+type TodaySession = {
+    id: string;
+    student: string;
+    time: string;
+    title: string;
+    type: string;
+};
 
-const activities = [
-    'Alya Prameswari joined Frontend Basics.',
-    'Megan Norton opened 3 mentor slots.',
-    'Design review schedule moved to 11:00.',
-];
+type UserComposition = {
+    activeAccounts: number;
+    verifiedProfiles: number;
+};
 
-export default function Dashboard() {
+const statIcons = {
+    Mentors: UserRoundCheck,
+    Schedules: CalendarDays,
+    Students: GraduationCap,
+};
+
+export default function Dashboard({
+    activities,
+    programProgress,
+    stats,
+    todaySessions,
+    userComposition,
+}: {
+    activities: string[];
+    programProgress: ProgramProgress[];
+    stats: DashboardStat[];
+    todaySessions: TodaySession[];
+    userComposition: UserComposition;
+}) {
     return (
         <>
             <Head title="Dashboard" />
@@ -102,7 +90,11 @@ export default function Dashboard() {
                         <Card key={item.label}>
                             <CardContent className="flex items-center gap-4 px-6 py-5">
                                 <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                                    <item.icon className="size-5" />
+                                    {(() => {
+                                        const Icon = statIcons[item.label];
+
+                                        return <Icon className="size-5" />;
+                                    })()}
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <p className="text-sm text-muted-foreground">
@@ -131,24 +123,32 @@ export default function Dashboard() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-5">
-                            {cohorts.map((item) => (
-                                <div key={item.label}>
-                                    <div className="mb-2 flex items-center justify-between text-sm">
-                                        <span className="font-medium">
-                                            {item.label}
-                                        </span>
-                                        <span className="text-muted-foreground">
-                                            {item.value}%
-                                        </span>
+                            {programProgress.length > 0 ? (
+                                programProgress.map((item) => (
+                                    <div key={item.label}>
+                                        <div className="mb-2 flex items-center justify-between text-sm">
+                                            <span className="font-medium">
+                                                {item.label}
+                                            </span>
+                                            <span className="text-muted-foreground">
+                                                {item.value}%
+                                            </span>
+                                        </div>
+                                        <div className="h-3 rounded-full bg-muted">
+                                            <div
+                                                className="h-full rounded-full bg-primary"
+                                                style={{
+                                                    width: `${item.value}%`,
+                                                }}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="h-3 rounded-full bg-muted">
-                                        <div
-                                            className="h-full rounded-full bg-primary"
-                                            style={{ width: `${item.value}%` }}
-                                        />
-                                    </div>
+                                ))
+                            ) : (
+                                <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                                    No program enrollment data yet.
                                 </div>
-                            ))}
+                            )}
                         </CardContent>
                     </Card>
 
@@ -160,25 +160,34 @@ export default function Dashboard() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {schedules.map((item) => (
-                                <div
-                                    key={item.title}
-                                    className="rounded-2xl border p-4"
-                                >
-                                    <div className="flex items-center justify-between gap-3">
-                                        <p className="font-medium">
-                                            {item.title}
+                            {todaySessions.length > 0 ? (
+                                todaySessions.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className="rounded-2xl border p-4"
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <p className="font-medium">
+                                                {item.title}
+                                            </p>
+                                            <Badge variant="outline">
+                                                {item.type}
+                                            </Badge>
+                                        </div>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            {item.student}
                                         </p>
-                                        <Badge variant="outline">
-                                            {item.type}
-                                        </Badge>
+                                        <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                                            <Clock3 className="size-4" />
+                                            {item.time}
+                                        </p>
                                     </div>
-                                    <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-                                        <Clock3 className="size-4" />
-                                        {item.time}
-                                    </p>
+                                ))
+                            ) : (
+                                <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                                    No sessions scheduled today.
                                 </div>
-                            ))}
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -195,7 +204,7 @@ export default function Dashboard() {
                             <div className="rounded-2xl border p-5">
                                 <UsersRound className="size-5 text-primary" />
                                 <p className="mt-4 text-3xl font-semibold">
-                                    216
+                                    {userComposition.activeAccounts}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
                                     Total active accounts
@@ -204,7 +213,7 @@ export default function Dashboard() {
                             <div className="rounded-2xl border p-5">
                                 <CheckCircle2 className="size-5 text-primary" />
                                 <p className="mt-4 text-3xl font-semibold">
-                                    94%
+                                    {userComposition.verifiedProfiles}%
                                 </p>
                                 <p className="text-sm text-muted-foreground">
                                     Verified user profiles
@@ -221,15 +230,21 @@ export default function Dashboard() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {activities.map((activity) => (
-                                <div
-                                    key={activity}
-                                    className="flex items-start gap-3 rounded-2xl border p-4"
-                                >
-                                    <span className="mt-1 size-2 rounded-full bg-primary" />
-                                    <p className="text-sm">{activity}</p>
+                            {activities.length > 0 ? (
+                                activities.map((activity) => (
+                                    <div
+                                        key={activity}
+                                        className="flex items-start gap-3 rounded-2xl border p-4"
+                                    >
+                                        <span className="mt-1 size-2 rounded-full bg-primary" />
+                                        <p className="text-sm">{activity}</p>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                                    No recent activity yet.
                                 </div>
-                            ))}
+                            )}
                         </CardContent>
                     </Card>
                 </div>

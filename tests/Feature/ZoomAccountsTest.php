@@ -2,6 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\AcademicField;
+use App\Models\Program;
+use App\Models\ProgramEnrollment;
+use App\Models\ProgramVariant;
+use App\Models\SessionBooking;
+use App\Models\Subject;
 use App\Models\User;
 use App\Models\ZoomAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -35,6 +41,54 @@ class ZoomAccountsTest extends TestCase
                 ->has('accounts'));
     }
 
+    public function test_zoom_accounts_page_shows_nearest_full_account_release(): void
+    {
+        $this->travelTo('2026-07-10 09:30:00');
+
+        $user = User::factory()->admin()->create();
+        $firstFullAccount = ZoomAccount::factory()->create([
+            'name' => 'First Full Zoom',
+        ]);
+        $secondFullAccount = ZoomAccount::factory()->create([
+            'name' => 'Second Full Zoom',
+        ]);
+
+        SessionBooking::factory()->create([
+            'duration' => 60,
+            'scheduled_at' => '2026-07-10 09:00:00',
+            'status' => 'assigned',
+            'zoom_account_id' => $firstFullAccount->id,
+        ]);
+        SessionBooking::factory()->create([
+            'duration' => 120,
+            'scheduled_at' => '2026-07-10 09:15:00',
+            'status' => 'assigned',
+            'zoom_account_id' => $firstFullAccount->id,
+        ]);
+        SessionBooking::factory()->create([
+            'duration' => 120,
+            'scheduled_at' => '2026-07-10 09:00:00',
+            'status' => 'assigned',
+            'zoom_account_id' => $secondFullAccount->id,
+        ]);
+        SessionBooking::factory()->create([
+            'duration' => 120,
+            'scheduled_at' => '2026-07-10 09:10:00',
+            'status' => 'assigned',
+            'zoom_account_id' => $secondFullAccount->id,
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('zoom-accounts'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page): Assert => $page
+                ->component('admin/integrations/zoom-accounts')
+                ->where('capacity.fullAccounts', 2)
+                ->where('capacity.nearestRelease.name', 'First Full Zoom')
+                ->where('capacity.nearestRelease.releaseAt', 'Jul 10, 2026 10:00')
+            );
+    }
+
     public function test_admin_users_can_visit_a_zoom_account_detail_page(): void
     {
         $user = User::factory()->admin()->create();
@@ -63,6 +117,74 @@ class ZoomAccountsTest extends TestCase
                 ->where('breadcrumbs.0.title', 'Zoom Accounts')
                 ->where('breadcrumbs.1.title', 'AveRose Detail Room')
                 ->missing('breadcrumbs.2'));
+    }
+
+    public function test_zoom_account_detail_lists_scheduled_meetings(): void
+    {
+        $user = User::factory()->admin()->create();
+        $mentor = User::factory()->mentor()->create([
+            'name' => 'Raka Mentor',
+        ]);
+        $student = User::factory()->student()->create([
+            'name' => 'Sinta Student',
+        ]);
+        $account = ZoomAccount::factory()->create();
+        $field = AcademicField::factory()->create();
+        $subject = Subject::factory()->create([
+            'name' => 'IELTS Speaking',
+        ]);
+        $program = Program::factory()->create([
+            'name' => 'IELTS Intensive',
+        ]);
+        $variant = ProgramVariant::factory()->create([
+            'field_id' => $field->id,
+        ]);
+        $program->subjects()->attach($subject);
+        $enrollment = ProgramEnrollment::factory()->for($student)->create([
+            'field_id' => $field->id,
+            'program_id' => $program->id,
+            'program_variant_id' => $variant->id,
+        ]);
+
+        SessionBooking::factory()->create([
+            'duration' => 90,
+            'mentor_id' => $mentor->id,
+            'program_enrollment_id' => $enrollment->id,
+            'scheduled_at' => '2026-07-10 13:00:00',
+            'status' => 'assigned',
+            'subject_id' => $subject->id,
+            'user_id' => $student->id,
+            'zoom_account_id' => $account->id,
+            'zoom_link' => 'https://zoom.test/j/123',
+            'zoom_meeting_id' => '123',
+        ]);
+        SessionBooking::factory()->create([
+            'duration' => 60,
+            'mentor_id' => $mentor->id,
+            'program_enrollment_id' => $enrollment->id,
+            'scheduled_at' => now()->subDay(),
+            'status' => 'assigned',
+            'subject_id' => $subject->id,
+            'user_id' => $student->id,
+            'zoom_account_id' => $account->id,
+            'zoom_link' => 'https://zoom.test/j/past',
+            'zoom_meeting_id' => 'past',
+        ]);
+
+        $this->actingAs($user)
+            ->get(route('zoom-accounts.show', $account))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page): Assert => $page
+                ->component('admin/integrations/zoom-account-detail')
+                ->where('meetings.0.title', 'IELTS Speaking')
+                ->where('meetings.0.student', 'Sinta Student')
+                ->where('meetings.0.mentor', 'Raka Mentor')
+                ->where('meetings.0.program', 'IELTS Intensive')
+                ->where('meetings.0.meetingId', '123')
+                ->where('meetings.0.status', 'Assigned')
+                ->where('meetings.0.timingGroup', 'upcoming')
+                ->missing('meetings.1')
+            );
     }
 
     public function test_zoom_accounts_table_has_required_columns(): void

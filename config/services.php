@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'zoom' => [
+        'api_url' => env('ZOOM_API_URL', 'https://api.zoom.us/v2'),
+        'auth_url' => env('ZOOM_AUTH_URL', 'https://zoom.us/oauth/token'),
+        'create_real_meetings' => env('ZOOM_CREATE_REAL_MEETINGS', false),
+    ],
+
 ];

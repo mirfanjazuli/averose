@@ -1,5 +1,10 @@
 import { Link } from '@inertiajs/react';
-import { CalendarDays, ClipboardCheck, LayoutGrid } from 'lucide-react';
+import {
+    CalendarDays,
+    ClipboardCheck,
+    GraduationCap,
+    LayoutGrid,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -53,6 +58,18 @@ export function StudentSidebar() {
                             <Link href="/scheduling/schedules" prefetch>
                                 <CalendarDays />
                                 <span>Schedules</span>
+                            </Link>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton
+                            asChild
+                            isActive={isCurrentUrl('/enrollments')}
+                            tooltip={{ children: 'Enrollments' }}
+                        >
+                            <Link href="/enrollments" prefetch>
+                                <GraduationCap />
+                                <span>Enrollments</span>
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>

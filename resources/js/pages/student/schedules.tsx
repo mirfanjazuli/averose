@@ -1,14 +1,16 @@
 import { Head } from '@inertiajs/react';
 import {
-    ArrowUpRight,
     CheckCircle2,
     Clock3,
     GraduationCap,
     MonitorUp,
+    Search,
     UserRoundCheck,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { BookingSubjectOption } from '@/components/student-book-session-dialog';
+
+import { StudentBookSessionDialog } from '@/components/student-book-session-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,108 +20,71 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 
-const sessions = [
-    {
-        title: 'Responsive layout review',
-        mentor: 'Megan Norton',
-        program: 'Frontend Basics',
-        time: 'Today, 09:00 - 10:00',
-        status: 'Next',
-    },
-    {
-        title: 'Component composition',
-        mentor: 'Raka Mahendra',
-        program: 'React Advanced',
-        time: 'Wednesday, 14:00 - 15:00',
-        status: 'Confirmed',
-    },
-    {
-        title: 'Portfolio feedback',
-        mentor: 'Nadia Putri',
-        program: 'UI Design',
-        time: 'Friday, 10:00 - 11:00',
-        status: 'Confirmed',
-    },
-];
+type StudentSession = {
+    endAt: string;
+    id: string;
+    mentor: string;
+    program: string;
+    startAt: string;
+    status: string;
+    time: string;
+    title: string;
+    zoomLink: string | null;
+};
 
-const week = [
-    { day: 'Mon', date: '12', active: false },
-    { day: 'Tue', date: '13', active: true },
-    { day: 'Wed', date: '14', active: false },
-    { day: 'Thu', date: '15', active: false },
-    { day: 'Fri', date: '16', active: false },
-];
+function sessionDay(session: StudentSession) {
+    const dateValue = new Date(session.startAt);
 
-const subjects = [
-    {
-        value: 'frontend-basics',
-        label: 'Frontend Basics',
-        mentor: 'Megan Norton',
-    },
-    {
-        value: 'react-advanced',
-        label: 'React Advanced',
-        mentor: 'Raka Mahendra',
-    },
-    {
-        value: 'ui-design',
-        label: 'UI Design',
-        mentor: 'Nadia Putri',
-    },
-];
-
-const bookingSteps = ['Subject', 'Date & time', 'Confirm'] as const;
-
-export default function StudentSchedules() {
-    const [bookingOpen, setBookingOpen] = useState(false);
-    const [bookingStep, setBookingStep] = useState(0);
-    const [subject, setSubject] = useState('');
-    const [date, setDate] = useState('');
-    const [time, setTime] = useState('');
-
-    const selectedSubject = useMemo(
-        () => subjects.find((item) => item.value === subject),
-        [subject],
-    );
-
-    const canContinue =
-        bookingStep === 0
-            ? Boolean(subject)
-            : bookingStep === 1
-              ? Boolean(date && time)
-              : true;
-
-    const closeBooking = () => {
-        setBookingOpen(false);
-        setBookingStep(0);
+    return {
+        active: dateValue.toDateString() === new Date().toDateString(),
+        date: new Intl.DateTimeFormat('en-US', { day: '2-digit' }).format(
+            dateValue,
+        ),
+        day: new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(
+            dateValue,
+        ),
+        id: session.id,
     };
+}
 
-    const submitBooking = (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        setSubject('');
-        setDate('');
-        setTime('');
-        closeBooking();
-    };
+export default function StudentSchedules({
+    sessions,
+    subjects,
+}: {
+    sessions: StudentSession[];
+    subjects: BookingSubjectOption[];
+}) {
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const week = useMemo(() => sessions.slice(0, 5).map(sessionDay), [sessions]);
+    const nextSession = sessions[0] ?? null;
+    const filteredSessions = useMemo(() => {
+        const normalizedSearch = searchQuery.trim().toLowerCase();
+
+        if (!normalizedSearch) {
+            return sessions;
+        }
+
+        return sessions.filter((session) =>
+            [
+                session.title,
+                session.mentor,
+                session.program,
+                session.time,
+                session.status,
+            ].some((value) => value.toLowerCase().includes(normalizedSearch)),
+        );
+    }, [searchQuery, sessions]);
 
     return (
         <>
@@ -135,202 +100,14 @@ export default function StudentSchedules() {
                             timeline.
                         </p>
                     </div>
-                    <Dialog
-                        open={bookingOpen}
-                        onOpenChange={(open) => {
-                            setBookingOpen(open);
-
-                            if (!open) {
-                                setBookingStep(0);
-                            }
-                        }}
-                    >
-                        <DialogTrigger asChild>
-                            <Button className="gap-2">
-                                Book session
-                                <ArrowUpRight className="size-4" />
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-xl">
-                            <DialogHeader>
-                                <DialogTitle>Book session</DialogTitle>
-                                <DialogDescription>
-                                    Choose a subject, pick your preferred time,
-                                    then confirm the booking.
-                                </DialogDescription>
-                            </DialogHeader>
-
-                            <form onSubmit={submitBooking} className="space-y-6">
-                                <div className="grid grid-cols-3 gap-2">
-                                    {bookingSteps.map((step, index) => (
-                                        <div
-                                            key={step}
-                                            className={
-                                                index <= bookingStep
-                                                    ? 'rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-primary'
-                                                    : 'rounded-xl border px-3 py-2 text-muted-foreground'
-                                            }
-                                        >
-                                            <p className="text-xs">
-                                                Step {index + 1}
-                                            </p>
-                                            <p className="truncate text-sm font-medium">
-                                                {step}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {bookingStep === 0 && (
-                                    <div className="space-y-3">
-                                        <Label htmlFor="booking-subject">
-                                            Subject
-                                        </Label>
-                                        <Select
-                                            value={subject}
-                                            onValueChange={setSubject}
-                                        >
-                                            <SelectTrigger
-                                                id="booking-subject"
-                                                className="w-full"
-                                            >
-                                                <SelectValue placeholder="Select subject" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {subjects.map((item) => (
-                                                    <SelectItem
-                                                        key={item.value}
-                                                        value={item.value}
-                                                    >
-                                                        {item.label}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {selectedSubject && (
-                                            <div className="rounded-lg border p-4 text-sm">
-                                                <p className="font-medium">
-                                                    {selectedSubject.label}
-                                                </p>
-                                                <p className="mt-1 text-muted-foreground">
-                                                    Mentor:{' '}
-                                                    {selectedSubject.mentor}
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {bookingStep === 1 && (
-                                    <div className="grid gap-4 sm:grid-cols-2">
-                                        <div className="space-y-3">
-                                            <Label htmlFor="booking-date">
-                                                Date
-                                            </Label>
-                                            <Input
-                                                id="booking-date"
-                                                type="date"
-                                                value={date}
-                                                onChange={(event) =>
-                                                    setDate(event.target.value)
-                                                }
-                                            />
-                                        </div>
-                                        <div className="space-y-3">
-                                            <Label htmlFor="booking-time">
-                                                Time
-                                            </Label>
-                                            <Input
-                                                id="booking-time"
-                                                type="time"
-                                                value={time}
-                                                onChange={(event) =>
-                                                    setTime(event.target.value)
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-
-                                {bookingStep === 2 && (
-                                    <div className="space-y-3 rounded-lg border p-4">
-                                        <div className="flex items-start justify-between gap-4">
-                                            <div>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Subject
-                                                </p>
-                                                <p className="font-medium">
-                                                    {selectedSubject?.label}
-                                                </p>
-                                            </div>
-                                            <Badge variant="secondary">
-                                                Pending
-                                            </Badge>
-                                        </div>
-                                        <div className="grid gap-3 text-sm sm:grid-cols-2">
-                                            <div>
-                                                <p className="text-muted-foreground">
-                                                    Mentor
-                                                </p>
-                                                <p className="font-medium">
-                                                    {selectedSubject?.mentor}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <p className="text-muted-foreground">
-                                                    Schedule
-                                                </p>
-                                                <p className="font-medium">
-                                                    {date} at {time}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <DialogFooter>
-                                    {bookingStep > 0 && (
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() =>
-                                                setBookingStep(
-                                                    (currentStep) =>
-                                                        currentStep - 1,
-                                                )
-                                            }
-                                        >
-                                            Back
-                                        </Button>
-                                    )}
-                                    {bookingStep < bookingSteps.length - 1 ? (
-                                        <Button
-                                            type="button"
-                                            disabled={!canContinue}
-                                            onClick={() =>
-                                                setBookingStep(
-                                                    (currentStep) =>
-                                                        currentStep + 1,
-                                                )
-                                            }
-                                        >
-                                            Continue
-                                        </Button>
-                                    ) : (
-                                        <Button type="submit">
-                                            Confirm booking
-                                        </Button>
-                                    )}
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
+                    <StudentBookSessionDialog subjects={subjects} />
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-5">
-                    {week.map((item) => (
+                    {week.length > 0 ? (
+                        week.map((item) => (
                         <Card
-                            key={item.day}
+                            key={item.id}
                             className={
                                 item.active
                                     ? 'border-primary/30 bg-primary/10 py-4'
@@ -346,16 +123,103 @@ export default function StudentSchedules() {
                                 </p>
                             </CardContent>
                         </Card>
-                    ))}
+                        ))
+                    ) : (
+                        <Card className="py-4 md:col-span-5">
+                            <CardContent className="px-4 text-sm text-muted-foreground">
+                                No booked sessions yet.
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
+
+                <Card>
+                    <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                            <CardTitle>Upcoming sessions</CardTitle>
+                            <CardDescription>
+                                Your scheduled learning sessions.
+                            </CardDescription>
+                        </div>
+                        <div className="flex h-10 min-w-64 items-center gap-2 rounded-2xl border bg-background px-3 text-sm text-muted-foreground">
+                            <Search className="size-4" />
+                            <Input
+                                value={searchQuery}
+                                onChange={(event) =>
+                                    setSearchQuery(event.target.value)
+                                }
+                                placeholder="Search sessions..."
+                                className="h-auto border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0"
+                            />
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="rounded-2xl border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Session</TableHead>
+                                        <TableHead>Program</TableHead>
+                                        <TableHead>Mentor</TableHead>
+                                        <TableHead>Time</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="w-24 text-right" />
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredSessions.length > 0 ? (
+                                        filteredSessions.map((session) => (
+                                            <TableRow key={session.id}>
+                                                <TableCell className="font-medium">
+                                                    {session.title}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {session.program}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {session.mentor}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {session.time}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant="outline">
+                                                        {session.status}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                    >
+                                                        Details
+                                                    </Button>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell
+                                                colSpan={6}
+                                                className="h-24 text-center text-sm text-muted-foreground"
+                                            >
+                                                No sessions found.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </CardContent>
+                </Card>
 
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
                     <Card>
                         <CardHeader className="flex-row items-center justify-between gap-4">
                             <div>
-                                <CardTitle>Upcoming sessions</CardTitle>
+                                <CardTitle>This week</CardTitle>
                                 <CardDescription>
-                                    Your scheduled learning sessions.
+                                    Sessions grouped by upcoming day.
                                 </CardDescription>
                             </div>
                             <Badge variant="secondary">
@@ -363,42 +227,48 @@ export default function StudentSchedules() {
                             </Badge>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {sessions.map((session) => (
-                                <div
-                                    key={`${session.title}-${session.time}`}
-                                    className="grid gap-4 rounded-lg border p-4 md:grid-cols-[auto_minmax(0,1fr)_auto]"
-                                >
-                                    <div className="flex size-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                        <GraduationCap className="size-5" />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <h2 className="font-semibold">
-                                                {session.title}
-                                            </h2>
-                                            <Badge variant="outline">
-                                                {session.status}
-                                            </Badge>
+                            {sessions.length > 0 ? (
+                                sessions.map((session) => (
+                                    <div
+                                        key={session.id}
+                                        className="grid gap-4 rounded-lg border p-4 md:grid-cols-[auto_minmax(0,1fr)_auto]"
+                                    >
+                                        <div className="flex size-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                            <GraduationCap className="size-5" />
                                         </div>
-                                        <p className="mt-1 text-sm text-muted-foreground">
-                                            {session.program}
-                                        </p>
-                                        <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground">
-                                            <span className="flex items-center gap-1.5">
-                                                <Clock3 className="size-4" />
-                                                {session.time}
-                                            </span>
-                                            <span className="flex items-center gap-1.5">
-                                                <UserRoundCheck className="size-4" />
-                                                {session.mentor}
-                                            </span>
+                                        <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <h2 className="font-semibold">
+                                                    {session.title}
+                                                </h2>
+                                                <Badge variant="outline">
+                                                    {session.status}
+                                                </Badge>
+                                            </div>
+                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                {session.program}
+                                            </p>
+                                            <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground">
+                                                <span className="flex items-center gap-1.5">
+                                                    <Clock3 className="size-4" />
+                                                    {session.time}
+                                                </span>
+                                                <span className="flex items-center gap-1.5">
+                                                    <UserRoundCheck className="size-4" />
+                                                    {session.mentor}
+                                                </span>
+                                            </div>
                                         </div>
+                                        <Button variant="outline" size="sm">
+                                            Details
+                                        </Button>
                                     </div>
-                                    <Button variant="outline" size="sm">
-                                        Details
-                                    </Button>
+                                ))
+                            ) : (
+                                <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                                    No booked sessions yet.
                                 </div>
-                            ))}
+                            )}
                         </CardContent>
                     </Card>
 
@@ -417,16 +287,30 @@ export default function StudentSchedules() {
                                     </div>
                                     <div>
                                         <p className="font-medium">
-                                            Responsive layout review
+                                            {nextSession?.title ??
+                                                'No session booked'}
                                         </p>
                                         <p className="text-sm text-muted-foreground">
-                                            Starts today at 09:00
+                                            {nextSession?.time ??
+                                                'Book a session to see it here.'}
                                         </p>
                                     </div>
                                 </div>
-                                <Button className="mt-4 w-full">
-                                    Join session
-                                </Button>
+                                {nextSession?.zoomLink ? (
+                                    <Button asChild className="mt-4 w-full">
+                                        <a
+                                            href={nextSession.zoomLink}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                        >
+                                            Join session
+                                        </a>
+                                    </Button>
+                                ) : (
+                                    <Button className="mt-4 w-full" disabled>
+                                        Join session
+                                    </Button>
+                                )}
                             </div>
                             <div className="rounded-lg border p-4">
                                 <p className="flex items-center gap-2 font-medium">

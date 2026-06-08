@@ -2,7 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\AcademicField;
+use App\Models\Program;
+use App\Models\ProgramEnrollment;
+use App\Models\ProgramVariant;
+use App\Models\SessionBooking;
+use App\Models\Subject;
 use App\Models\User;
+use App\Models\ZoomAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -42,6 +49,54 @@ class SchedulesTest extends TestCase
         $response
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->component('mentor/schedules'));
+    }
+
+    public function test_mentor_schedules_receive_database_sessions(): void
+    {
+        $mentor = User::factory()->mentor()->create();
+        $student = User::factory()->student()->create([
+            'name' => 'Sinta Student',
+        ]);
+        $field = AcademicField::factory()->create();
+        $subject = Subject::factory()->create([
+            'name' => 'Writing Review',
+        ]);
+        $program = Program::factory()->create([
+            'name' => 'IELTS Intensive',
+        ]);
+        $variant = ProgramVariant::factory()->create([
+            'field_id' => $field->id,
+        ]);
+        $zoomAccount = ZoomAccount::factory()->create([
+            'name' => 'Mentor Zoom',
+        ]);
+        $enrollment = ProgramEnrollment::factory()->for($student)->create([
+            'field_id' => $field->id,
+            'program_id' => $program->id,
+            'program_variant_id' => $variant->id,
+        ]);
+
+        SessionBooking::factory()->create([
+            'mentor_id' => $mentor->id,
+            'program_enrollment_id' => $enrollment->id,
+            'scheduled_at' => '2026-07-10 13:00:00',
+            'status' => 'assigned',
+            'subject_id' => $subject->id,
+            'user_id' => $student->id,
+            'zoom_account_id' => $zoomAccount->id,
+            'zoom_link' => 'https://zoom.test/j/mentor',
+        ]);
+
+        $this->actingAs($mentor)
+            ->get(route('schedules'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page): Assert => $page
+                ->component('mentor/schedules')
+                ->where('sessions.0.title', 'Writing Review')
+                ->where('sessions.0.student', 'Sinta Student')
+                ->where('sessions.0.program', 'IELTS Intensive')
+                ->where('sessions.0.zoomAccount', 'Mentor Zoom')
+            );
     }
 
     public function test_student_users_can_visit_the_schedules_page(): void

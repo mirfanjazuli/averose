@@ -8,13 +8,15 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
-#[Fillable(['name', 'email', 'password', 'role'])]
+#[Fillable(['name', 'nickname', 'slug', 'email', 'password', 'role', 'status'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements PasskeyUser
 {
@@ -28,6 +30,7 @@ class User extends Authenticatable implements PasskeyUser
      */
     protected $attributes = [
         'role' => UserRole::Student->value,
+        'status' => 'active',
     ];
 
     /**
@@ -50,6 +53,11 @@ class User extends Authenticatable implements PasskeyUser
         return $this->role === UserRole::Admin;
     }
 
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
+
     public function isStudent(): bool
     {
         return $this->role === UserRole::Student;
@@ -58,5 +66,52 @@ class User extends Authenticatable implements PasskeyUser
     public function isMentor(): bool
     {
         return $this->role === UserRole::Mentor;
+    }
+
+    public function programEnrollments(): HasMany
+    {
+        return $this->hasMany(ProgramEnrollment::class);
+    }
+
+    public function mentorBookings(): HasMany
+    {
+        return $this->hasMany(SessionBooking::class, 'mentor_id');
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (User $user): void {
+            if ($user->isDirty('name') || blank($user->slug)) {
+                $user->slug = static::uniqueValue('slug', Str::slug($user->name) ?: 'user', $user);
+            }
+
+            if ($user->isDirty('name') || blank($user->nickname)) {
+                $user->nickname = static::uniqueValue('nickname', static::nicknameBase($user->name), $user);
+            }
+        });
+    }
+
+    private static function nicknameBase(string $name): string
+    {
+        $firstName = Str::of($name)->trim()->explode(' ')->filter()->first() ?? 'User';
+        $baseName = Str::of($firstName)->ascii()->replaceMatches('/[^A-Za-z0-9]/', '')->toString();
+
+        return Str::ucfirst(Str::lower($baseName ?: 'User'));
+    }
+
+    private static function uniqueValue(string $column, string $baseValue, User $user): string
+    {
+        $value = $baseValue;
+        $counter = 2;
+
+        while (static::query()
+            ->where($column, $value)
+            ->when($user->exists, fn ($query) => $query->whereKeyNot($user->getKey()))
+            ->exists()) {
+            $value = "{$baseValue}_{$counter}";
+            $counter++;
+        }
+
+        return $value;
     }
 }

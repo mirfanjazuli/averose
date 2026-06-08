@@ -1,6 +1,7 @@
 import { Form, Head, Link } from '@inertiajs/react';
 import {
     CalendarClock,
+    CircleAlert,
     Eye,
     MoreVertical,
     Pencil,
@@ -67,19 +68,36 @@ import {
 import { ZoomAccountForm } from '@/components/zoom-account-form';
 
 type ZoomAccount = {
+    activeMeetings?: number;
     id: number;
+    isFull?: boolean;
     name: string;
     slug: string;
     accountId: string;
     clientId: string;
     createdAt: string | null;
+    releaseAt?: string | null;
+    releaseIn?: string | null;
     updatedAt: string | null;
+};
+
+type CapacitySummary = {
+    fullAccounts: number;
+    nearestRelease: {
+        activeMeetings: number;
+        name: string;
+        releaseAt: string;
+        releaseIn: string;
+        slug: string;
+    } | null;
 };
 
 export default function ZoomAccounts({
     accounts,
+    capacity,
 }: {
     accounts: ZoomAccount[];
+    capacity: CapacitySummary;
 }) {
     const [addAccountDialogOpen, setAddAccountDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -297,13 +315,28 @@ export default function ZoomAccounts({
                     <Card>
                         <CardContent className="flex items-center gap-4 px-6 py-5">
                             <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                                <CalendarClock className="size-5" />
+                                {capacity.nearestRelease ? (
+                                    <CircleAlert className="size-5" />
+                                ) : (
+                                    <CalendarClock className="size-5" />
+                                )}
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <p className="text-sm text-muted-foreground">
-                                    Scheduled meetings
+                                    Full accounts
                                 </p>
-                                <p className="text-2xl font-semibold">0</p>
+                                <p className="text-2xl font-semibold">
+                                    {capacity.fullAccounts}
+                                </p>
+                                {capacity.nearestRelease && (
+                                    <Link
+                                        href={`/zoom-accounts/${capacity.nearestRelease.slug}`}
+                                        className="mt-1 block truncate text-xs text-primary hover:underline"
+                                    >
+                                        {capacity.nearestRelease.name} frees{' '}
+                                        {capacity.nearestRelease.releaseIn}
+                                    </Link>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -366,9 +399,28 @@ export default function ZoomAccounts({
                                                         {account.createdAt}
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Badge variant="default">
-                                                            Active
-                                                        </Badge>
+                                                        <div className="space-y-1">
+                                                            <Badge
+                                                                variant={
+                                                                    account.isFull
+                                                                        ? 'destructive'
+                                                                        : 'default'
+                                                                }
+                                                            >
+                                                                {account.isFull
+                                                                    ? 'Full'
+                                                                    : 'Active'}
+                                                            </Badge>
+                                                            {account.isFull &&
+                                                                account.releaseAt && (
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        Frees{' '}
+                                                                        {
+                                                                            account.releaseIn
+                                                                        }
+                                                                    </p>
+                                                                )}
+                                                        </div>
                                                     </TableCell>
                                                     <TableCell className="text-right">
                                                         <DropdownMenu>

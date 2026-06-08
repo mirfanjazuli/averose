@@ -5,7 +5,7 @@ import {
     Clock3,
     MessageSquareText,
     MonitorUp,
-    Star,
+    NotebookText,
     UsersRound,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -18,55 +18,41 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 
-const stats = [
-    {
-        label: 'Sessions today',
-        value: '4',
-        helper: '2 completed',
-        icon: CalendarCheck2,
-    },
-    {
-        label: 'Assigned students',
-        value: '18',
-        helper: '5 active programs',
-        icon: UsersRound,
-    },
-    {
-        label: 'Average rating',
-        value: '4.9',
-        helper: 'Last 30 days',
-        icon: Star,
-    },
-];
+type MentorStat = {
+    helper: string;
+    label: 'Sessions today' | 'Assigned students' | 'Teaching journal';
+    value: string;
+};
 
-const todaySchedules = [
-    {
-        student: 'Alya Prameswari',
-        program: 'Frontend Basics',
-        time: '09:00 - 10:00',
-        status: 'Next',
-    },
-    {
-        student: 'Raka Mahendra',
-        program: 'Laravel Starter',
-        time: '13:00 - 14:00',
-        status: 'Confirmed',
-    },
-    {
-        student: 'Nadia Putri',
-        program: 'React Advanced',
-        time: '16:00 - 17:00',
-        status: 'Confirmed',
-    },
-];
+type MentorSession = {
+    duration: string;
+    id: string;
+    program: string;
+    status: string;
+    student: string;
+    time: string;
+    title: string;
+    zoomAccount: string | null;
+    zoomLink: string | null;
+};
 
-const focusItems = [
-    'Review capstone progress for Frontend Basics cohort.',
-    'Prepare feedback notes for Laravel Starter students.',
-    'Open next week availability before 18:00.',
-];
+const statIcons = {
+    'Assigned students': UsersRound,
+    'Sessions today': CalendarCheck2,
+    'Teaching journal': NotebookText,
+};
 
-export default function MentorDashboard() {
+export default function MentorDashboard({
+    focusItems,
+    nextSession,
+    stats,
+    todaySessions,
+}: {
+    focusItems: string[];
+    nextSession: MentorSession | null;
+    stats: MentorStat[];
+    todaySessions: MentorSession[];
+}) {
     return (
         <>
             <Head title="Dashboard" />
@@ -81,35 +67,39 @@ export default function MentorDashboard() {
                             follow-up priorities.
                         </p>
                     </div>
-                    <Button asChild className="gap-2">
-                        <Link href="/settings/profile">
-                            Update availability
+                    <Button asChild variant="outline" className="gap-2">
+                        <Link href="/scheduling/schedules">
+                            View schedules
                             <ArrowUpRight className="size-4" />
                         </Link>
                     </Button>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-3">
-                    {stats.map((item) => (
-                        <Card key={item.label}>
-                            <CardContent className="flex items-center gap-4 px-6 py-5">
-                                <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                                    <item.icon className="size-5" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        {item.label}
-                                    </p>
-                                    <p className="mt-1 text-2xl font-semibold">
-                                        {item.value}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {item.helper}
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+                    {stats.map((item) => {
+                        const Icon = statIcons[item.label];
+
+                        return (
+                            <Card key={item.label}>
+                                <CardContent className="flex items-center gap-4 px-6 py-5">
+                                    <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                        <Icon className="size-5" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">
+                                            {item.label}
+                                        </p>
+                                        <p className="mt-1 text-2xl font-semibold">
+                                            {item.value}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {item.helper}
+                                        </p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
                 </div>
 
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -117,71 +107,102 @@ export default function MentorDashboard() {
                         <CardHeader>
                             <CardTitle>Today&apos;s sessions</CardTitle>
                             <CardDescription>
-                                Upcoming mentor sessions and student context.
+                                Sessions assigned to you today.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {todaySchedules.map((schedule) => (
-                                <div
-                                    key={`${schedule.student}-${schedule.time}`}
-                                    className="flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4"
-                                >
-                                    <div className="min-w-0">
-                                        <p className="font-medium">
-                                            {schedule.student}
-                                        </p>
-                                        <p className="mt-1 text-sm text-muted-foreground">
-                                            {schedule.program}
-                                        </p>
+                            {todaySessions.length > 0 ? (
+                                todaySessions.map((session) => (
+                                    <div
+                                        key={session.id}
+                                        className="flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="font-medium">
+                                                {session.student}
+                                            </p>
+                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                {session.title} ·{' '}
+                                                {session.program}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                <Clock3 className="size-4" />
+                                                {session.time}
+                                            </p>
+                                            <Badge variant="secondary">
+                                                {session.status}
+                                            </Badge>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                                            <Clock3 className="size-4" />
-                                            {schedule.time}
-                                        </p>
-                                        <Badge variant="secondary">
-                                            {schedule.status}
-                                        </Badge>
-                                    </div>
+                                ))
+                            ) : (
+                                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                                    No sessions scheduled today.
                                 </div>
-                            ))}
+                            )}
                         </CardContent>
                     </Card>
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>Session room</CardTitle>
+                            <CardTitle>Next session</CardTitle>
                             <CardDescription>
-                                Quick access for the next online session.
+                                Quick access to your upcoming room.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="rounded-lg border p-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                                        <MonitorUp className="size-5" />
+                            {nextSession ? (
+                                <div className="rounded-lg border p-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                                            <MonitorUp className="size-5" />
+                                        </div>
+                                        <div className="min-w-0">
+                                            <p className="truncate font-medium">
+                                                {nextSession.title}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {nextSession.student}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="font-medium">
-                                            Frontend Basics
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            Starts at 09:00
-                                        </p>
-                                    </div>
+                                    <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                                        <Clock3 className="size-4" />
+                                        {nextSession.time}
+                                    </p>
+                                    <Button
+                                        asChild={!!nextSession.zoomLink}
+                                        className="mt-4 w-full"
+                                        disabled={!nextSession.zoomLink}
+                                    >
+                                        {nextSession.zoomLink ? (
+                                            <a
+                                                href={nextSession.zoomLink}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                            >
+                                                Open room
+                                            </a>
+                                        ) : (
+                                            <span>Room not ready</span>
+                                        )}
+                                    </Button>
                                 </div>
-                                <Button className="mt-4 w-full">
-                                    Open room
-                                </Button>
-                            </div>
+                            ) : (
+                                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+                                    No upcoming session assigned.
+                                </div>
+                            )}
                             <div className="rounded-lg border p-4">
                                 <p className="flex items-center gap-2 font-medium">
                                     <MessageSquareText className="size-4 text-primary" />
-                                    Latest note
+                                    Focus
                                 </p>
                                 <p className="mt-2 text-sm text-muted-foreground">
-                                    Alya asked for extra review on responsive
-                                    layout composition.
+                                    Review student context before joining each
+                                    room.
                                 </p>
                             </div>
                         </CardContent>

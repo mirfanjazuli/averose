@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
 #[Fillable(['name', 'account_id', 'client_id', 'client_secret', 'token_secret'])]
@@ -19,6 +20,11 @@ class ZoomAccount extends Model
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    public function sessionBookings(): HasMany
+    {
+        return $this->hasMany(SessionBooking::class);
     }
 
     protected static function booted(): void

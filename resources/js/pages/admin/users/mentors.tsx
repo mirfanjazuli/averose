@@ -1,80 +1,83 @@
-import { Head } from '@inertiajs/react';
+import { Form, Head, Link } from '@inertiajs/react';
 import {
-    CalendarCheck,
-    Mail,
-    MoreHorizontal,
+    Eye,
+    MoreVertical,
+    Pencil,
     Plus,
     Search,
     ShieldCheck,
-    Star,
+    Trash2,
     UserCheck,
 } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import {
+    AlertDialog,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
-    DialogClose,
     DialogContent,
     DialogDescription,
-    DialogFooter,
     DialogHeader,
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import type { ManagedUser } from '@/components/user-management-form';
+import { UserManagementForm } from '@/components/user-management-form';
 
-const stats = [
-    { label: 'Total mentors', value: '32', icon: UserCheck },
-    { label: 'Active sessions', value: '76', icon: CalendarCheck },
-    { label: 'Verified mentors', value: '29', icon: ShieldCheck },
-];
+type User = ManagedUser & {
+    createdAt: string | null;
+    id: number;
+    slug: string;
+    status: string;
+    nickname: string;
+};
 
-const mentors = [
-    {
-        name: 'Megan Norton',
-        email: 'megan@example.com',
-        expertise: 'Product Design',
-        rating: '4.9',
-        status: 'Available',
-        avatar: 'https://i.pravatar.cc/96?img=32',
-    },
-    {
-        name: 'Floyd Miles',
-        email: 'floyd@example.com',
-        expertise: 'Frontend',
-        rating: '4.8',
-        status: 'Available',
-        avatar: 'https://i.pravatar.cc/96?img=12',
-    },
-    {
-        name: 'Guy Hawkins',
-        email: 'guy@example.com',
-        expertise: 'Backend',
-        rating: '4.7',
-        status: 'Busy',
-        avatar: 'https://i.pravatar.cc/96?img=33',
-    },
-    {
-        name: 'Kristin Watson',
-        email: 'kristin@example.com',
-        expertise: 'Career Coaching',
-        rating: '4.9',
-        status: 'Offline',
-        avatar: 'https://i.pravatar.cc/96?img=47',
-    },
-];
+export default function Mentors({ users }: { users: User[] }) {
+    const [addDialogOpen, setAddDialogOpen] = useState(false);
+    const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [deletingUser, setDeletingUser] = useState<User | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
-export default function Mentors() {
+    const filteredUsers = useMemo(() => {
+        const normalizedSearch = searchQuery.trim().toLowerCase();
+
+        if (!normalizedSearch) {
+            return users;
+        }
+
+        return users.filter((user) =>
+            [user.name, user.nickname, user.email, user.status].some((value) =>
+                value.toLowerCase().includes(normalizedSearch),
+            ),
+        );
+    }, [users, searchQuery]);
+
     return (
         <>
             <Head title="Mentors" />
@@ -85,10 +88,10 @@ export default function Mentors() {
                             Mentors
                         </h1>
                         <p className="mt-1 text-sm text-muted-foreground">
-                            Manage mentor profiles, expertise, and availability.
+                            Manage mentor accounts and access.
                         </p>
                     </div>
-                    <Dialog>
+                    <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
                         <DialogTrigger asChild>
                             <Button className="gap-2">
                                 <Plus className="size-4" />
@@ -99,198 +102,247 @@ export default function Mentors() {
                             <DialogHeader>
                                 <DialogTitle>Add mentor</DialogTitle>
                                 <DialogDescription>
-                                    Create a mentor profile with temporary
-                                    access details.
+                                    Create a mentor account with default access.
                                 </DialogDescription>
                             </DialogHeader>
-                            <form
-                                className="grid gap-4"
-                                onSubmit={(event) => event.preventDefault()}
-                            >
-                                <div className="grid gap-2">
-                                    <Label htmlFor="mentor-name">Name</Label>
-                                    <Input
-                                        id="mentor-name"
-                                        name="name"
-                                        placeholder="Mentor name"
-                                        autoComplete="name"
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="mentor-email">Email</Label>
-                                    <Input
-                                        id="mentor-email"
-                                        name="email"
-                                        type="email"
-                                        placeholder="mentor@example.com"
-                                        autoComplete="email"
-                                    />
-                                </div>
-                                <input
-                                    type="hidden"
-                                    name="password"
-                                    value="averose123"
-                                />
-                                <div className="grid gap-2">
-                                    <Label htmlFor="mentor-status">
-                                        Status
-                                    </Label>
-                                    <Select defaultValue="available">
-                                        <SelectTrigger
-                                            id="mentor-status"
-                                            className="w-full"
-                                        >
-                                            <SelectValue placeholder="Select status" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="available">
-                                                Available
-                                            </SelectItem>
-                                            <SelectItem value="busy">
-                                                Busy
-                                            </SelectItem>
-                                            <SelectItem value="offline">
-                                                Offline
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="mentor-expertise">
-                                        Expertise
-                                    </Label>
-                                    <Input
-                                        id="mentor-expertise"
-                                        name="expertise"
-                                        placeholder="Frontend, Backend, Product Design"
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="mentor-level">Level</Label>
-                                    <Select defaultValue="senior">
-                                        <SelectTrigger
-                                            id="mentor-level"
-                                            className="w-full"
-                                        >
-                                            <SelectValue placeholder="Select level" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="junior">
-                                                Junior
-                                            </SelectItem>
-                                            <SelectItem value="mid">
-                                                Mid
-                                            </SelectItem>
-                                            <SelectItem value="senior">
-                                                Senior
-                                            </SelectItem>
-                                            <SelectItem value="lead">
-                                                Lead
-                                            </SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <DialogFooter className="pt-2">
-                                    <DialogClose asChild>
-                                        <Button type="button" variant="outline">
-                                            Cancel
-                                        </Button>
-                                    </DialogClose>
-                                    <Button type="submit">Save mentor</Button>
-                                </DialogFooter>
-                            </form>
+                            <UserManagementForm
+                                action="/users/mentors"
+                                idPrefix="mentor"
+                                resetOnSuccess
+                                onSuccess={() => {
+                                    setAddDialogOpen(false);
+                                    toast.success('Mentor added.');
+                                }}
+                                onError={() =>
+                                    toast.error('Please check the mentor form.')
+                                }
+                                submitLabel="Save mentor"
+                            />
                         </DialogContent>
                     </Dialog>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
-                    {stats.map((item) => (
-                        <Card key={item.label}>
-                            <CardContent className="flex items-center gap-4 px-6 py-5">
-                                <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                                    <item.icon className="size-5" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        {item.label}
-                                    </p>
-                                    <p className="text-2xl font-semibold">
-                                        {item.value}
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+                <Dialog
+                    open={!!editingUser}
+                    onOpenChange={(open) => !open && setEditingUser(null)}
+                >
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Edit mentor</DialogTitle>
+                            <DialogDescription>
+                                Update mentor account details.
+                            </DialogDescription>
+                        </DialogHeader>
+                        {editingUser && (
+                            <UserManagementForm
+                                action={`/users/${editingUser.slug}`}
+                                idPrefix="edit-mentor"
+                                method="put"
+                                user={editingUser}
+                                onSuccess={() => {
+                                    setEditingUser(null);
+                                    toast.success('Mentor updated.');
+                                }}
+                                onError={() =>
+                                    toast.error('Please check the mentor form.')
+                                }
+                                submitLabel="Save changes"
+                            />
+                        )}
+                    </DialogContent>
+                </Dialog>
+
+                <AlertDialog
+                    open={!!deletingUser}
+                    onOpenChange={(open) => !open && setDeletingUser(null)}
+                >
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Delete mentor?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This will remove {deletingUser?.name} from
+                                mentor accounts.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        {deletingUser && (
+                            <Form
+                                action={`/users/${deletingUser.slug}`}
+                                method="delete"
+                                disableWhileProcessing
+                                onSuccess={() => {
+                                    setDeletingUser(null);
+                                    toast.success('Mentor deleted.');
+                                }}
+                                onError={() =>
+                                    toast.error('Unable to delete this mentor.')
+                                }
+                            >
+                                {({ processing }) => (
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel
+                                            type="button"
+                                            disabled={processing}
+                                        >
+                                            Cancel
+                                        </AlertDialogCancel>
+                                        <Button
+                                            type="submit"
+                                            variant="destructive"
+                                            disabled={processing}
+                                        >
+                                            Delete mentor
+                                        </Button>
+                                    </AlertDialogFooter>
+                                )}
+                            </Form>
+                        )}
+                    </AlertDialogContent>
+                </AlertDialog>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                    <Card>
+                        <CardContent className="flex items-center gap-4 px-6 py-5">
+                            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                                <UserCheck className="size-5" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">
+                                    Total mentors
+                                </p>
+                                <p className="text-2xl font-semibold">
+                                    {users.length}
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center gap-4 px-6 py-5">
+                            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                                <ShieldCheck className="size-5" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">
+                                    Active mentors
+                                </p>
+                                <p className="text-2xl font-semibold">
+                                    {
+                                        users.filter(
+                                            (user) => user.status === 'active',
+                                        ).length
+                                    }
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 <Card>
                     <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-                        <CardTitle>Mentor directory</CardTitle>
+                        <CardTitle>Mentor list</CardTitle>
                         <div className="flex h-10 min-w-64 items-center gap-2 rounded-2xl border bg-background px-3 text-sm text-muted-foreground">
                             <Search className="size-4" />
-                            <span>Search mentors...</span>
+                            <Input
+                                value={searchQuery}
+                                onChange={(event) =>
+                                    setSearchQuery(event.target.value)
+                                }
+                                placeholder="Search mentors..."
+                                className="h-auto border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0"
+                            />
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="divide-y rounded-2xl border">
-                            {mentors.map((mentor) => (
-                                <div
-                                    key={mentor.email}
-                                    className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_9rem_5rem_7rem_auto]"
-                                >
-                                    <div className="flex min-w-0 items-center gap-3">
-                                        <Avatar>
-                                            <AvatarImage
-                                                src={mentor.avatar}
-                                                alt={mentor.name}
-                                            />
-                                            <AvatarFallback>
-                                                {mentor.name
-                                                    .split(' ')
-                                                    .map((part) => part[0])
-                                                    .join('')}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <div className="min-w-0">
-                                            <p className="truncate font-medium">
-                                                {mentor.name}
-                                            </p>
-                                            <p className="flex items-center gap-1.5 truncate text-sm text-muted-foreground">
-                                                <Mail className="size-3.5" />
-                                                {mentor.email}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center">
-                                        <Badge variant="outline">
-                                            {mentor.expertise}
-                                        </Badge>
-                                    </div>
-                                    <div className="flex items-center gap-1 text-sm font-medium">
-                                        <Star className="size-4 fill-[#f2aa35] text-[#f2aa35]" />
-                                        {mentor.rating}
-                                    </div>
-                                    <div className="flex items-center">
-                                        <Badge
-                                            variant={
-                                                mentor.status === 'Available'
-                                                    ? 'default'
-                                                    : 'secondary'
-                                            }
-                                        >
-                                            {mentor.status}
-                                        </Badge>
-                                    </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon-sm"
-                                        className="rounded-full"
-                                    >
-                                        <MoreHorizontal className="size-4" />
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
+                        {users.length === 0 ? (
+                            <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                                No mentors added yet.
+                            </div>
+                        ) : (
+                            <div className="rounded-2xl border">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Name</TableHead>
+                                            <TableHead>Nickname</TableHead>
+                                            <TableHead>Email</TableHead>
+                                            <TableHead>Created</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="w-12 text-right" />
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredUsers.map((user) => (
+                                            <TableRow key={user.id}>
+                                                <TableCell className="font-medium">
+                                                    {user.name}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {user.nickname}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {user.email}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {user.createdAt}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge>{user.status}</Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger
+                                                            asChild
+                                                        >
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon-sm"
+                                                                className="rounded-full"
+                                                            >
+                                                                <MoreVertical className="size-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent
+                                                            align="end"
+                                                            className="w-40"
+                                                        >
+                                                            <DropdownMenuItem asChild>
+                                                                <Link
+                                                                    href={`/users/mentors/${user.slug}`}
+                                                                >
+                                                                    <Eye className="size-4" />
+                                                                    View
+                                                                </Link>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                onClick={() =>
+                                                                    setEditingUser(
+                                                                        user,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Pencil className="size-4" />
+                                                                Edit
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem
+                                                                variant="destructive"
+                                                                onClick={() =>
+                                                                    setDeletingUser(
+                                                                        user,
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Trash2 className="size-4" />
+                                                                Delete
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>
@@ -300,13 +352,7 @@ export default function Mentors() {
 
 Mentors.layout = {
     breadcrumbs: [
-        {
-            title: 'Users',
-            href: '/users/students',
-        },
-        {
-            title: 'Mentors',
-            href: '/users/mentors',
-        },
+        { title: 'Users', href: '/users/students' },
+        { title: 'Mentors', href: '/users/mentors' },
     ],
 };

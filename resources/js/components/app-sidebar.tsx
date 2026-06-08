@@ -44,12 +44,13 @@ export function AppSidebar() {
     const { isCurrentUrl } = useCurrentUrl();
     const isSchedulesOpen = isCurrentUrl('/scheduling', undefined, true);
     const isUsersOpen =
-        isCurrentUrl('/users/students') || isCurrentUrl('/users/mentors');
+        isCurrentUrl('/users/students', undefined, true) ||
+        isCurrentUrl('/users/mentors', undefined, true);
     const isAcademicsOpen =
-        isCurrentUrl('/academics/fields') ||
-        isCurrentUrl('/academics/programs') ||
-        isCurrentUrl('/academics/subjects') ||
-        isCurrentUrl('/academics/try-outs');
+        isCurrentUrl('/academics/fields', undefined, true) ||
+        isCurrentUrl('/academics/programs', undefined, true) ||
+        isCurrentUrl('/academics/subjects', undefined, true) ||
+        isCurrentUrl('/academics/try-outs', undefined, true);
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -206,6 +207,8 @@ export function AppSidebar() {
                                             asChild
                                             isActive={isCurrentUrl(
                                                 '/users/students',
+                                                undefined,
+                                                true,
                                             )}
                                         >
                                             <Link
@@ -222,6 +225,8 @@ export function AppSidebar() {
                                             asChild
                                             isActive={isCurrentUrl(
                                                 '/users/mentors',
+                                                undefined,
+                                                true,
                                             )}
                                         >
                                             <Link
@@ -277,6 +282,8 @@ export function AppSidebar() {
                                             asChild
                                             isActive={isCurrentUrl(
                                                 '/academics/programs',
+                                                undefined,
+                                                true,
                                             )}
                                         >
                                             <Link
