@@ -1,11 +1,13 @@
 <?php
 
 use App\Http\Controllers\Admin\AcademicFieldController;
+use App\Http\Controllers\Admin\MentorJournalController;
 use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\SessionAssignmentController;
 use App\Http\Controllers\Admin\SubjectController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\MentorSessionCompletionController;
 use App\Http\Controllers\SchedulesController;
 use App\Http\Controllers\SessionBookingController;
 use App\Http\Controllers\StudentEnrollmentsController;
@@ -49,6 +51,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::put('academics/subjects/{subject}', [SubjectController::class, 'update'])->name('subjects.update');
         Route::delete('academics/subjects/{subject}', [SubjectController::class, 'destroy'])->name('subjects.destroy');
         Route::inertia('academics/try-outs', 'admin/try-outs')->name('admin.try-outs');
+        Route::get('mentoring/journals', [MentorJournalController::class, 'index'])->name('mentoring.journals');
+        Route::get('mentoring/journals/{journal}', [MentorJournalController::class, 'show'])->name('mentoring.journals.show');
         Route::get('zoom-accounts', [ZoomAccountsController::class, 'index'])->name('zoom-accounts');
         Route::post('zoom-accounts', [ZoomAccountsController::class, 'store'])->name('zoom-accounts.store');
         Route::get('zoom-accounts/{zoom_account}', [ZoomAccountsController::class, 'show'])->name('zoom-accounts.show');
@@ -60,6 +64,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('enrollments', StudentEnrollmentsController::class)->name('enrollments');
         Route::post('scheduling/schedules/bookings', [SessionBookingController::class, 'store'])->name('session-bookings.store');
         Route::get('try-outs', TryOutsController::class)->name('try-outs');
+    });
+
+    Route::middleware('role:mentor')->group(function () {
+        Route::post('mentor/sessions/{session_booking}/complete', [MentorSessionCompletionController::class, 'store'])->name('mentor.sessions.complete');
     });
 });
 

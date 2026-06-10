@@ -28,6 +28,7 @@ class DashboardController extends Controller
                 'userComposition' => $this->adminUserComposition(),
             ]),
             UserRole::Mentor => Inertia::render('mentor/dashboard', [
+                'completionSession' => $this->mentorCompletionSession($request),
                 'focusItems' => $this->mentorFocusItems($request),
                 'nextSession' => $this->mentorNextSession($request),
                 'stats' => $this->mentorStats($request),
@@ -182,9 +183,8 @@ class DashboardController extends Controller
             [
                 'helper' => 'Completed sessions',
                 'label' => 'Teaching journal',
-                'value' => (string) SessionBooking::query()
-                    ->where('mentor_id', $mentorId)
-                    ->where('status', 'completed')
+                'value' => (string) $request->user()
+                    ->mentorJournals()
                     ->count(),
             ],
         ];
@@ -213,6 +213,27 @@ class DashboardController extends Controller
             ->first();
 
         return $booking ? $this->mentorSessionData($booking) : null;
+    }
+
+    private function mentorCompletionSession(Request $request): ?array
+    {
+        $booking = SessionBooking::query()
+            ->with(['subject:id,name', 'user:id,name', 'enrollment.program:id,name', 'zoomAccount:id,name'])
+            ->where('mentor_id', $request->user()->id)
+            ->where('scheduled_at', '<=', now())
+            ->whereIn('status', ['assigned', 'rescheduled'])
+            ->whereDoesntHave('mentorJournal')
+            ->orderByDesc('scheduled_at')
+            ->first();
+
+        if (! $booking) {
+            return null;
+        }
+
+        $session = $this->mentorSessionData($booking);
+        $session['needsCompletion'] = true;
+
+        return $session;
     }
 
     private function mentorFocusItems(Request $request): array
@@ -354,11 +375,23 @@ class DashboardController extends Controller
     {
         $startAt = $booking->scheduled_at;
         $endAt = $booking->scheduled_at->copy()->addMinutes($booking->duration);
+        $previousSession = SessionBooking::query()
+            ->with('mentorJournal:id,session_booking_id,next_improvement_plan')
+            ->where('mentor_id', $booking->mentor_id)
+            ->where('user_id', $booking->user_id)
+            ->where('scheduled_at', '<', $booking->scheduled_at)
+            ->where('status', 'completed')
+            ->whereHas('mentorJournal')
+            ->latest('scheduled_at')
+            ->first();
 
         return [
             'duration' => "{$booking->duration} minutes",
             'endAt' => $endAt->toJSON(),
             'id' => (string) $booking->id,
+            'improvementPlan' => $previousSession
+                ? $previousSession->mentorJournal?->next_improvement_plan
+                : 'No previous improvement plan recorded yet.',
             'program' => $booking->enrollment?->program?->name ?? '-',
             'startAt' => $startAt->toJSON(),
             'status' => Str::headline($booking->status),

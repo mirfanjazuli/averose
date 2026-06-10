@@ -12,6 +12,7 @@ import {
     Layers3,
     LibraryBig,
     Repeat2,
+    NotebookPen,
     Shapes,
     UserRoundCheck,
     UsersRound,
@@ -51,6 +52,7 @@ export function AppSidebar() {
         isCurrentUrl('/academics/programs', undefined, true) ||
         isCurrentUrl('/academics/subjects', undefined, true) ||
         isCurrentUrl('/academics/try-outs', undefined, true);
+    const isMentoringOpen = isCurrentUrl('/mentoring', undefined, true);
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -324,6 +326,47 @@ export function AppSidebar() {
                                             >
                                                 <ClipboardList />
                                                 <span>Try Out</span>
+                                            </Link>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                </SidebarMenuSub>
+                            </CollapsibleContent>
+                        </SidebarMenuItem>
+                    </Collapsible>
+
+                    <Collapsible
+                        asChild
+                        defaultOpen={isMentoringOpen}
+                        className="group/collapsible"
+                    >
+                        <SidebarMenuItem>
+                            <CollapsibleTrigger asChild>
+                                <SidebarMenuButton
+                                    isActive={isMentoringOpen}
+                                    tooltip={{ children: 'Mentoring' }}
+                                >
+                                    <UserRoundCheck />
+                                    <span>Mentoring</span>
+                                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                                </SidebarMenuButton>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                                <SidebarMenuSub>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton
+                                            asChild
+                                            isActive={isCurrentUrl(
+                                                '/mentoring/journals',
+                                                undefined,
+                                                true,
+                                            )}
+                                        >
+                                            <Link
+                                                href="/mentoring/journals"
+                                                prefetch
+                                            >
+                                                <NotebookPen />
+                                                <span>Journals</span>
                                             </Link>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
