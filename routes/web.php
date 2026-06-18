@@ -15,7 +15,7 @@ use App\Http\Controllers\TryOutsController;
 use App\Http\Controllers\ZoomAccountsController;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/login')->name('home');
+Route::inertia('/', 'welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');

@@ -2,17 +2,18 @@
 
 namespace Tests\Feature;
 
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
-    use RefreshDatabase;
-
-    public function test_home_page_redirects_to_login(): void
+    public function test_home_page_displays_the_landing_page(): void
     {
         $response = $this->get(route('home'));
 
-        $response->assertRedirect(route('login'));
+        $response->assertOk();
+        $response->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('welcome')
+        );
     }
 }
