@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ProgramEnrollment;
 use App\Models\SessionBooking;
+use App\Models\SessionRecording;
 use App\Models\User;
 use App\UserRole;
 use Illuminate\Http\Request;
@@ -35,6 +36,7 @@ class DashboardController extends Controller
                 'todaySessions' => $this->mentorTodaySessions($request),
             ]),
             UserRole::Student => Inertia::render('student/dashboard', [
+                'recordings' => $this->studentRecordings($request),
                 'sessions' => $this->studentSessions($request, 5),
                 'stats' => $this->studentStats($request),
                 'subjects' => $this->studentSubjectOptions($request),
@@ -348,6 +350,29 @@ class DashboardController extends Controller
                 'value' => 'react-advanced',
             ],
         ];
+    }
+
+    private function studentRecordings(Request $request): array
+    {
+        return SessionRecording::query()
+            ->with(['sessionBooking.subject:id,name', 'sessionBooking.mentor:id,name'])
+            ->where('user_id', $request->user()->id)
+            ->latest('recorded_at')
+            ->latest()
+            ->limit(6)
+            ->get()
+            ->map(function (SessionRecording $recording): array {
+                return [
+                    'id' => (string) $recording->id,
+                    'mentor' => $recording->sessionBooking?->mentor?->name ?? '-',
+                    'recordedAt' => $recording->recorded_at?->toJSON(),
+                    'subject' => $recording->sessionBooking?->subject?->name ?? 'Session',
+                    'title' => $recording->title,
+                    'youtubeEmbedUrl' => "https://www.youtube-nocookie.com/embed/{$recording->youtube_video_id}",
+                    'youtubeUrl' => $recording->youtube_url,
+                ];
+            })
+            ->all();
     }
 
     private function sessionData(SessionBooking $booking): array

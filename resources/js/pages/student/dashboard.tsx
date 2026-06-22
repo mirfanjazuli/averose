@@ -7,6 +7,7 @@ import {
     Clock3,
     GraduationCap,
     MonitorUp,
+    PlayCircle,
 } from 'lucide-react';
 import type { BookingSubjectOption } from '@/components/student-book-session-dialog';
 
@@ -33,6 +34,16 @@ type StudentSession = {
     zoomLink: string | null;
 };
 
+type StudentRecording = {
+    id: string;
+    mentor: string;
+    recordedAt: string | null;
+    subject: string;
+    title: string;
+    youtubeEmbedUrl: string;
+    youtubeUrl: string;
+};
+
 type StudentStats = {
     activePrograms: number;
     completedLessons: number;
@@ -41,10 +52,12 @@ type StudentStats = {
 };
 
 export default function StudentDashboard({
+    recordings,
     sessions,
     stats,
     subjects,
 }: {
+    recordings: StudentRecording[];
     sessions: StudentSession[];
     stats: StudentStats;
     subjects: BookingSubjectOption[];
@@ -241,6 +254,66 @@ export default function StudentDashboard({
                         </CardContent>
                     </Card>
                 </div>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Session recordings</CardTitle>
+                        <CardDescription>
+                            Uploaded mentor session videos from YouTube.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {recordings.length > 0 ? (
+                            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                                {recordings.map((recording) => (
+                                    <div
+                                        key={recording.id}
+                                        className="overflow-hidden rounded-lg border"
+                                    >
+                                        <div className="aspect-video bg-muted">
+                                            <iframe
+                                                className="h-full w-full"
+                                                src={recording.youtubeEmbedUrl}
+                                                title={recording.title}
+                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                                allowFullScreen
+                                            />
+                                        </div>
+                                        <div className="space-y-3 p-4">
+                                            <div>
+                                                <p className="line-clamp-2 font-medium">
+                                                    {recording.title}
+                                                </p>
+                                                <p className="mt-1 text-sm text-muted-foreground">
+                                                    {recording.subject} -{' '}
+                                                    {recording.mentor}
+                                                </p>
+                                            </div>
+                                            <Button
+                                                asChild
+                                                variant="outline"
+                                                className="w-full gap-2"
+                                            >
+                                                <a
+                                                    href={recording.youtubeUrl}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                >
+                                                    <PlayCircle className="size-4" />
+                                                    Watch video
+                                                </a>
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                                No session recordings uploaded yet.
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
         </>
     );

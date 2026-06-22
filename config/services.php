@@ -41,4 +41,8 @@ return [
         'create_real_meetings' => env('ZOOM_CREATE_REAL_MEETINGS', false),
     ],
 
+    'n8n' => [
+        'webhook_token' => env('N8N_WEBHOOK_TOKEN'),
+    ],
+
 ];

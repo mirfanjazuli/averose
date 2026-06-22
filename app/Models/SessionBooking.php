@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['user_id', 'mentor_id', 'zoom_account_id', 'program_enrollment_id', 'subject_id', 'scheduled_at', 'duration', 'zoom_link', 'zoom_meeting_id', 'zoom_start_url', 'zoom_passcode', 'assigned_at', 'status'])]
@@ -43,6 +44,11 @@ class SessionBooking extends Model
     public function mentorJournal(): HasOne
     {
         return $this->hasOne(MentorJournal::class);
+    }
+
+    public function recordings(): HasMany
+    {
+        return $this->hasMany(SessionRecording::class);
     }
 
     /**

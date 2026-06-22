@@ -83,6 +83,11 @@ class User extends Authenticatable implements PasskeyUser
         return $this->hasMany(MentorJournal::class, 'mentor_id');
     }
 
+    public function sessionRecordings(): HasMany
+    {
+        return $this->hasMany(SessionRecording::class);
+    }
+
     protected static function booted(): void
     {
         static::saving(function (User $user): void {
