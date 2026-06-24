@@ -62,14 +62,7 @@ class StoreSessionBookingRequest extends FormRequest
                     $validator->errors()->add('subject_id', 'There are no remaining sessions for this enrollment.');
                 }
 
-                $scheduledAt = CarbonImmutable::parse(
-                    "{$this->string('date')} {$this->string('time')}",
-                    config('app.timezone'),
-                );
-
-                if ($scheduledAt->lessThan(now()->addHours(5))) {
-                    $validator->errors()->add('time', 'Session time must be at least 5 hours from now.');
-                }
+                CarbonImmutable::parse("{$this->string('date')} {$this->string('time')}", config('app.timezone'));
             },
         ];
     }

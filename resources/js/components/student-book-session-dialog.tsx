@@ -122,14 +122,6 @@ function calendarMonthDays(monthDate: Date): (Date | null)[] {
     return days;
 }
 
-function selectedDateTime(date: string, time: string): Date | null {
-    if (!date || !time) {
-        return null;
-    }
-
-    return new Date(`${date}T${time}:00`);
-}
-
 function TimePicker({
     disabled,
     onChange,
@@ -195,9 +187,6 @@ export function StudentBookSessionDialog({
     const [visibleMonth, setVisibleMonth] = useState(
         () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     );
-    const [minimumBookingTime, setMinimumBookingTime] =
-        useState<Date | null>(null);
-
     const selectedSubject = useMemo(
         () => subjects.find((item) => item.value === subject),
         [subject, subjects],
@@ -206,12 +195,6 @@ export function StudentBookSessionDialog({
         () => calendarMonthDays(visibleMonth),
         [visibleMonth],
     );
-    const sessionDateTime = selectedDateTime(date, time);
-    const isTooSoon = Boolean(
-        sessionDateTime &&
-            minimumBookingTime &&
-            sessionDateTime < minimumBookingTime,
-    );
     const hasRemainingSession =
         selectedSubject?.sessionsRemaining === null ||
         (selectedSubject?.sessionsRemaining ?? 0) > 0;
@@ -219,8 +202,7 @@ export function StudentBookSessionDialog({
         date &&
             time &&
             selectedSubject?.enrollmentId &&
-            hasRemainingSession &&
-            !isTooSoon,
+            hasRemainingSession,
     );
     const endTime =
         selectedSubject && time ? addMinutes(time, selectedSubject.duration) : '';
@@ -248,12 +230,6 @@ export function StudentBookSessionDialog({
             open={bookingOpen}
             onOpenChange={(open) => {
                 setBookingOpen(open);
-
-                if (open) {
-                    setMinimumBookingTime(
-                        new Date(Date.now() + 5 * 60 * 60 * 1000),
-                    );
-                }
 
                 if (!open) {
                     resetBooking();
@@ -402,12 +378,6 @@ export function StudentBookSessionDialog({
                                         {!date && (
                                             <p className="mt-2 text-xs text-muted-foreground">
                                                 Select a date first.
-                                            </p>
-                                        )}
-                                        {isTooSoon && (
-                                            <p className="mt-2 text-xs text-destructive">
-                                                Pick a time at least 5 hours
-                                                from now.
                                             </p>
                                         )}
                                         {errors.time && (

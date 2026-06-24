@@ -42,7 +42,7 @@ class SessionBookingTest extends TestCase
         CarbonImmutable::setTestNow();
     }
 
-    public function test_student_cannot_book_less_than_five_hours_from_now(): void
+    public function test_student_can_book_less_than_five_hours_from_now(): void
     {
         CarbonImmutable::setTestNow('2026-06-06 15:00:00');
         [$student, $enrollment, $subject] = $this->bookingFixture();
@@ -54,10 +54,15 @@ class SessionBookingTest extends TestCase
                 'date' => '2026-06-06',
                 'time' => '19:59',
             ])
-            ->assertSessionHasErrors('time');
+            ->assertRedirect();
 
-        $this->assertDatabaseCount('session_bookings', 0);
-        $this->assertSame(0, $enrollment->refresh()->sessions_used);
+        $this->assertDatabaseHas('session_bookings', [
+            'user_id' => $student->id,
+            'program_enrollment_id' => $enrollment->id,
+            'subject_id' => $subject->id,
+            'status' => 'pending',
+        ]);
+        $this->assertSame(1, $enrollment->refresh()->sessions_used);
 
         CarbonImmutable::setTestNow();
     }

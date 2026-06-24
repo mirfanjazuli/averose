@@ -41,12 +41,6 @@ class SessionBookingController extends Controller
                 config('app.timezone'),
             );
 
-            if ($scheduledAt->lessThan(now()->addHours(5))) {
-                throw ValidationException::withMessages([
-                    'time' => 'Session time must be at least 5 hours from now.',
-                ]);
-            }
-
             SessionBooking::query()->create([
                 'user_id' => $request->user()->id,
                 'program_enrollment_id' => $enrollment->id,
