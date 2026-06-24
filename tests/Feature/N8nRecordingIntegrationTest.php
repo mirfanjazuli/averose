@@ -104,6 +104,26 @@ class N8nRecordingIntegrationTest extends TestCase
             ->assertUnprocessable();
     }
 
+    public function test_n8n_rejects_recording_when_meeting_id_differs_even_with_start_time(): void
+    {
+        [, , $account] = $this->bookingFixture();
+
+        $this->withHeader('X-N8N-Token', 'n8n-secret')
+            ->postJson(route('n8n.youtube-recordings.store'), [
+                'account_id' => $account->account_id,
+                'app_key' => $account->slug,
+                'meeting_id' => 'different-meeting-id-format',
+                'start_time' => '2026-06-18T10:00:00Z',
+                'title' => 'Fallback Matching Recording',
+                'youtube_url' => '',
+                'youtube_video_id' => 'fallback123',
+            ])
+            ->assertUnprocessable()
+            ->assertJson([
+                'message' => 'No session booking matches this Zoom meeting.',
+            ]);
+    }
+
     private function bookingFixture(): array
     {
         $student = User::factory()->student()->create();

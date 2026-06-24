@@ -27,7 +27,7 @@ class YoutubeRecordingController extends Controller
             'recording_type' => ['nullable', 'string'],
             'start_time' => ['nullable', 'date'],
             'title' => ['nullable', 'string', 'max:255'],
-            'youtube_url' => ['nullable', 'url'],
+            'youtube_url' => ['nullable', 'string'],
             'youtube_video_id' => ['required', 'string', 'max:255'],
         ]);
 
@@ -46,9 +46,14 @@ class YoutubeRecordingController extends Controller
             ->where('zoom_meeting_id', $validated['meeting_id'])
             ->first();
 
-        abort_unless($booking, Response::HTTP_UNPROCESSABLE_ENTITY, 'No session booking matches this Zoom meeting.');
+        if (! $booking) {
+            return response()->json([
+                'message' => 'No session booking matches this Zoom meeting.',
+                'received' => Arr::only($validated, ['app_key', 'account_id', 'meeting_id', 'meeting_uuid', 'start_time', 'youtube_video_id']),
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
-        $youtubeUrl = $validated['youtube_url'] ?? "https://www.youtube.com/watch?v={$validated['youtube_video_id']}";
+        $youtubeUrl = $this->youtubeUrl($validated);
 
         $recording = SessionRecording::query()->updateOrCreate(
             ['youtube_video_id' => $validated['youtube_video_id']],
@@ -71,6 +76,20 @@ class YoutubeRecordingController extends Controller
             'id' => (string) $recording->id,
             'status' => $recording->wasRecentlyCreated ? 'created' : 'updated',
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function youtubeUrl(array $validated): string
+    {
+        $youtubeUrl = (string) ($validated['youtube_url'] ?? '');
+
+        if (filter_var($youtubeUrl, FILTER_VALIDATE_URL)) {
+            return $youtubeUrl;
+        }
+
+        return "https://www.youtube.com/watch?v={$validated['youtube_video_id']}";
     }
 
     private function abortWhenTokenIsInvalid(Request $request): void
