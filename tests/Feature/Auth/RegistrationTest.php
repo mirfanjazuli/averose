@@ -3,6 +3,7 @@
 namespace Tests\Feature\Auth;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\Rules\Password;
 use Laravel\Fortify\Features;
 use Tests\TestCase;
 
@@ -35,5 +36,10 @@ class RegistrationTest extends TestCase
 
         $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
+    }
+
+    public function test_password_rules_only_require_eight_characters()
+    {
+        $this->assertSame('minlength: 8;', Password::defaults()->toPasswordRulesString());
     }
 }

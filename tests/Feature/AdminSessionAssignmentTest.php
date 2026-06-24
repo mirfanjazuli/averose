@@ -11,6 +11,7 @@ use App\Models\Subject;
 use App\Models\User;
 use App\Models\ZoomAccount;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -109,6 +110,7 @@ class AdminSessionAssignmentTest extends TestCase
             'services.zoom.api_url' => 'https://api.zoom.test/v2',
             'services.zoom.auth_url' => 'https://zoom.test/oauth/token',
             'services.zoom.create_real_meetings' => true,
+            'app.timezone' => 'Asia/Jakarta',
         ]);
 
         Http::fake([
@@ -149,6 +151,14 @@ class AdminSessionAssignmentTest extends TestCase
         $this->assertSame('abc123', $booking->zoom_passcode);
         $this->assertSame('https://zoom.test/s/987654321', $booking->zoom_start_url);
         Http::assertSentCount(2);
+        Http::assertSent(function (Request $request): bool {
+            if ($request->url() !== 'https://api.zoom.test/v2/users/me/meetings') {
+                return false;
+            }
+
+            return $request->data()['start_time'] === '2026-07-10T09:00:00'
+                && $request->data()['timezone'] === 'Asia/Jakarta';
+        });
     }
 
     public function test_admin_cannot_assign_when_all_zoom_accounts_are_full(): void

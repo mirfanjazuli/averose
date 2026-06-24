@@ -28,7 +28,10 @@ class ZoomMeetingService
                     'join_before_host' => false,
                     'waiting_room' => true,
                 ],
-                'start_time' => $booking->scheduled_at->toIso8601String(),
+                'start_time' => $booking->scheduled_at
+                    ->copy()
+                    ->timezone(config('app.timezone'))
+                    ->format('Y-m-d\TH:i:s'),
                 'timezone' => config('app.timezone'),
                 'topic' => $this->topic($booking),
                 'type' => 2,
