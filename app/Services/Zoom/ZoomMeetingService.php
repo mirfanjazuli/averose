@@ -26,7 +26,7 @@ class ZoomMeetingService
                     'approval_type' => 2,
                     'auto_recording' => 'cloud',
                     'join_before_host' => true,
-                    'waiting_room' => true,
+                    'waiting_room' => false,
                 ],
                 'start_time' => $booking->scheduled_at
                     ->copy()
