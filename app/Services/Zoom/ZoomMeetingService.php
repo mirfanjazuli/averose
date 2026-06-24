@@ -24,8 +24,8 @@ class ZoomMeetingService
                 'duration' => $booking->duration,
                 'settings' => [
                     'approval_type' => 2,
-                    'auto_recording' => 'none',
-                    'join_before_host' => false,
+                    'auto_recording' => 'cloud',
+                    'join_before_host' => true,
                     'waiting_room' => true,
                 ],
                 'start_time' => $booking->scheduled_at

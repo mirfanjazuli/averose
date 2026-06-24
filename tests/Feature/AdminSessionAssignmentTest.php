@@ -156,7 +156,9 @@ class AdminSessionAssignmentTest extends TestCase
                 return false;
             }
 
-            return $request->data()['start_time'] === '2026-07-10T09:00:00'
+            return $request->data()['settings']['auto_recording'] === 'cloud'
+                && $request->data()['settings']['join_before_host'] === true
+                && $request->data()['start_time'] === '2026-07-10T09:00:00'
                 && $request->data()['timezone'] === 'Asia/Jakarta';
         });
     }
