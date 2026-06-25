@@ -4,6 +4,7 @@ import {
     ClipboardCheck,
     GraduationCap,
     LayoutGrid,
+    Video,
 } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavUser } from '@/components/nav-user';
@@ -46,6 +47,18 @@ export function StudentSidebar() {
                             <Link href="/dashboard" prefetch>
                                 <LayoutGrid />
                                 <span>Dashboard</span>
+                            </Link>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton
+                            asChild
+                            isActive={isCurrentUrl('/recordings')}
+                            tooltip={{ children: 'Recordings' }}
+                        >
+                            <Link href="/recordings" prefetch>
+                                <Video />
+                                <span>Recordings</span>
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>

@@ -87,10 +87,10 @@ class MentorJournalsTest extends TestCase
         ]);
 
         $this->actingAs($admin)
-            ->get(route('mentoring.journals'))
+            ->get(route('monitoring.mentor-journals'))
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('admin/mentoring/journals')
+                ->component('admin/monitoring/mentor-journals')
                 ->where('journals.0.mentor', 'Nadia Putri')
                 ->where('journals.0.student', 'Alya Safira')
                 ->where('journals.0.sessionName', 'IELTS Writing')
@@ -98,10 +98,10 @@ class MentorJournalsTest extends TestCase
             );
 
         $this->actingAs($admin)
-            ->get(route('mentoring.journals.show', $journal))
+            ->get(route('monitoring.mentor-journals.show', $journal))
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('admin/mentoring/journal-detail')
+                ->component('admin/monitoring/mentor-journal-detail')
                 ->where('journal.achievement', 'Clearer paragraph flow.')
                 ->where('journal.nextImprovementPlan', 'Practice evidence mapping.')
             );

@@ -52,7 +52,7 @@ export function AppSidebar() {
         isCurrentUrl('/academics/programs', undefined, true) ||
         isCurrentUrl('/academics/subjects', undefined, true) ||
         isCurrentUrl('/academics/try-outs', undefined, true);
-    const isMentoringOpen = isCurrentUrl('/mentoring', undefined, true);
+    const isMentoringOpen = isCurrentUrl('/monitoring', undefined, true);
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -343,10 +343,10 @@ export function AppSidebar() {
                             <CollapsibleTrigger asChild>
                                 <SidebarMenuButton
                                     isActive={isMentoringOpen}
-                                    tooltip={{ children: 'Mentoring' }}
+                                    tooltip={{ children: 'Monitoring' }}
                                 >
                                     <UserRoundCheck />
-                                    <span>Mentoring</span>
+                                    <span>Monitoring</span>
                                     <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                                 </SidebarMenuButton>
                             </CollapsibleTrigger>
@@ -356,17 +356,35 @@ export function AppSidebar() {
                                         <SidebarMenuSubButton
                                             asChild
                                             isActive={isCurrentUrl(
-                                                '/mentoring/journals',
+                                                '/monitoring/mentor-journals',
                                                 undefined,
                                                 true,
                                             )}
                                         >
                                             <Link
-                                                href="/mentoring/journals"
+                                                href="/monitoring/mentor-journals"
                                                 prefetch
                                             >
                                                 <NotebookPen />
-                                                <span>Journals</span>
+                                                <span>Mentor Journals</span>
+                                            </Link>
+                                        </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                    <SidebarMenuSubItem>
+                                        <SidebarMenuSubButton
+                                            asChild
+                                            isActive={isCurrentUrl(
+                                                '/monitoring/recordings',
+                                                undefined,
+                                                true,
+                                            )}
+                                        >
+                                            <Link
+                                                href="/monitoring/recordings"
+                                                prefetch
+                                            >
+                                                <Video />
+                                                <span>Recordings</span>
                                             </Link>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>

@@ -226,12 +226,12 @@ export default function MentorJournalDetail({
 MentorJournalDetail.layout = {
     breadcrumbs: [
         {
-            title: 'Mentoring',
-            href: '/mentoring/journals',
+            title: 'Monitoring',
+            href: '/monitoring/mentor-journals',
         },
         {
-            title: 'Journals',
-            href: '/mentoring/journals',
+            title: 'Mentor Journals',
+            href: '/monitoring/mentor-journals',
         },
     ],
 };

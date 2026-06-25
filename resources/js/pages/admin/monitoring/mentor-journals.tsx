@@ -64,7 +64,7 @@ const getDateRangeLabel = (dateRange: DateRange | undefined) => {
     return 'Select date range';
 };
 
-export default function MentoringJournals({
+export default function MentorJournals({
     journals,
 }: {
     journals: MentorJournal[];
@@ -101,12 +101,12 @@ export default function MentoringJournals({
 
     return (
         <>
-            <Head title="Journals" />
+            <Head title="Mentor Journals" />
             <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h1 className="font-heading text-2xl font-semibold">
-                            Journals
+                            Mentor Journals
                         </h1>
                         <p className="mt-1 text-sm text-muted-foreground">
                             Track mentor teaching notes, session summaries, and
@@ -277,7 +277,7 @@ export default function MentoringJournals({
                                                                 asChild
                                                             >
                                                                 <Link
-                                                                    href={`/mentoring/journals/${journal.slug}`}
+                                                                    href={`/monitoring/mentor-journals/${journal.slug}`}
                                                                 >
                                                                     <Eye className="size-4" />
                                                                     View
@@ -299,15 +299,15 @@ export default function MentoringJournals({
     );
 }
 
-MentoringJournals.layout = {
+MentorJournals.layout = {
     breadcrumbs: [
         {
-            title: 'Mentoring',
-            href: '/mentoring/journals',
+            title: 'Monitoring',
+            href: '/monitoring/mentor-journals',
         },
         {
-            title: 'Journals',
-            href: '/mentoring/journals',
+            title: 'Mentor Journals',
+            href: '/monitoring/mentor-journals',
         },
     ],
 };

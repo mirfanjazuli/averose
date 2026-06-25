@@ -11,7 +11,7 @@ class MentorJournalController extends Controller
 {
     public function index(): Response
     {
-        return Inertia::render('admin/mentoring/journals', [
+        return Inertia::render('admin/monitoring/mentor-journals', [
             'journals' => MentorJournal::query()
                 ->with([
                     'mentor:id,name',
@@ -35,19 +35,19 @@ class MentorJournalController extends Controller
             'subject:id,name',
         ]);
 
-        return Inertia::render('admin/mentoring/journal-detail', [
+        return Inertia::render('admin/monitoring/mentor-journal-detail', [
             'breadcrumbs' => [
                 [
-                    'title' => 'Mentoring',
-                    'href' => '/mentoring/journals',
+                    'title' => 'Monitoring',
+                    'href' => '/monitoring/mentor-journals',
                 ],
                 [
-                    'title' => 'Journals',
-                    'href' => '/mentoring/journals',
+                    'title' => 'Mentor Journals',
+                    'href' => '/monitoring/mentor-journals',
                 ],
                 [
                     'title' => $journal->subject?->name ?? 'Journal',
-                    'href' => "/mentoring/journals/{$journal->slug}",
+                    'href' => "/monitoring/mentor-journals/{$journal->slug}",
                 ],
             ],
             'journal' => $this->journalData($journal),
