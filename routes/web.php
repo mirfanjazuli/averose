@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\MentorJournalController;
 use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\SessionAssignmentController;
 use App\Http\Controllers\Admin\SubjectController;
+use App\Http\Controllers\Admin\TryOutController as AdminTryOutController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MentorSessionCompletionController;
@@ -51,7 +52,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('academics/subjects', [SubjectController::class, 'store'])->name('subjects.store');
         Route::put('academics/subjects/{subject}', [SubjectController::class, 'update'])->name('subjects.update');
         Route::delete('academics/subjects/{subject}', [SubjectController::class, 'destroy'])->name('subjects.destroy');
-        Route::inertia('academics/try-outs', 'admin/try-outs')->name('admin.try-outs');
+        Route::get('academics/try-outs', [AdminTryOutController::class, 'index'])->name('admin.try-outs');
+        Route::get('academics/try-outs/import/template', [AdminTryOutController::class, 'template'])->name('admin.try-outs.import.template');
+        Route::post('academics/try-outs/import/preview', [AdminTryOutController::class, 'preview'])->name('admin.try-outs.import.preview');
+        Route::post('academics/try-outs/import', [AdminTryOutController::class, 'import'])->name('admin.try-outs.import');
+        Route::get('academics/try-outs/{try_out}', [AdminTryOutController::class, 'show'])->name('admin.try-outs.show');
+        Route::put('academics/try-outs/{try_out}', [AdminTryOutController::class, 'update'])->name('admin.try-outs.update');
+        Route::post('academics/try-outs/{try_out}/reimport/preview', [AdminTryOutController::class, 'reimportPreview'])->name('admin.try-outs.reimport.preview');
+        Route::post('academics/try-outs/{try_out}/reimport', [AdminTryOutController::class, 'reimport'])->name('admin.try-outs.reimport');
+        Route::put('academics/try-outs/{try_out}/questions/{question}', [AdminTryOutController::class, 'updateQuestion'])->name('admin.try-outs.questions.update');
+        Route::put('academics/try-outs/{try_out}/publish', [AdminTryOutController::class, 'publish'])->name('admin.try-outs.publish');
+        Route::put('academics/try-outs/{try_out}/unpublish', [AdminTryOutController::class, 'unpublish'])->name('admin.try-outs.unpublish');
         Route::get('monitoring/mentor-journals', [MentorJournalController::class, 'index'])->name('monitoring.mentor-journals');
         Route::get('monitoring/mentor-journals/{journal}', [MentorJournalController::class, 'show'])->name('monitoring.mentor-journals.show');
         Route::get('monitoring/recordings', [RecordingsController::class, 'index'])->name('monitoring.recordings');
@@ -67,7 +78,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('enrollments', StudentEnrollmentsController::class)->name('enrollments');
         Route::get('recordings', [RecordingsController::class, 'index'])->name('student.recordings');
         Route::post('scheduling/schedules/bookings', [SessionBookingController::class, 'store'])->name('session-bookings.store');
-        Route::get('try-outs', TryOutsController::class)->name('try-outs');
+        Route::get('try-outs', [TryOutsController::class, 'index'])->name('try-outs');
+        Route::get('try-outs/results', [TryOutsController::class, 'results'])->name('try-outs.results');
+        Route::get('try-outs/{try_out}/results/{try_out_attempt}', [TryOutsController::class, 'result'])->name('try-outs.results.show');
+        Route::get('try-outs/{try_out}', [TryOutsController::class, 'show'])->name('try-outs.show');
+        Route::post('try-outs/{try_out}/submit', [TryOutsController::class, 'submit'])->name('try-outs.submit');
     });
 
     Route::middleware('role:mentor')->group(function () {

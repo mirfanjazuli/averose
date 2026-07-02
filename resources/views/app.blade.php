@@ -36,6 +36,28 @@
 
         @fonts
 
+        @if (str_contains($page['component'], 'try-out'))
+            <script>
+                window.MathJax = {
+                    tex: {
+                        displayMath: {
+                            '[+]': [['$$', '$$']],
+                        },
+                        inlineMath: {
+                            '[+]': [['$', '$']],
+                        },
+                        processEscapes: true,
+                    },
+                    startup: {
+                        typeset: false,
+                    },
+                };
+            </script>
+            <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+            <link rel="preload" as="script" href="https://cdn.jsdelivr.net/npm/mathjax@4.1.2/tex-mml-chtml.js">
+            <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@4.1.2/tex-mml-chtml.js"></script>
+        @endif
+
         @viteReactRefresh
         @vite(['resources/css/app.css', 'resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])
         <x-inertia::head>

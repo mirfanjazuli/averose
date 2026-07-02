@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowUpRight,
     BookOpenCheck,
@@ -7,6 +7,17 @@ import {
     Clock3,
     Trophy,
 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,46 +28,154 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 
-const tryOuts = [
-    {
-        title: 'Frontend Basics Assessment',
-        subject: 'Frontend Basics',
-        duration: '45 min',
-        questions: 30,
-        status: 'Available',
-    },
-    {
-        title: 'React Component Practice',
-        subject: 'React Advanced',
-        duration: '60 min',
-        questions: 40,
-        status: 'Available',
-    },
-    {
-        title: 'UI Design Foundation',
-        subject: 'UI Design',
-        duration: '35 min',
-        questions: 25,
-        status: 'Completed',
-    },
-];
+type TryOut = {
+    duration: string;
+    durationMinutes: number | null;
+    id: string;
+    questions: number;
+    slug: string;
+    status: string;
+    title: string;
+};
 
-const history = [
-    {
-        title: 'UI Design Foundation',
-        score: '88',
-        result: 'Passed',
-        date: 'May 28',
-    },
-    {
-        title: 'HTML & CSS Fundamentals',
-        score: '81',
-        result: 'Passed',
-        date: 'May 18',
-    },
-];
+type Summary = {
+    bestScore: number | null;
+    completed: number;
+};
 
-export default function StudentTryOuts() {
+type SavedTryOutProgress = {
+    activeIndex?: number;
+    answers?: Record<string, string>;
+    flaggedQuestions?: Record<string, boolean>;
+    startedAt?: number;
+};
+
+type TryOutProgressState = 'expired' | 'in_progress' | 'not_started';
+
+const progressStorageKey = (tryOutId: string) => `try-out-progress:${tryOutId}`;
+
+const readSavedProgress = (tryOutId: string): SavedTryOutProgress => {
+    if (typeof window === 'undefined') {
+        return {};
+    }
+
+    const savedProgress = window.localStorage.getItem(
+        progressStorageKey(tryOutId),
+    );
+
+    if (!savedProgress) {
+        return {};
+    }
+
+    try {
+        return JSON.parse(savedProgress) as SavedTryOutProgress;
+    } catch {
+        return {};
+    }
+};
+
+const progressStateFor = (tryOut: TryOut): TryOutProgressState => {
+    const savedProgress = readSavedProgress(tryOut.id);
+
+    if (!savedProgress.startedAt) {
+        return 'not_started';
+    }
+
+    if (!tryOut.durationMinutes) {
+        return 'in_progress';
+    }
+
+    const durationSeconds = tryOut.durationMinutes * 60;
+    const elapsedSeconds = Math.floor(
+        (Date.now() - savedProgress.startedAt) / 1000,
+    );
+
+    return elapsedSeconds >= durationSeconds ? 'expired' : 'in_progress';
+};
+
+export default function StudentTryOuts({
+    summary,
+    tryOuts,
+}: {
+    summary: Summary;
+    tryOuts: TryOut[];
+}) {
+    const [progressStates, setProgressStates] = useState<
+        Record<string, TryOutProgressState>
+    >({});
+    const [selectedTryOut, setSelectedTryOut] = useState<TryOut | null>(null);
+    const [selectedProgressState, setSelectedProgressState] =
+        useState<TryOutProgressState>('not_started');
+    const [autoSubmittingTryOutId, setAutoSubmittingTryOutId] = useState<
+        string | null
+    >(null);
+
+    useEffect(() => {
+        let isCurrent = true;
+
+        queueMicrotask(() => {
+            if (!isCurrent) {
+                return;
+            }
+
+            const nextProgressStates = Object.fromEntries(
+                tryOuts.map((tryOut) => [tryOut.id, progressStateFor(tryOut)]),
+            );
+
+            setProgressStates(nextProgressStates);
+
+            const expiredTryOut = tryOuts.find(
+                (tryOut) => nextProgressStates[tryOut.id] === 'expired',
+            );
+
+            if (!expiredTryOut) {
+                return;
+            }
+
+            const savedProgress = readSavedProgress(expiredTryOut.id);
+
+            setAutoSubmittingTryOutId(expiredTryOut.id);
+            router.post(
+                `/try-outs/${expiredTryOut.slug}/submit`,
+                { answers: savedProgress.answers ?? {} },
+                {
+                    onFinish: () => {
+                        window.localStorage.removeItem(
+                            progressStorageKey(expiredTryOut.id),
+                        );
+                        setAutoSubmittingTryOutId(null);
+                    },
+                },
+            );
+        });
+
+        return () => {
+            isCurrent = false;
+        };
+    }, [tryOuts]);
+
+    const startSelectedTryOut = () => {
+        if (!selectedTryOut) {
+            return;
+        }
+
+        router.visit(`/try-outs/${selectedTryOut.slug}`);
+    };
+
+    const openTryOutDialog = (tryOut: TryOut) => {
+        const currentProgressState =
+            progressStates[tryOut.id] ?? progressStateFor(tryOut);
+
+        if (currentProgressState === 'in_progress') {
+            router.visit(`/try-outs/${tryOut.slug}`);
+
+            return;
+        }
+
+        setSelectedProgressState(currentProgressState);
+        setSelectedTryOut(tryOut);
+    };
+
     return (
         <>
             <Head title="Try Out" />
@@ -71,16 +190,18 @@ export default function StudentTryOuts() {
                             latest results.
                         </p>
                     </div>
-                    <Button variant="outline" className="gap-2">
-                        View results
-                        <ArrowUpRight className="size-4" />
+                    <Button asChild variant="outline" className="gap-2">
+                        <Link href="/try-outs/results">
+                            View results
+                            <ArrowUpRight className="size-4" />
+                        </Link>
                     </Button>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-3">
                     <Card>
                         <CardContent className="flex items-center gap-4 px-6 py-5">
-                            <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <div className="flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                 <ClipboardCheck className="size-5" />
                             </div>
                             <div>
@@ -88,14 +209,14 @@ export default function StudentTryOuts() {
                                     Available tests
                                 </p>
                                 <p className="mt-1 text-2xl font-semibold">
-                                    2
+                                    {tryOuts.length}
                                 </p>
                             </div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-4 px-6 py-5">
-                            <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <div className="flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                 <Trophy className="size-5" />
                             </div>
                             <div>
@@ -103,14 +224,14 @@ export default function StudentTryOuts() {
                                     Best score
                                 </p>
                                 <p className="mt-1 text-2xl font-semibold">
-                                    88
+                                    {summary.bestScore ?? '-'}
                                 </p>
                             </div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-4 px-6 py-5">
-                            <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <div className="flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                 <CheckCircle2 className="size-5" />
                             </div>
                             <div>
@@ -118,110 +239,107 @@ export default function StudentTryOuts() {
                                     Completed
                                 </p>
                                 <p className="mt-1 text-2xl font-semibold">
-                                    2
+                                    {summary.completed}
                                 </p>
                             </div>
                         </CardContent>
                     </Card>
                 </div>
 
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Available try outs</CardTitle>
-                            <CardDescription>
-                                Pick an assessment when you are ready.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {tryOuts.map((item) => (
-                                <div
-                                    key={item.title}
-                                    className="grid gap-4 rounded-lg border p-4 md:grid-cols-[auto_minmax(0,1fr)_auto]"
-                                >
-                                    <div className="flex size-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                        <BookOpenCheck className="size-5" />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <h2 className="font-semibold">
-                                                {item.title}
-                                            </h2>
-                                            <Badge
-                                                variant={
-                                                    item.status === 'Available'
-                                                        ? 'secondary'
-                                                        : 'outline'
-                                                }
-                                            >
-                                                {item.status}
-                                            </Badge>
-                                        </div>
-                                        <p className="mt-1 text-sm text-muted-foreground">
-                                            {item.subject}
-                                        </p>
-                                        <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground">
-                                            <span className="flex items-center gap-1.5">
-                                                <Clock3 className="size-4" />
-                                                {item.duration}
-                                            </span>
-                                            <span>
-                                                {item.questions} questions
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <Button
-                                        variant={
-                                            item.status === 'Available'
-                                                ? 'default'
-                                                : 'outline'
-                                        }
-                                        size="sm"
-                                    >
-                                        {item.status === 'Available'
-                                            ? 'Start'
-                                            : 'Review'}
-                                    </Button>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Available try outs</CardTitle>
+                        <CardDescription>
+                            Pick an assessment when you are ready.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {tryOuts.map((item) => (
+                            <div
+                                key={item.id}
+                                className="grid gap-4 rounded-lg border p-4 md:grid-cols-[auto_minmax(0,1fr)_auto]"
+                            >
+                                <div className="flex size-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                    <BookOpenCheck className="size-5" />
                                 </div>
-                            ))}
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Recent results</CardTitle>
-                            <CardDescription>
-                                Your latest try out performance.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {history.map((item) => (
-                                <div
-                                    key={item.title}
-                                    className="rounded-lg border p-4"
-                                >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div>
-                                            <p className="font-medium">
-                                                {item.title}
-                                            </p>
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                {item.date}
-                                            </p>
-                                        </div>
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <h2 className="font-semibold">
+                                            {item.title}
+                                        </h2>
                                         <Badge variant="secondary">
-                                            {item.result}
+                                            {item.status}
                                         </Badge>
                                     </div>
-                                    <p className="mt-4 text-3xl font-semibold">
-                                        {item.score}
-                                    </p>
+                                    <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground">
+                                        <span className="flex items-center gap-1.5">
+                                            <Clock3 className="size-4" />
+                                            {item.duration}
+                                        </span>
+                                        <span>{item.questions} questions</span>
+                                    </div>
                                 </div>
-                            ))}
-                        </CardContent>
-                    </Card>
-                </div>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={
+                                        autoSubmittingTryOutId === item.id
+                                    }
+                                    onClick={() => openTryOutDialog(item)}
+                                >
+                                    {autoSubmittingTryOutId === item.id
+                                        ? 'Saving result...'
+                                        : progressStates[item.id] ===
+                                            'in_progress'
+                                          ? 'Continue try out'
+                                          : 'Start'}
+                                </Button>
+                            </div>
+                        ))}
+
+                        {tryOuts.length === 0 && (
+                            <div className="rounded-lg border p-8 text-center text-sm text-muted-foreground">
+                                No try outs available yet.
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
+
+            <AlertDialog
+                open={!!selectedTryOut}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setSelectedTryOut(null);
+                    }
+                }}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            {selectedTryOut &&
+                            selectedProgressState === 'in_progress'
+                                ? 'Continue try out?'
+                                : 'Start try out?'}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {selectedTryOut &&
+                            selectedProgressState === 'in_progress'
+                                ? 'Your previous progress and remaining time will be restored.'
+                                : 'The timer will start when you open the try out. Make sure you are ready before continuing.'}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={startSelectedTryOut}>
+                            {selectedTryOut &&
+                            selectedProgressState === 'in_progress'
+                                ? 'Continue'
+                                : 'Start now'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </>
     );
 }

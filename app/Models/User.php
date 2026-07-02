@@ -88,6 +88,11 @@ class User extends Authenticatable implements PasskeyUser
         return $this->hasMany(SessionRecording::class);
     }
 
+    public function tryOutAttempts(): HasMany
+    {
+        return $this->hasMany(TryOutAttempt::class);
+    }
+
     protected static function booted(): void
     {
         static::saving(function (User $user): void {
