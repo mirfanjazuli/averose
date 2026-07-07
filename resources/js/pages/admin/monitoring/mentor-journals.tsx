@@ -1,8 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
-import { format } from 'date-fns';
 import {
     CalendarDays,
-    CalendarIcon,
     Clock3,
     Eye,
     MoreVertical,
@@ -11,9 +9,13 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { DateRange } from 'react-day-picker';
+import {
+    DateRangeFilter,
+    formatDateForRangeQuery,
+    getThisMonthDateRange,
+} from '@/components/date-range-filter';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     DropdownMenu,
@@ -22,11 +24,6 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
-import {
     Table,
     TableBody,
     TableCell,
@@ -34,35 +31,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { cn } from '@/lib/utils';
 import { noteVariants } from './mentor-journal-data';
 import type { MentorJournal } from './mentor-journal-data';
-
-const formatDateForInput = (date: Date) => date.toISOString().slice(0, 10);
-
-const getThisMonthRange = (): DateRange => {
-    const today = new Date();
-
-    return {
-        from: new Date(today.getFullYear(), today.getMonth(), 1),
-        to: new Date(today.getFullYear(), today.getMonth() + 1, 0),
-    };
-};
-
-const getDateRangeLabel = (dateRange: DateRange | undefined) => {
-    if (dateRange?.from && dateRange.to) {
-        return `${format(dateRange.from, 'MMM d, yyyy')} - ${format(
-            dateRange.to,
-            'MMM d, yyyy',
-        )}`;
-    }
-
-    if (dateRange?.from) {
-        return format(dateRange.from, 'MMM d, yyyy');
-    }
-
-    return 'Select date range';
-};
 
 export default function MentorJournals({
     journals,
@@ -70,13 +40,15 @@ export default function MentorJournals({
     journals: MentorJournal[];
 }) {
     const [dateRange, setDateRange] = useState<DateRange | undefined>(
-        getThisMonthRange,
+        getThisMonthDateRange,
     );
     const filteredJournals = useMemo(() => {
         const dateFrom = dateRange?.from
-            ? formatDateForInput(dateRange.from)
+            ? formatDateForRangeQuery(dateRange.from)
             : null;
-        const dateTo = dateRange?.to ? formatDateForInput(dateRange.to) : null;
+        const dateTo = dateRange?.to
+            ? formatDateForRangeQuery(dateRange.to)
+            : null;
 
         return journals.filter((journal) => {
             if (dateFrom && journal.date < dateFrom) {
@@ -113,34 +85,10 @@ export default function MentorJournals({
                             review status.
                         </p>
                     </div>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                className={cn(
-                                    'h-10 w-full justify-start gap-2 rounded-2xl px-3 text-left font-normal sm:w-72',
-                                    !dateRange?.from &&
-                                        'text-muted-foreground',
-                                )}
-                            >
-                                <CalendarIcon className="size-4" />
-                                {getDateRangeLabel(dateRange)}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent
-                            align="end"
-                            className="w-auto gap-0 p-0"
-                        >
-                            <Calendar
-                                mode="range"
-                                defaultMonth={dateRange?.from}
-                                selected={dateRange}
-                                onSelect={setDateRange}
-                                numberOfMonths={2}
-                            />
-                        </PopoverContent>
-                    </Popover>
+                    <DateRangeFilter
+                        value={dateRange}
+                        onChange={setDateRange}
+                    />
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-3">

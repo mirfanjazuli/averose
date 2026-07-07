@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { CalendarDays, LayoutGrid } from 'lucide-react';
+import { CalendarDays, LayoutGrid, NotebookPen } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -47,12 +47,24 @@ export function MentorSidebar() {
                     <SidebarMenuItem>
                         <SidebarMenuButton
                             asChild
-                            isActive={isCurrentUrl('/scheduling/schedules')}
+                            isActive={isCurrentUrl('/schedules')}
                             tooltip={{ children: 'Schedules' }}
                         >
-                            <Link href="/scheduling/schedules" prefetch>
+                            <Link href="/schedules" prefetch>
                                 <CalendarDays />
                                 <span>Schedules</span>
+                            </Link>
+                        </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton
+                            asChild
+                            isActive={isCurrentUrl('/journals')}
+                            tooltip={{ children: 'Journals' }}
+                        >
+                            <Link href="/journals" prefetch>
+                                <NotebookPen />
+                                <span>Journals</span>
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>

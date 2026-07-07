@@ -31,7 +31,10 @@ class MentorDashboardTest extends TestCase
         $this->actingAs($user)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('mentor/dashboard'));
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('mentor/dashboard')
+                ->where('auth.user.role', 'mentor')
+            );
     }
 
     public function test_mentor_dashboard_receives_database_sessions(): void
@@ -78,8 +81,40 @@ class MentorDashboardTest extends TestCase
                 ->where('stats.1.value', '1')
                 ->where('todaySessions.0.title', 'IELTS Speaking')
                 ->where('todaySessions.0.student', 'Alya Prameswari')
-                ->where('nextSession.title', 'IELTS Speaking')
-                ->where('nextSession.program', 'IELTS Intensive')
+                ->where('nextSessions.0.title', 'IELTS Speaking')
+                ->where('nextSessions.0.program', 'IELTS Intensive')
+            );
+    }
+
+    public function test_mentor_dashboard_shows_two_oldest_pending_journals(): void
+    {
+        $this->travelTo('2026-07-10 12:00:00');
+
+        $mentor = User::factory()->mentor()->create();
+        $oldestSession = SessionBooking::factory()->create([
+            'mentor_id' => $mentor->id,
+            'scheduled_at' => now()->subDays(3),
+            'status' => 'assigned',
+        ]);
+        $secondOldestSession = SessionBooking::factory()->create([
+            'mentor_id' => $mentor->id,
+            'scheduled_at' => now()->subDays(2),
+            'status' => 'rescheduled',
+        ]);
+        SessionBooking::factory()->create([
+            'mentor_id' => $mentor->id,
+            'scheduled_at' => now()->subDay(),
+            'status' => 'assigned',
+        ]);
+
+        $this->actingAs($mentor)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page): Assert => $page
+                ->component('mentor/dashboard')
+                ->has('pendingJournals', 2)
+                ->where('pendingJournals.0.id', (string) $oldestSession->id)
+                ->where('pendingJournals.1.id', (string) $secondOldestSession->id)
             );
     }
 

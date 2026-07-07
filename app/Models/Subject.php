@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
@@ -29,6 +30,11 @@ class Subject extends Model
     public function programs(): BelongsToMany
     {
         return $this->belongsToMany(Program::class, 'program_subject')->withTimestamps();
+    }
+
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(SessionBooking::class);
     }
 
     protected static function booted(): void

@@ -141,6 +141,15 @@
 }
 
 @layer utilities {
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+
     math.math-equation {
         display: inline-block;
         font-size: 1.05em;

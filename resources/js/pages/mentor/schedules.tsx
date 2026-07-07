@@ -1,7 +1,9 @@
 import { Head } from '@inertiajs/react';
 import {
     CalendarCheck2,
+    Info,
     MoreVertical,
+    Repeat2,
     Search,
     Video,
 } from 'lucide-react';
@@ -51,6 +53,12 @@ type MentorSession = {
     endAt: string;
     id: string;
     program: string;
+    rescheduleRequest: {
+        id: string;
+        reason: string;
+        requested: string;
+        status: string;
+    } | null;
     startAt: string;
     status: string;
     student: string;
@@ -107,8 +115,8 @@ export default function MentorSchedules({
 
         return scheduledDate.toDateString() === today.toDateString();
     }).length;
-    const assignedCount = sessions.filter(
-        (session) => session.status === 'Assigned',
+    const pendingRescheduleCount = sessions.filter(
+        (session) => session.rescheduleRequest,
     ).length;
 
     const goToPage = (page: number) => {
@@ -159,14 +167,61 @@ export default function MentorSchedules({
                     <Card>
                         <CardContent className="px-6 py-5">
                             <p className="text-sm text-muted-foreground">
-                                Assigned
+                                Reschedule requests
                             </p>
                             <p className="mt-1 text-2xl font-semibold">
-                                {assignedCount}
+                                {pendingRescheduleCount}
                             </p>
                         </CardContent>
                     </Card>
                 </div>
+
+                {pendingRescheduleCount > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Reschedule information</CardTitle>
+                            <CardDescription>
+                                These requests are waiting for admin approval.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {sessions
+                                .filter((session) => session.rescheduleRequest)
+                                .map((session) => (
+                                    <div
+                                        key={session.id}
+                                        className="flex flex-wrap items-start justify-between gap-3 rounded-lg border p-4"
+                                    >
+                                        <div>
+                                            <p className="flex items-center gap-2 font-medium">
+                                                <Info className="size-4 text-primary" />
+                                                {session.student} requested a
+                                                reschedule
+                                            </p>
+                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                {session.title}: {session.time}{' '}
+                                                to{' '}
+                                                {
+                                                    session.rescheduleRequest
+                                                        ?.requested
+                                                }
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                Reason:{' '}
+                                                {
+                                                    session.rescheduleRequest
+                                                        ?.reason
+                                                }
+                                            </p>
+                                        </div>
+                                        <Badge variant="secondary">
+                                            Waiting admin approval
+                                        </Badge>
+                                    </div>
+                                ))}
+                        </CardContent>
+                    </Card>
+                )}
 
                 <Card>
                     <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
@@ -249,6 +304,15 @@ export default function MentorSchedules({
                                                         <Badge variant="outline">
                                                             {session.status}
                                                         </Badge>
+                                                        {session.rescheduleRequest && (
+                                                            <Badge
+                                                                variant="secondary"
+                                                                className="ml-2 gap-1"
+                                                            >
+                                                                <Repeat2 className="size-3" />
+                                                                Reschedule
+                                                            </Badge>
+                                                        )}
                                                     </TableCell>
                                                     <TableCell className="text-right">
                                                         <DropdownMenu>
@@ -311,8 +375,7 @@ export default function MentorSchedules({
                                     <p className="text-sm text-muted-foreground">
                                         Showing {firstSessionIndex + 1}-
                                         {Math.min(
-                                            firstSessionIndex +
-                                                sessionsPerPage,
+                                            firstSessionIndex + sessionsPerPage,
                                             filteredSessions.length,
                                         )}{' '}
                                         of {filteredSessions.length} sessions
@@ -419,7 +482,7 @@ MentorSchedules.layout = {
     breadcrumbs: [
         {
             title: 'Schedules',
-            href: '/scheduling/schedules',
+            href: '/schedules',
         },
     ],
 };

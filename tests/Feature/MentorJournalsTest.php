@@ -107,6 +107,122 @@ class MentorJournalsTest extends TestCase
             );
     }
 
+    public function test_mentor_can_view_own_journal_page(): void
+    {
+        $mentor = User::factory()->mentor()->create();
+        $otherMentor = User::factory()->mentor()->create();
+        $student = User::factory()->student()->create([
+            'name' => 'Alya Safira',
+        ]);
+        $subject = Subject::factory()->create([
+            'name' => 'IELTS Writing',
+        ]);
+        $session = SessionBooking::factory()->create([
+            'duration' => 90,
+            'mentor_id' => $mentor->id,
+            'scheduled_at' => '2026-06-09 10:00:00',
+            'status' => 'completed',
+            'subject_id' => $subject->id,
+            'user_id' => $student->id,
+        ]);
+        $journal = MentorJournal::factory()->create([
+            'mentor_id' => $mentor->id,
+            'next_improvement_plan' => 'Practice evidence mapping.',
+            'session_booking_id' => $session->id,
+            'student_id' => $student->id,
+            'subject_id' => $subject->id,
+        ]);
+        MentorJournal::factory()->create([
+            'mentor_id' => $otherMentor->id,
+        ]);
+
+        $this->actingAs($mentor)
+            ->get(route('mentor.journals'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page): Assert => $page
+                ->component('mentor/journals')
+                ->has('journals', 1)
+                ->where('journals.0.id', (string) $journal->id)
+                ->where('journals.0.student', 'Alya Safira')
+                ->where('journals.0.sessionName', 'IELTS Writing')
+                ->where('journals.0.duration', '90 min')
+                ->where('journals.0.nextImprovementPlan', 'Practice evidence mapping.')
+            );
+    }
+
+    public function test_mentor_can_view_own_journal_detail(): void
+    {
+        $mentor = User::factory()->mentor()->create();
+        $student = User::factory()->student()->create([
+            'name' => 'Alya Safira',
+        ]);
+        $subject = Subject::factory()->create([
+            'name' => 'IELTS Writing',
+        ]);
+        $session = SessionBooking::factory()->create([
+            'duration' => 90,
+            'mentor_id' => $mentor->id,
+            'scheduled_at' => '2026-06-09 10:00:00',
+            'status' => 'completed',
+            'subject_id' => $subject->id,
+            'user_id' => $student->id,
+        ]);
+        $journal = MentorJournal::factory()->create([
+            'achievement' => 'Clearer paragraph flow.',
+            'improvement_area' => 'Needs stronger examples.',
+            'mentor_id' => $mentor->id,
+            'next_improvement_plan' => 'Practice evidence mapping.',
+            'session_booking_id' => $session->id,
+            'slug' => 'ielts-writing-alya-safira',
+            'student_id' => $student->id,
+            'subject_id' => $subject->id,
+        ]);
+
+        $this->actingAs($mentor)
+            ->get(route('mentor.journals.show', $journal))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page): Assert => $page
+                ->component('mentor/journal-detail')
+                ->where('journal.student', 'Alya Safira')
+                ->where('journal.sessionName', 'IELTS Writing')
+                ->where('journal.date', 'Tuesday, 09 June 2026')
+                ->where('journal.time', '10:00 - 11:30')
+                ->where('journal.achievement', 'Clearer paragraph flow.')
+                ->where('journal.nextImprovementPlan', 'Practice evidence mapping.')
+            );
+    }
+
+    public function test_mentor_cannot_view_another_mentor_journal_detail(): void
+    {
+        $mentor = User::factory()->mentor()->create();
+        $otherMentor = User::factory()->mentor()->create();
+        $journal = MentorJournal::factory()->create([
+            'mentor_id' => $otherMentor->id,
+        ]);
+
+        $this->actingAs($mentor)
+            ->get(route('mentor.journals.show', $journal))
+            ->assertNotFound();
+    }
+
+    public function test_students_cannot_visit_mentor_journal_page(): void
+    {
+        $student = User::factory()->student()->create();
+
+        $this->actingAs($student)
+            ->get(route('mentor.journals'))
+            ->assertForbidden();
+    }
+
+    public function test_old_mentor_journal_url_redirects_to_short_url(): void
+    {
+        $mentor = User::factory()->mentor()->create();
+
+        $this->actingAs($mentor)
+            ->get('/mentor/journals')
+            ->assertRedirect('/journals');
+    }
+
     public function test_dashboard_shows_next_session_after_pending_session_is_completed(): void
     {
         $mentor = User::factory()->mentor()->create();
@@ -135,7 +251,7 @@ class MentorJournalsTest extends TestCase
             ->assertInertia(fn (Assert $page): Assert => $page
                 ->component('mentor/dashboard')
                 ->where('completionSession.id', (string) $pendingSession->id)
-                ->where('nextSession.title', 'Speaking')
+                ->where('nextSessions.0.title', 'Speaking')
             );
 
         $this->actingAs($mentor)
@@ -152,8 +268,8 @@ class MentorJournalsTest extends TestCase
             ->assertInertia(fn (Assert $page): Assert => $page
                 ->component('mentor/dashboard')
                 ->where('completionSession', null)
-                ->where('nextSession.title', 'Speaking')
-                ->where('nextSession.improvementPlan', 'Practice two timed prompts.')
+                ->where('nextSessions.0.title', 'Speaking')
+                ->where('nextSessions.0.improvementPlan', 'Practice two timed prompts.')
             );
     }
 }

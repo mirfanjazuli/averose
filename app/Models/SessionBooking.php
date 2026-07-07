@@ -51,6 +51,16 @@ class SessionBooking extends Model
         return $this->hasMany(SessionRecording::class);
     }
 
+    public function rescheduleRequests(): HasMany
+    {
+        return $this->hasMany(SessionRescheduleRequest::class);
+    }
+
+    public function pendingRescheduleRequest(): HasOne
+    {
+        return $this->hasOne(SessionRescheduleRequest::class)->where('status', 'pending')->latestOfMany();
+    }
+
     /**
      * Get the attributes that should be cast.
      *

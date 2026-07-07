@@ -4,14 +4,17 @@ use App\Http\Controllers\Admin\AcademicFieldController;
 use App\Http\Controllers\Admin\MentorJournalController;
 use App\Http\Controllers\Admin\ProgramController;
 use App\Http\Controllers\Admin\SessionAssignmentController;
+use App\Http\Controllers\Admin\SessionRescheduleRequestController as AdminSessionRescheduleRequestController;
 use App\Http\Controllers\Admin\SubjectController;
 use App\Http\Controllers\Admin\TryOutController as AdminTryOutController;
 use App\Http\Controllers\Admin\UserManagementController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\MentorJournalController as MentorJournalPageController;
 use App\Http\Controllers\MentorSessionCompletionController;
 use App\Http\Controllers\RecordingsController;
 use App\Http\Controllers\SchedulesController;
 use App\Http\Controllers\SessionBookingController;
+use App\Http\Controllers\SessionRescheduleRequestController;
 use App\Http\Controllers\StudentEnrollmentsController;
 use App\Http\Controllers\TryOutsController;
 use App\Http\Controllers\ZoomAccountsController;
@@ -24,8 +27,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('scheduling/schedules', SchedulesController::class)->name('schedules');
 
     Route::middleware('role:admin')->group(function () {
+        Route::get('dashboard/download-pdf', [DashboardController::class, 'downloadAdminPdf'])->name('dashboard.download-pdf');
         Route::inertia('scheduling/mentor-assignments', 'admin/schedules/mentor-assignments')->name('schedules.mentor-assignments');
-        Route::inertia('scheduling/reschedule-requests', 'admin/schedules/reschedule-requests')->name('schedules.reschedule-requests');
+        Route::get('scheduling/reschedule-requests', [AdminSessionRescheduleRequestController::class, 'index'])->name('schedules.reschedule-requests');
+        Route::put('scheduling/reschedule-requests/{session_reschedule_request}/approve', [AdminSessionRescheduleRequestController::class, 'approve'])->name('schedules.reschedule-requests.approve');
+        Route::put('scheduling/reschedule-requests/{session_reschedule_request}/reject', [AdminSessionRescheduleRequestController::class, 'reject'])->name('schedules.reschedule-requests.reject');
         Route::inertia('scheduling/working-hours', 'admin/schedules/working-hours')->name('schedules.working-hours');
         Route::inertia('scheduling/public-holidays', 'admin/schedules/public-holidays')->name('schedules.public-holidays');
         Route::put('scheduling/schedules/{session_booking}/assignment', [SessionAssignmentController::class, 'update'])->name('schedules.assignment.update');
@@ -78,6 +84,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('enrollments', StudentEnrollmentsController::class)->name('enrollments');
         Route::get('recordings', [RecordingsController::class, 'index'])->name('student.recordings');
         Route::post('scheduling/schedules/bookings', [SessionBookingController::class, 'store'])->name('session-bookings.store');
+        Route::post('scheduling/schedules/{session_booking}/reschedule-requests', [SessionRescheduleRequestController::class, 'store'])->name('session-reschedule-requests.store');
         Route::get('try-outs', [TryOutsController::class, 'index'])->name('try-outs');
         Route::get('try-outs/results', [TryOutsController::class, 'results'])->name('try-outs.results');
         Route::get('try-outs/{try_out}/results/{try_out_attempt}', [TryOutsController::class, 'result'])->name('try-outs.results.show');
@@ -86,6 +93,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware('role:mentor')->group(function () {
+        Route::get('schedules', SchedulesController::class)->name('mentor.schedules');
+        Route::get('journals', [MentorJournalPageController::class, 'index'])->name('mentor.journals');
+        Route::get('journals/{journal}', [MentorJournalPageController::class, 'show'])->name('mentor.journals.show');
+        Route::redirect('mentor/journals', 'journals');
         Route::post('mentor/sessions/{session_booking}/complete', [MentorSessionCompletionController::class, 'store'])->name('mentor.sessions.complete');
     });
 });

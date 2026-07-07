@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpenText,
     CalendarOff,
@@ -42,7 +42,14 @@ import { useCurrentUrl } from '@/hooks/use-current-url';
 import { dashboard } from '@/routes';
 
 export function AppSidebar() {
+    const page = usePage<{
+        navigation?: {
+            pendingRescheduleRequests?: number;
+        };
+    }>();
     const { isCurrentUrl } = useCurrentUrl();
+    const pendingRescheduleRequests =
+        page.props.navigation?.pendingRescheduleRequests ?? 0;
     const isSchedulesOpen = isCurrentUrl('/scheduling', undefined, true);
     const isUsersOpen =
         isCurrentUrl('/users/students', undefined, true) ||
@@ -145,7 +152,17 @@ export function AppSidebar() {
                                                 prefetch
                                             >
                                                 <Repeat2 />
-                                                <span>Reschedule Requests</span>
+                                                <span className="min-w-0 flex-1 truncate whitespace-nowrap">
+                                                    Reschedule Requests
+                                                </span>
+                                                {pendingRescheduleRequests >
+                                                    0 && (
+                                                    <span className="ml-2 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] leading-none font-semibold text-white">
+                                                        {
+                                                            pendingRescheduleRequests
+                                                        }
+                                                    </span>
+                                                )}
                                             </Link>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
@@ -244,7 +261,6 @@ export function AppSidebar() {
                             </CollapsibleContent>
                         </SidebarMenuItem>
                     </Collapsible>
-
                     <Collapsible
                         asChild
                         defaultOpen={isAcademicsOpen}

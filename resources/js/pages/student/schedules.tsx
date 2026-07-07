@@ -1,16 +1,19 @@
-import { Head } from '@inertiajs/react';
+import { Form, Head } from '@inertiajs/react';
 import {
     CheckCircle2,
     Clock3,
     GraduationCap,
     MonitorUp,
+    Repeat2,
     Search,
     UserRoundCheck,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { BookingSubjectOption } from '@/components/student-book-session-dialog';
+import { toast } from 'sonner';
 
+import InputError from '@/components/input-error';
 import { StudentBookSessionDialog } from '@/components/student-book-session-dialog';
+import type { BookingSubjectOption } from '@/components/student-book-session-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -20,7 +23,22 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import {
     Table,
     TableBody,
@@ -29,12 +47,32 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+
+const rescheduleReasons = [
+    'Sakit',
+    'Bentrok sekolah/kampus',
+    'Kegiatan keluarga',
+    'Kendala internet/perangkat',
+    'Lainnya',
+];
 
 type StudentSession = {
+    canRequestReschedule: boolean;
     endAt: string;
     id: string;
     mentor: string;
     program: string;
+    rescheduleRequest: {
+        id: string;
+        reason: string;
+        requested: string;
+        status: string;
+    } | null;
+    rescheduleSlots: {
+        label: string;
+        value: string;
+    }[];
     startAt: string;
     status: string;
     time: string;
@@ -65,8 +103,13 @@ export default function StudentSchedules({
     subjects: BookingSubjectOption[];
 }) {
     const [searchQuery, setSearchQuery] = useState('');
+    const [reschedulingSession, setReschedulingSession] =
+        useState<StudentSession | null>(null);
 
-    const week = useMemo(() => sessions.slice(0, 5).map(sessionDay), [sessions]);
+    const week = useMemo(
+        () => sessions.slice(0, 5).map(sessionDay),
+        [sessions],
+    );
     const nextSession = sessions[0] ?? null;
     const filteredSessions = useMemo(() => {
         const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -106,23 +149,23 @@ export default function StudentSchedules({
                 <div className="grid gap-4 md:grid-cols-5">
                     {week.length > 0 ? (
                         week.map((item) => (
-                        <Card
-                            key={item.id}
-                            className={
-                                item.active
-                                    ? 'border-primary/30 bg-primary/10 py-4'
-                                    : 'py-4'
-                            }
-                        >
-                            <CardContent className="px-4 text-center">
-                                <p className="text-xs text-muted-foreground">
-                                    {item.day}
-                                </p>
-                                <p className="mt-1 text-2xl font-semibold">
-                                    {item.date}
-                                </p>
-                            </CardContent>
-                        </Card>
+                            <Card
+                                key={item.id}
+                                className={
+                                    item.active
+                                        ? 'border-primary/30 bg-primary/10 py-4'
+                                        : 'py-4'
+                                }
+                            >
+                                <CardContent className="px-4 text-center">
+                                    <p className="text-xs text-muted-foreground">
+                                        {item.day}
+                                    </p>
+                                    <p className="mt-1 text-2xl font-semibold">
+                                        {item.date}
+                                    </p>
+                                </CardContent>
+                            </Card>
                         ))
                     ) : (
                         <Card className="py-4 md:col-span-5">
@@ -188,12 +231,28 @@ export default function StudentSchedules({
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                    >
-                                                        Details
-                                                    </Button>
+                                                    {session.rescheduleRequest ? (
+                                                        <Badge variant="secondary">
+                                                            Reschedule pending
+                                                        </Badge>
+                                                    ) : (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            disabled={
+                                                                !session.canRequestReschedule
+                                                            }
+                                                            className="gap-2"
+                                                            onClick={() =>
+                                                                setReschedulingSession(
+                                                                    session,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Repeat2 className="size-4" />
+                                                            Request
+                                                        </Button>
+                                                    )}
                                                 </TableCell>
                                             </TableRow>
                                         ))
@@ -244,6 +303,11 @@ export default function StudentSchedules({
                                                 <Badge variant="outline">
                                                     {session.status}
                                                 </Badge>
+                                                {session.rescheduleRequest && (
+                                                    <Badge variant="secondary">
+                                                        Reschedule requested
+                                                    </Badge>
+                                                )}
                                             </div>
                                             <p className="mt-1 text-sm text-muted-foreground">
                                                 {session.program}
@@ -259,9 +323,37 @@ export default function StudentSchedules({
                                                 </span>
                                             </div>
                                         </div>
-                                        <Button variant="outline" size="sm">
-                                            Details
-                                        </Button>
+                                        {session.rescheduleRequest ? (
+                                            <div className="text-right text-sm">
+                                                <Badge variant="secondary">
+                                                    Pending admin approval
+                                                </Badge>
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    {
+                                                        session
+                                                            .rescheduleRequest
+                                                            .requested
+                                                    }
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={
+                                                    !session.canRequestReschedule
+                                                }
+                                                className="gap-2"
+                                                onClick={() =>
+                                                    setReschedulingSession(
+                                                        session,
+                                                    )
+                                                }
+                                            >
+                                                <Repeat2 className="size-4" />
+                                                Request
+                                            </Button>
+                                        )}
                                     </div>
                                 ))
                             ) : (
@@ -326,6 +418,150 @@ export default function StudentSchedules({
                     </Card>
                 </div>
             </div>
+
+            <Dialog
+                open={!!reschedulingSession}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setReschedulingSession(null);
+                    }
+                }}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Request reschedule</DialogTitle>
+                        <DialogDescription>
+                            Admin will review your request before the schedule
+                            changes.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {reschedulingSession && (
+                        <Form
+                            action={`/scheduling/schedules/${reschedulingSession.id}/reschedule-requests`}
+                            method="post"
+                            onSuccess={() => {
+                                setReschedulingSession(null);
+                                toast.success('Reschedule request sent.');
+                            }}
+                            onError={() => {
+                                toast.error(
+                                    'Failed to send reschedule request.',
+                                );
+                            }}
+                            className="space-y-4"
+                        >
+                            {({ errors, processing }) => (
+                                <>
+                                    <div className="rounded-lg border p-3 text-sm">
+                                        <p className="font-medium">
+                                            {reschedulingSession.title}
+                                        </p>
+                                        <p className="mt-1 text-muted-foreground">
+                                            Current: {reschedulingSession.time}
+                                        </p>
+                                        <p className="text-muted-foreground">
+                                            Mentor: {reschedulingSession.mentor}
+                                        </p>
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="reason">Reason</Label>
+                                        <Select name="reason" required>
+                                            <SelectTrigger id="reason">
+                                                <SelectValue placeholder="Choose a reason" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {rescheduleReasons.map(
+                                                    (reason) => (
+                                                        <SelectItem
+                                                            key={reason}
+                                                            value={reason}
+                                                        >
+                                                            {reason}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                        <InputError message={errors.reason} />
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="requested_scheduled_at">
+                                            New schedule
+                                        </Label>
+                                        <Select
+                                            name="requested_scheduled_at"
+                                            required
+                                        >
+                                            <SelectTrigger id="requested_scheduled_at">
+                                                <SelectValue placeholder="Choose an available slot" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {reschedulingSession
+                                                    .rescheduleSlots.length >
+                                                0 ? (
+                                                    reschedulingSession.rescheduleSlots.map(
+                                                        (slot) => (
+                                                            <SelectItem
+                                                                key={slot.value}
+                                                                value={
+                                                                    slot.value
+                                                                }
+                                                            >
+                                                                {slot.label}
+                                                            </SelectItem>
+                                                        ),
+                                                    )
+                                                ) : (
+                                                    <SelectItem
+                                                        value="none"
+                                                        disabled
+                                                    >
+                                                        No slots available
+                                                    </SelectItem>
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                        <InputError
+                                            message={
+                                                errors.requested_scheduled_at
+                                            }
+                                        />
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="notes">
+                                            Notes optional
+                                        </Label>
+                                        <Textarea
+                                            id="notes"
+                                            name="notes"
+                                            rows={3}
+                                            placeholder="Add short context for admin"
+                                        />
+                                        <InputError message={errors.notes} />
+                                    </div>
+
+                                    <Button
+                                        type="submit"
+                                        disabled={
+                                            processing ||
+                                            reschedulingSession.rescheduleSlots
+                                                .length === 0
+                                        }
+                                        className="w-full"
+                                    >
+                                        {processing
+                                            ? 'Sending...'
+                                            : 'Send request'}
+                                    </Button>
+                                </>
+                            )}
+                        </Form>
+                    )}
+                </DialogContent>
+            </Dialog>
         </>
     );
 }

@@ -2,6 +2,8 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\SessionRescheduleRequest;
+use App\UserRole;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -46,7 +48,7 @@ class HandleInertiaRequests extends Middleware
                         'id' => $request->user()->id,
                         'name' => $request->user()->name,
                         'email' => $request->user()->email,
-                        'role' => $request->user()->role,
+                        'role' => $request->user()->role->value,
                     ]
                     : null,
             ],
@@ -56,6 +58,12 @@ class HandleInertiaRequests extends Middleware
                 'tryOutImportPreview' => $request->session()->get('tryOutImportPreview'),
                 'tryOutReimportPreview' => $request->session()->get('tryOutReimportPreview'),
                 'tryOutResult' => $request->session()->get('tryOutResult'),
+            ],
+
+            'navigation' => [
+                'pendingRescheduleRequests' => $request->user()?->role === UserRole::Admin
+                    ? SessionRescheduleRequest::query()->where('status', 'pending')->count()
+                    : 0,
             ],
 
             'sidebarOpen' => ! $request->hasCookie('sidebar_state')

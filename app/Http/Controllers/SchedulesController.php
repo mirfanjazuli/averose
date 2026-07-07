@@ -6,6 +6,7 @@ use App\Models\ProgramEnrollment;
 use App\Models\SessionBooking;
 use App\Models\User;
 use App\UserRole;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -36,7 +37,7 @@ class SchedulesController extends Controller
     private function adminSessions(): array
     {
         return SessionBooking::query()
-            ->with(['mentor:id,name', 'subject:id,name', 'user:id,name', 'zoomAccount:id,name,slug', 'enrollment.program:id,name'])
+            ->with(['mentor:id,name', 'pendingRescheduleRequest', 'subject:id,name', 'user:id,name', 'zoomAccount:id,name,slug', 'enrollment.program:id,name'])
             ->orderBy('scheduled_at')
             ->get()
             ->map(fn (SessionBooking $booking): array => $this->sessionData($booking, includeStudent: true))
@@ -59,7 +60,7 @@ class SchedulesController extends Controller
     private function mentorSessions(Request $request): array
     {
         return SessionBooking::query()
-            ->with(['subject:id,name', 'user:id,name', 'zoomAccount:id,name,slug', 'enrollment.program:id,name'])
+            ->with(['pendingRescheduleRequest', 'subject:id,name', 'user:id,name', 'zoomAccount:id,name,slug', 'enrollment.program:id,name'])
             ->where('mentor_id', $request->user()->id)
             ->orderBy('scheduled_at')
             ->get()
@@ -70,7 +71,7 @@ class SchedulesController extends Controller
     private function studentSessions(Request $request): array
     {
         return SessionBooking::query()
-            ->with(['mentor:id,name', 'subject:id,name', 'zoomAccount:id,name', 'enrollment.program:id,name'])
+            ->with(['mentor:id,name', 'pendingRescheduleRequest', 'subject:id,name', 'zoomAccount:id,name', 'enrollment.program:id,name'])
             ->where('user_id', $request->user()->id)
             ->orderBy('scheduled_at')
             ->get()
@@ -155,11 +156,84 @@ class SchedulesController extends Controller
             'zoomPasscode' => $booking->zoom_passcode,
         ];
 
+        if ($booking->pendingRescheduleRequest) {
+            $requestedAt = $booking->pendingRescheduleRequest->requested_scheduled_at;
+            $requestedEndAt = $requestedAt->copy()->addMinutes($booking->pendingRescheduleRequest->duration);
+
+            $data['rescheduleRequest'] = [
+                'id' => (string) $booking->pendingRescheduleRequest->id,
+                'reason' => $booking->pendingRescheduleRequest->reason,
+                'requested' => "{$requestedAt->format('D, M j, H:i')} - {$requestedEndAt->format('H:i')}",
+                'status' => Str::headline($booking->pendingRescheduleRequest->status),
+            ];
+        } else {
+            $data['rescheduleRequest'] = null;
+        }
+
         if ($includeStudent) {
             $data['zoomStartUrl'] = $booking->zoom_start_url;
             $data['student'] = $booking->user?->name ?? '-';
+        } else {
+            $data['canRequestReschedule'] = $booking->mentor_id !== null && $booking->scheduled_at->isFuture() && ! $booking->pendingRescheduleRequest;
+            $data['rescheduleSlots'] = $this->rescheduleSlots($booking);
         }
 
         return $data;
+    }
+
+    private function rescheduleSlots(SessionBooking $booking): array
+    {
+        if (! $booking->mentor_id || $booking->scheduled_at->isPast() || $booking->pendingRescheduleRequest) {
+            return [];
+        }
+
+        $slots = [];
+        $cursor = $this->nextHalfHour(CarbonImmutable::now()->addHour());
+        $lastDay = CarbonImmutable::now()->addDays(14)->endOfDay();
+
+        while ($cursor->lessThanOrEqualTo($lastDay) && count($slots) < 18) {
+            if ($cursor->hour >= 8 && $cursor->hour < 20 && $this->mentorAvailableAt($booking, $cursor)) {
+                $endAt = $cursor->addMinutes($booking->duration);
+
+                $slots[] = [
+                    'label' => "{$cursor->format('D, M j, H:i')} - {$endAt->format('H:i')}",
+                    'value' => $cursor->format('Y-m-d H:i:s'),
+                ];
+            }
+
+            $cursor = $cursor->addMinutes(30);
+        }
+
+        return $slots;
+    }
+
+    private function mentorAvailableAt(SessionBooking $booking, CarbonImmutable $startAt): bool
+    {
+        $endAt = $startAt->addMinutes($booking->duration);
+
+        if ($startAt->equalTo(CarbonImmutable::instance($booking->scheduled_at))) {
+            return false;
+        }
+
+        return ! SessionBooking::query()
+            ->where('mentor_id', $booking->mentor_id)
+            ->whereKeyNot($booking->id)
+            ->where('scheduled_at', '<', $endAt)
+            ->get(['id', 'scheduled_at', 'duration'])
+            ->contains(fn (SessionBooking $mentorBooking): bool => $mentorBooking->scheduled_at->copy()->addMinutes($mentorBooking->duration)->greaterThan($startAt));
+    }
+
+    private function nextHalfHour(CarbonImmutable $date): CarbonImmutable
+    {
+        $minute = $date->minute;
+        $roundedMinute = (int) (ceil($minute / 30) * 30);
+
+        if ($roundedMinute >= 60) {
+            $nextHour = $date->addHour();
+
+            return $nextHour->setTime($nextHour->hour, 0, 0);
+        }
+
+        return $date->setTime($date->hour, $roundedMinute, 0);
     }
 }

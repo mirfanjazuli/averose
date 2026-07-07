@@ -1,22 +1,11 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import {
-    ArrowUpRight,
-    CalendarCheck2,
-    Clock3,
-    CircleAlert,
-    MessageSquareText,
-    MonitorUp,
-    NotebookText,
-    UsersRound,
-} from 'lucide-react';
+import { ArrowUpRight, Clock3 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Card,
     CardContent,
-    CardDescription,
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
@@ -30,10 +19,11 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 
 type MentorStat = {
     helper: string;
-    label: 'Sessions today' | 'Assigned students' | 'Teaching journal';
+    label: 'Monthly sessions' | 'Pending journals' | 'Today' | 'Upcoming';
     value: string;
 };
 
@@ -53,61 +43,224 @@ type MentorSession = {
     zoomLink: string | null;
 };
 
-const statIcons = {
-    'Assigned students': UsersRound,
-    'Sessions today': CalendarCheck2,
-    'Teaching journal': NotebookText,
+type MentorJournal = {
+    date: string;
+    id: string;
+    improvementPlan: string;
+    note: string;
+    program: string;
+    slug: string;
+    student: string;
+    title: string;
 };
+
+function EmptyState({ children }: { children: string }) {
+    return (
+        <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+            {children}
+        </div>
+    );
+}
+
+function SessionSummary({ session }: { session: MentorSession }) {
+    return (
+        <div className="min-w-0">
+            <p className="truncate font-medium">{session.student}</p>
+            <p className="mt-1 truncate text-sm text-muted-foreground">
+                {session.title} · {session.program}
+            </p>
+        </div>
+    );
+}
+
+const sessionTimeFormatter = new Intl.DateTimeFormat('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+});
+
+function sessionTimeRange(session: MentorSession) {
+    if (!session.startAt || !session.endAt) {
+        return session.time;
+    }
+
+    const startAt = new Date(session.startAt);
+    const endAt = new Date(session.endAt);
+
+    if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+        return session.time;
+    }
+
+    return `${sessionTimeFormatter.format(startAt)} - ${sessionTimeFormatter.format(endAt)}`;
+}
+
+function NextSessionSummary({
+    session,
+    showFocus,
+}: {
+    session: MentorSession;
+    showFocus: boolean;
+}) {
+    return (
+        <div className="flex min-w-0 items-start gap-3">
+            <div className="shrink-0 rounded-md bg-muted px-2.5 py-1 text-sm font-medium">
+                {sessionTimeRange(session)}
+            </div>
+            <div className="min-w-0">
+                <p className="truncate font-medium">{session.student}</p>
+                <p className="mt-1 truncate text-sm text-muted-foreground">
+                    {session.title} · {session.program}
+                </p>
+                {showFocus && (
+                    <div className="mt-3 text-sm">
+                        <p className="font-medium text-foreground">Focus</p>
+                        <p className="mt-1 italic text-muted-foreground">
+                            {session.improvementPlan}
+                        </p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+type SessionDateGroup = {
+    key: string;
+    label: string;
+    sessions: MentorSession[];
+};
+
+const sessionDateFormatter = new Intl.DateTimeFormat(undefined, {
+    day: 'numeric',
+    month: 'short',
+    weekday: 'long',
+});
+
+function localDateKey(date: Date) {
+    return [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0'),
+    ].join('-');
+}
+
+function sessionDateLabel(startAt?: string) {
+    if (!startAt) {
+        return 'Upcoming';
+    }
+
+    const date = new Date(startAt);
+
+    if (Number.isNaN(date.getTime())) {
+        return 'Upcoming';
+    }
+
+    const today = new Date();
+    const tomorrow = new Date(today);
+
+    tomorrow.setDate(today.getDate() + 1);
+
+    if (localDateKey(date) === localDateKey(today)) {
+        return 'Today';
+    }
+
+    if (localDateKey(date) === localDateKey(tomorrow)) {
+        return 'Tomorrow';
+    }
+
+    return sessionDateFormatter.format(date);
+}
+
+function groupSessionsByDate(sessions: MentorSession[]) {
+    return sessions.reduce<SessionDateGroup[]>((groups, session) => {
+        const startAt = session.startAt ? new Date(session.startAt) : null;
+        const key =
+            startAt && !Number.isNaN(startAt.getTime())
+                ? localDateKey(startAt)
+                : 'upcoming';
+        const label = sessionDateLabel(session.startAt);
+        const existingGroup = groups.find((group) => group.key === key);
+
+        if (existingGroup) {
+            existingGroup.sessions.push(session);
+
+            return groups;
+        }
+
+        groups.push({
+            key,
+            label,
+            sessions: [session],
+        });
+
+        return groups;
+    }, []);
+}
+
+function OpenRoomButton({ session }: { session: MentorSession }) {
+    if (!session.zoomLink) {
+        return (
+            <Button disabled className="shrink-0">
+                Room not ready
+            </Button>
+        );
+    }
+
+    return (
+        <Button asChild className="shrink-0">
+            <a href={session.zoomLink} target="_blank" rel="noreferrer">
+                Open room
+            </a>
+        </Button>
+    );
+}
 
 export default function MentorDashboard({
     completionSession,
-    focusItems,
-    nextSession,
+    nextSessions,
+    pendingJournals,
+    recentJournals,
     stats,
-    todaySessions,
 }: {
     completionSession: MentorSession | null;
-    focusItems: string[];
-    nextSession: MentorSession | null;
+    nextSessions: MentorSession[];
+    pendingJournals: MentorSession[];
+    recentJournals: MentorJournal[];
     stats: MentorStat[];
-    todaySessions: MentorSession[];
 }) {
+    const nextSessionGroups = groupSessionsByDate(nextSessions);
+    const nearestSessionId = nextSessions[0]?.id;
     const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
+    const [selectedCompletionSession, setSelectedCompletionSession] =
+        useState<MentorSession | null>(completionSession);
     const completionForm = useForm({
         achievement: '',
         improvement_area: '',
-        next_improvement_plan: nextSession?.improvementPlan ?? '',
+        next_improvement_plan: nextSessions[0]?.improvementPlan ?? '',
     });
-    const sessionToComplete = completionSession;
-    const isCompletionPending = !!completionSession;
-    const focusPlan =
-        nextSession?.improvementPlan ??
-        'No previous improvement plan recorded yet.';
 
-    const openCompletionDialog = () => {
+    const openCompletionDialog = (session: MentorSession) => {
+        setSelectedCompletionSession(session);
         completionForm.setData({
             achievement: '',
             improvement_area: '',
-            next_improvement_plan:
-                completionSession?.improvementPlan ??
-                nextSession?.improvementPlan ??
-                '',
+            next_improvement_plan: session.improvementPlan ?? '',
         });
         completionForm.clearErrors();
         setCompletionDialogOpen(true);
     };
 
     const saveCompletion = () => {
-        if (!sessionToComplete) {
+        if (!selectedCompletionSession) {
             return;
         }
 
         completionForm.post(
-            `/mentor/sessions/${sessionToComplete.id}/complete`,
+            `/mentor/sessions/${selectedCompletionSession.id}/complete`,
             {
                 preserveScroll: true,
                 onSuccess: () => {
                     setCompletionDialogOpen(false);
+                    setSelectedCompletionSession(null);
                     completionForm.reset();
                     toast.success('Session journal completed.');
                 },
@@ -131,7 +284,9 @@ export default function MentorDashboard({
                             <DialogTitle>Complete session</DialogTitle>
                             <DialogDescription>
                                 Record the teaching journal for{' '}
-                                {sessionToComplete?.student ?? 'this student'}.
+                                {selectedCompletionSession?.student ??
+                                    'this student'}
+                                .
                             </DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-4">
@@ -245,180 +400,200 @@ export default function MentorDashboard({
                         </p>
                     </div>
                     <Button asChild variant="outline" className="gap-2">
-                        <Link href="/scheduling/schedules">
+                        <Link href="/schedules">
                             View schedules
                             <ArrowUpRight className="size-4" />
                         </Link>
                     </Button>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
-                    {stats.map((item) => {
-                        const Icon = statIcons[item.label];
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    {stats.map((item) => (
+                        <Card key={item.label}>
+                            <CardContent className="relative flex min-h-40 flex-col justify-between px-6">
+                                <div className="flex items-start justify-between gap-4">
+                                    <p className="min-w-0 truncate text-sm text-muted-foreground">
+                                        {item.label}
+                                    </p>
+                                    <Button
+                                        asChild
+                                        variant="secondary"
+                                        size="icon"
+                                        className="-mt-1 size-8 shrink-0 rounded-full"
+                                    >
+                                        <Link href="/schedules">
+                                            <ArrowUpRight className="size-3.5" />
+                                        </Link>
+                                    </Button>
+                                </div>
 
-                        return (
-                            <Card key={item.label}>
-                                <CardContent className="flex items-center gap-4 px-6 py-5">
-                                    <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                                        <Icon className="size-5" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">
-                                            {item.label}
-                                        </p>
-                                        <p className="mt-1 text-2xl font-semibold">
+                                <div>
+                                    <div className="flex items-end gap-2">
+                                        <p
+                                            className={cn(
+                                                'text-5xl font-semibold tracking-normal',
+                                                item.label ===
+                                                    'Pending journals' &&
+                                                    Number(item.value) > 0 &&
+                                                    'text-destructive',
+                                            )}
+                                        >
                                             {item.value}
                                         </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {item.helper}
-                                        </p>
                                     </div>
-                                </CardContent>
-                            </Card>
-                        );
-                    })}
+                                    <p className="mt-2 truncate text-xs text-muted-foreground">
+                                        {item.helper}
+                                    </p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
                 </div>
 
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Today&apos;s sessions</CardTitle>
-                            <CardDescription>
-                                Sessions assigned to you today.
-                            </CardDescription>
+                            <CardTitle>Next session</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-3">
-                            {todaySessions.length > 0 ? (
-                                todaySessions.map((session) => (
-                                    <div
-                                        key={session.id}
-                                        className="flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4"
-                                    >
-                                        <div className="min-w-0">
-                                            <p className="font-medium">
-                                                {session.student}
-                                            </p>
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                {session.title} ·{' '}
-                                                {session.program}
-                                            </p>
+                        <CardContent className="space-y-4">
+                            {nextSessionGroups.length > 0 ? (
+                                <div className="space-y-5">
+                                    {nextSessionGroups.map((group) => (
+                                        <div
+                                            key={group.key}
+                                            className="space-y-3"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <p className="shrink-0 text-xs font-semibold tracking-normal text-muted-foreground">
+                                                    {group.label}
+                                                </p>
+                                                {/* <div className="h-px flex-1 bg-border" /> */}
+                                            </div>
+
+                                            {group.sessions.map((session) => (
+                                                <div
+                                                    key={session.id}
+                                                    className="rounded-lg border p-4"
+                                                >
+                                                    <div className="flex flex-wrap items-start justify-between gap-4">
+                                                        <NextSessionSummary
+                                                            session={session}
+                                                            showFocus={
+                                                                session.id ===
+                                                                nearestSessionId
+                                                            }
+                                                        />
+                                                        <OpenRoomButton
+                                                            session={session}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
-                                        <div className="flex items-center gap-3">
-                                            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                                                <Clock3 className="size-4" />
-                                                {session.time}
-                                            </p>
-                                            <Badge variant="secondary">
-                                                {session.status}
-                                            </Badge>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                                    No sessions scheduled today.
+                                    ))}
                                 </div>
+                            ) : (
+                                <EmptyState>
+                                    No upcoming session assigned.
+                                </EmptyState>
                             )}
                         </CardContent>
                     </Card>
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>Next session</CardTitle>
-                            <CardDescription>
-                                Quick access to your upcoming room.
-                            </CardDescription>
+                            <CardTitle>Journal needs completion</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            {isCompletionPending && completionSession ? (
-                                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-                                    <p className="flex items-center gap-2 font-medium text-destructive">
-                                        <CircleAlert className="size-4" />
-                                        Complete previous session
-                                    </p>
-                                    <p className="mt-2 text-sm text-muted-foreground">
-                                        {completionSession.student} ·{' '}
-                                        {completionSession.title}
-                                    </p>
-                                    <Button
-                                        type="button"
-                                        className="mt-4 w-full"
-                                        onClick={openCompletionDialog}
+                        <CardContent className="space-y-3">
+                            {pendingJournals.length > 0 ? (
+                                pendingJournals.map((session) => (
+                                    <div
+                                        key={session.id}
+                                        className="rounded-lg border p-4"
                                     >
-                                        Complete session
-                                    </Button>
-                                </div>
-                            ) : nextSession ? (
-                                <div className="rounded-lg border p-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                                            <MonitorUp className="size-5" />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="truncate font-medium">
-                                                {nextSession.title}
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {nextSession.student}
+                                        <div className="min-w-0 space-y-1">
+                                            <SessionSummary
+                                                session={session}
+                                            />
+                                            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                                                <Clock3 className="size-4" />
+                                                {session.time}
                                             </p>
                                         </div>
+                                        <Button
+                                            type="button"
+                                            className="mt-4 w-full"
+                                            onClick={() =>
+                                                openCompletionDialog(session)
+                                            }
+                                        >
+                                            Complete
+                                        </Button>
                                     </div>
-                                    <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
-                                        <Clock3 className="size-4" />
-                                        {nextSession.time}
-                                    </p>
-                                    <Button
-                                        asChild={!!nextSession.zoomLink}
-                                        className="mt-4 w-full"
-                                        disabled={!nextSession.zoomLink}
-                                    >
-                                        {nextSession.zoomLink ? (
-                                            <a
-                                                href={nextSession.zoomLink}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                            >
-                                                Open room
-                                            </a>
-                                        ) : (
-                                            <span>Room not ready</span>
-                                        )}
-                                    </Button>
-                                </div>
+                                ))
                             ) : (
-                                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                                    No upcoming session assigned.
-                                </div>
+                                <EmptyState>No pending journals.</EmptyState>
                             )}
-                            <div className="rounded-lg border p-4">
-                                <p className="flex items-center gap-2 font-medium">
-                                    <MessageSquareText className="size-4 text-primary" />
-                                    Focus
-                                </p>
-                                <p className="mt-2 text-sm text-muted-foreground">
-                                    {focusPlan}
-                                </p>
-                            </div>
                         </CardContent>
                     </Card>
                 </div>
 
                 <Card>
-                    <CardHeader>
-                        <CardTitle>Focus list</CardTitle>
-                        <CardDescription>
-                            Priority follow-ups before the end of the day.
-                        </CardDescription>
+                    <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
+                        <div>
+                            <CardTitle>Recent journals</CardTitle>
+                        </div>
+                        <Link
+                            href="/journals"
+                            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                        >
+                            View all
+                            <ArrowUpRight className="size-4" />
+                        </Link>
                     </CardHeader>
-                    <CardContent className="grid gap-3 md:grid-cols-3">
-                        {focusItems.map((item) => (
-                            <div
-                                key={item}
-                                className="rounded-lg border p-4 text-sm"
-                            >
-                                {item}
+                    <CardContent>
+                        {recentJournals.length > 0 ? (
+                            <div className="divide-y rounded-lg border">
+                                {recentJournals.map((journal) => (
+                                    <div
+                                        key={journal.id}
+                                        className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_auto]"
+                                    >
+                                        <div className="min-w-0">
+                                            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                                                <p className="truncate font-medium">
+                                                    {journal.student}
+                                                </p>
+                                                <span className="text-sm text-muted-foreground">
+                                                    {journal.date}
+                                                </span>
+                                            </div>
+                                            <p className="mt-1 truncate text-sm text-muted-foreground">
+                                                {journal.title} ·{' '}
+                                                {journal.program}
+                                            </p>
+                                            <p className="mt-2 line-clamp-2 text-sm italic text-muted-foreground">
+                                                * {journal.improvementPlan}
+                                            </p>
+                                        </div>
+                                        <Button
+                                            asChild
+                                            variant="ghost"
+                                            size="sm"
+                                            className="justify-self-start md:justify-self-end"
+                                        >
+                                            <Link
+                                                href={`/journals/${journal.slug}`}
+                                            >
+                                                Review
+                                            </Link>
+                                        </Button>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
+                        ) : (
+                            <EmptyState>No recent journals yet.</EmptyState>
+                        )}
                     </CardContent>
                 </Card>
             </div>
