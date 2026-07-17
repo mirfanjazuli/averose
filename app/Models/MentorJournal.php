@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['session_booking_id', 'mentor_id', 'student_id', 'subject_id', 'slug', 'note', 'achievement', 'improvement_area', 'next_improvement_plan'])]
+#[Fillable(['schedule_id', 'mentor_id', 'student_id', 'subject_id', 'slug', 'note', 'achievement', 'improvement_area', 'next_improvement_plan'])]
 class MentorJournal extends Model
 {
     /** @use HasFactory<MentorJournalFactory> */
@@ -19,9 +19,9 @@ class MentorJournal extends Model
         return 'slug';
     }
 
-    public function sessionBooking(): BelongsTo
+    public function schedule(): BelongsTo
     {
-        return $this->belongsTo(SessionBooking::class);
+        return $this->belongsTo(Schedule::class);
     }
 
     public function mentor(): BelongsTo

@@ -13,7 +13,7 @@ class AcademicFieldController extends Controller
 {
     public function index(): Response
     {
-        return Inertia::render('admin/academics/fields', [
+        return Inertia::render('admin/academics/fields/index', [
             'fields' => AcademicField::query()
                 ->withCount(['programs', 'subjects'])
                 ->latest()
@@ -46,7 +46,7 @@ class AcademicFieldController extends Controller
 
     public function destroy(AcademicField $academicField): RedirectResponse
     {
-        $academicField->delete();
+        $academicField->update(['status' => 'inactive']);
 
         return back();
     }

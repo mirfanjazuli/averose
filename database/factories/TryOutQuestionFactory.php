@@ -26,11 +26,16 @@ class TryOutQuestionFactory extends Factory
             'E' => fake()->sentence(),
         ];
 
+        $answer = fake()->randomElement(['A', 'B', 'C', 'D', 'E']);
+
         return [
-            'answer' => fake()->randomElement(['A', 'B', 'C', 'D', 'E']),
+            'answer' => $answer,
+            'correct_answers' => null,
             'number' => fake()->unique()->numberBetween(1, 100),
+            'question_type' => 'single_choice',
             'options' => $options,
             'options_html' => $options,
+            'points' => 1,
             'question_html' => fake()->sentence(),
             'question_text' => fake()->sentence(),
             'subject_name' => fake()->randomElement(['Matematika IPA', 'Fisika', 'Kimia', 'Biologi']),

@@ -1,9 +1,25 @@
-import { ChevronRight } from 'lucide-react';
-import { programs } from './data';
+import { BookOpenCheck, ChevronRight } from 'lucide-react';
 import { consultationUrl } from './links';
 import SectionHeading from './section-heading';
 
-export default function ProgramsSection() {
+type LandingProgram = {
+    description: string | null;
+    eyebrow: string;
+    id: number;
+    slug: string;
+    thumbnailUrl: string | null;
+    title: string;
+};
+
+export default function ProgramsSection({
+    programs,
+}: {
+    programs: LandingProgram[];
+}) {
+    if (programs.length === 0) {
+        return null;
+    }
+
     return (
         <section
             id="program"
@@ -22,25 +38,30 @@ export default function ProgramsSection() {
                 </div>
                 <div className="mt-10 grid gap-5 sm:mt-12 md:grid-cols-3">
                     {programs.map((program, index) => {
-                        const Icon = program.icon;
-
                         return (
                             <article
-                                key={program.title}
+                                key={program.id}
                                 className="group relative overflow-hidden rounded-[1.75rem] border bg-card p-5 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-xl sm:rounded-[2rem] sm:p-6"
                             >
-                                <div
-                                    className={`flex aspect-[4/3] items-center justify-center overflow-hidden rounded-[1.35rem] sm:rounded-[1.5rem] ${program.tone}`}
-                                >
-                                    <div className="relative flex size-28 items-center justify-center rounded-full border border-current/15 bg-background/10 sm:size-32">
-                                        <Icon
-                                            className="size-14 sm:size-16"
-                                            strokeWidth={1.35}
+                                <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-[1.35rem] bg-primary/10 text-primary sm:rounded-[1.5rem]">
+                                    {program.thumbnailUrl ? (
+                                        <img
+                                            src={program.thumbnailUrl}
+                                            alt=""
+                                            className="size-full object-cover transition duration-500 group-hover:scale-105"
                                         />
-                                        <span className="absolute -top-2 -right-3 flex size-10 items-center justify-center rounded-xl bg-background text-sm font-bold text-foreground shadow-lg sm:size-11 sm:rounded-2xl">
-                                            0{index + 1}
-                                        </span>
-                                    </div>
+                                    ) : (
+                                        <div className="flex size-28 items-center justify-center rounded-full border border-current/15 bg-background/60 sm:size-32">
+                                            <BookOpenCheck
+                                                className="size-14 sm:size-16"
+                                                strokeWidth={1.35}
+                                            />
+                                        </div>
+                                    )}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-black/0 to-black/0" />
+                                    <span className="absolute top-4 right-4 flex size-10 items-center justify-center rounded-xl bg-background text-sm font-bold text-foreground shadow-lg sm:size-11 sm:rounded-2xl">
+                                        {String(index + 1).padStart(2, '0')}
+                                    </span>
                                 </div>
                                 <div className="px-1 pt-6">
                                     <p className="text-xs font-semibold tracking-[0.16em] text-primary uppercase">
@@ -50,7 +71,8 @@ export default function ProgramsSection() {
                                         {program.title}
                                     </h3>
                                     <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                                        {program.description}
+                                        {program.description ||
+                                            'Program belajar AveRose dengan pendampingan personal dan target yang terukur.'}
                                     </p>
                                     <a
                                         href={consultationUrl}

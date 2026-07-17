@@ -14,45 +14,16 @@
         <meta charset="utf-8">
         <title>Averose Admin Dashboard</title>
         <style>
-            @page {
-                size: A4;
-            }
-
-            * {
-                box-sizing: border-box;
-            }
-
             body {
                 margin: 0;
                 color: #182320;
                 font-family: Inter, Arial, sans-serif;
                 font-size: 11px;
                 line-height: 1.45;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
             }
 
-            .watermark {
-                left: 50%;
-                opacity: 0.88;
-                position: fixed;
-                top: 50%;
-                transform: translate(-50%, -50%);
-                width: 112mm;
-                z-index: -1;
-            }
-
-            .watermark img {
-                display: block;
-                width: 100%;
-            }
-
-            .report-page {
-                break-after: page;
-            }
-
-            .report-page:last-child {
-                break-after: auto;
+            .page-break {
+                page-break-before: always;
             }
 
             h1,
@@ -83,32 +54,28 @@
             }
 
             .document-head {
-                align-items: flex-start;
-                display: flex;
-                gap: 18px;
-                justify-content: space-between;
                 margin-bottom: 16px;
+                width: 100%;
             }
 
             .document-title {
-                max-width: 105mm;
+                width: 62%;
             }
 
             .document-meta {
                 border-left: 2px solid #16735b;
-                min-width: 56mm;
                 padding-left: 10px;
+                width: 38%;
             }
 
             .meta-row {
-                display: grid;
-                gap: 8px;
-                grid-template-columns: 20mm minmax(0, 1fr);
                 margin-bottom: 3px;
             }
 
             .meta-label {
                 color: #66736f;
+                display: inline-block;
+                width: 20mm;
             }
 
             .section {
@@ -116,15 +83,9 @@
             }
 
             table {
-                border-collapse: separate;
-                border-spacing: 0;
+                border-collapse: collapse;
                 margin: 6px 0 12px;
-                table-layout: fixed;
                 width: 100%;
-            }
-
-            thead {
-                display: table-header-group;
             }
 
             thead th {
@@ -139,8 +100,7 @@
 
             th,
             td {
-                overflow-wrap: anywhere;
-                word-break: normal;
+                vertical-align: top;
             }
 
             tbody td {
@@ -154,7 +114,10 @@
             }
 
             .number {
-                font-variant-numeric: tabular-nums;
+                text-align: right;
+            }
+
+            thead th.number {
                 text-align: right;
             }
 
@@ -164,7 +127,8 @@
             }
 
             .summary-table tbody td {
-                padding-block: 8px;
+                padding-bottom: 8px;
+                padding-top: 8px;
             }
 
             .summary-value {
@@ -185,45 +149,31 @@
                 width: 22%;
             }
 
-            .two-column {
-                display: grid;
-                gap: 12px;
-                grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-
             .data-panel {
-                break-inside: avoid;
-            }
-
-            tr {
-                break-inside: avoid;
+                margin-bottom: 16px;
             }
         </style>
     </head>
     <body>
-        @if ($watermarkImage)
-            <div class="watermark">
-                <img src="{{ $watermarkImage }}" alt="">
-            </div>
-        @endif
-
-        <section class="report-page">
-            <header class="document-head">
-                <div class="document-title">
-                    <h1>Laporan Dashboard</h1>
-                    <p class="muted">Ringkasan data operasional Averose berdasarkan periode terpilih.</p>
-                </div>
-                <div class="document-meta">
-                    <div class="meta-row">
-                        <span class="meta-label">Periode</span>
-                        <span>{{ $period }}</span>
-                    </div>
-                    <div class="meta-row">
-                        <span class="meta-label">Dibuat</span>
-                        <span>{{ $generatedAt->format('d M Y H:i') }}</span>
-                    </div>
-                </div>
-            </header>
+        <section>
+            <table class="document-head">
+                <tr>
+                    <td class="document-title">
+                        <h1>Laporan Dashboard</h1>
+                        <p class="muted">Ringkasan data operasional Averose berdasarkan periode terpilih.</p>
+                    </td>
+                    <td class="document-meta">
+                        <div class="meta-row">
+                            <span class="meta-label">Periode</span>
+                            <span>{{ $period }}</span>
+                        </div>
+                        <div class="meta-row">
+                            <span class="meta-label">Dibuat</span>
+                            <span>{{ $generatedAt->format('d M Y H:i') }}</span>
+                        </div>
+                    </td>
+                </tr>
+            </table>
 
             <section class="section">
                 <h2>Ringkasan</h2>
@@ -278,9 +228,8 @@
             </section>
         </section>
 
-        <section class="report-page">
-            <div class="two-column">
-                <section class="data-panel">
+        <section class="page-break">
+            <section class="data-panel">
                     <h2>{{ $charts['popularPrograms']['title'] }}</h2>
                     <table>
                         <thead>
@@ -304,9 +253,9 @@
                             @endforelse
                         </tbody>
                     </table>
-                </section>
+            </section>
 
-                <section class="data-panel">
+            <section class="data-panel">
                     <h2>{{ $charts['popularSubjects']['title'] }}</h2>
                     <table>
                         <thead>
@@ -330,8 +279,7 @@
                             @endforelse
                         </tbody>
                     </table>
-                </section>
-            </div>
+            </section>
         </section>
     </body>
 </html>

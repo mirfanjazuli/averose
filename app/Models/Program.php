@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
-#[Fillable(['name', 'slug', 'description', 'max_reschedule', 'status'])]
+#[Fillable(['name', 'slug', 'thumbnail', 'description', 'max_reschedule', 'status'])]
 class Program extends Model
 {
     /** @use HasFactory<ProgramFactory> */

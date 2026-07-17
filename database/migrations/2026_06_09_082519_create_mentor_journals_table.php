@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('mentor_journals', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('session_booking_id')->unique()->constrained()->cascadeOnDelete();
+            $table->foreignId('schedule_id')->unique()->constrained('schedules')->cascadeOnDelete();
             $table->foreignId('mentor_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('student_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('subject_id')->nullable()->constrained()->nullOnDelete();

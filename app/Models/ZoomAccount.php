@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
-#[Fillable(['name', 'account_id', 'client_id', 'client_secret', 'token_secret'])]
+#[Fillable(['name', 'account_id', 'client_id', 'client_secret', 'token_secret', 'status'])]
 #[Hidden(['client_secret', 'token_secret'])]
 class ZoomAccount extends Model
 {
@@ -22,9 +22,9 @@ class ZoomAccount extends Model
         return 'slug';
     }
 
-    public function sessionBookings(): HasMany
+    public function schedules(): HasMany
     {
-        return $this->hasMany(SessionBooking::class);
+        return $this->hasMany(Schedule::class);
     }
 
     protected static function booted(): void

@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\AcademicField;
 use App\Models\Program;
 use App\Models\ProgramVariant;
-use App\Models\SessionBooking;
+use App\Models\Schedule;
 use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -47,7 +47,7 @@ class DashboardTest extends TestCase
             'status' => 'active',
         ]);
 
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'user_id' => $student->id,
             'mentor_id' => $mentor->id,
             'program_enrollment_id' => $enrollment->id,
@@ -62,7 +62,7 @@ class DashboardTest extends TestCase
         $response
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('admin/dashboard')
+                ->component('admin/dashboard/index')
                 ->where('stats.0.label', 'Total Program')
                 ->where('stats.0.value', '1')
                 ->where('stats.1.label', 'Total Sesi')
@@ -101,25 +101,25 @@ class DashboardTest extends TestCase
             'updated_at' => '2026-07-10 09:00:00',
         ]);
 
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'user_id' => $student->id,
             'program_enrollment_id' => $enrollment->id,
             'subject_id' => $subject->id,
             'scheduled_at' => '2026-06-10 09:00:00',
         ]);
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'user_id' => $student->id,
             'program_enrollment_id' => $enrollment->id,
             'subject_id' => $subject->id,
             'scheduled_at' => '2026-06-20 09:00:00',
         ]);
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'user_id' => $student->id,
             'program_enrollment_id' => $enrollment->id,
             'subject_id' => $subject->id,
             'scheduled_at' => '2026-07-10 09:00:00',
         ]);
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'user_id' => $student->id,
             'program_enrollment_id' => $enrollment->id,
             'subject_id' => $subject->id,
@@ -133,7 +133,7 @@ class DashboardTest extends TestCase
             ]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('admin/dashboard')
+                ->component('admin/dashboard/index')
                 ->where('filters.from', '2026-07-01')
                 ->where('filters.to', '2026-07-31')
                 ->where('stats.1.value', '1')
@@ -177,19 +177,19 @@ class DashboardTest extends TestCase
             'updated_at' => '2026-03-03 09:00:00',
         ])->save();
 
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'user_id' => $student->id,
             'program_enrollment_id' => $enrollment->id,
             'subject_id' => $subject->id,
             'scheduled_at' => '2026-01-10 09:00:00',
         ]);
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'user_id' => $student->id,
             'program_enrollment_id' => $enrollment->id,
             'subject_id' => $subject->id,
             'scheduled_at' => '2026-01-20 09:00:00',
         ]);
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'user_id' => $student->id,
             'program_enrollment_id' => $enrollment->id,
             'subject_id' => $subject->id,
@@ -203,7 +203,7 @@ class DashboardTest extends TestCase
             ]))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('admin/dashboard')
+                ->component('admin/dashboard/index')
                 ->has('charts.sessionTotals.items', 12)
                 ->where('charts.sessionTotals.items.0.label', 'Jan')
                 ->where('charts.sessionTotals.items.0.value', 2)
@@ -244,7 +244,7 @@ class DashboardTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('mentor/dashboard'));
+            ->assertInertia(fn (Assert $page) => $page->component('mentor/dashboard/index'));
     }
 
     public function test_mentor_dashboard_shows_two_nearest_next_sessions(): void
@@ -262,7 +262,7 @@ class DashboardTest extends TestCase
         ]);
         $subject = Subject::factory()->create();
 
-        $nearestSession = SessionBooking::factory()->create([
+        $nearestSession = Schedule::factory()->create([
             'user_id' => $student->id,
             'mentor_id' => $mentor->id,
             'program_enrollment_id' => $enrollment->id,
@@ -270,7 +270,7 @@ class DashboardTest extends TestCase
             'scheduled_at' => now()->addHour(),
             'status' => 'assigned',
         ]);
-        $secondNearestSession = SessionBooking::factory()->create([
+        $secondNearestSession = Schedule::factory()->create([
             'user_id' => $student->id,
             'mentor_id' => $mentor->id,
             'program_enrollment_id' => $enrollment->id,
@@ -278,7 +278,7 @@ class DashboardTest extends TestCase
             'scheduled_at' => now()->addDay(),
             'status' => 'rescheduled',
         ]);
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'user_id' => $student->id,
             'mentor_id' => $mentor->id,
             'program_enrollment_id' => $enrollment->id,
@@ -291,7 +291,7 @@ class DashboardTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('mentor/dashboard')
+                ->component('mentor/dashboard/index')
                 ->has('nextSessions', 2)
                 ->where('nextSessions.0.id', (string) $nearestSession->id)
                 ->where('nextSessions.1.id', (string) $secondNearestSession->id)
@@ -307,7 +307,7 @@ class DashboardTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('student/dashboard'));
+            ->assertInertia(fn (Assert $page) => $page->component('student/dashboard/index'));
     }
 
     public function test_student_dashboard_receives_booking_subject_options(): void
@@ -340,7 +340,7 @@ class DashboardTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('student/dashboard')
+                ->component('student/dashboard/index')
                 ->where('subjects.0.label', 'Academic Writing')
                 ->where('subjects.0.program', 'IELTS Intensive')
                 ->where('subjects.0.duration', 120)
@@ -374,7 +374,7 @@ class DashboardTest extends TestCase
             'status' => 'active',
         ]);
 
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'user_id' => $student->id,
             'program_enrollment_id' => $enrollment->id,
             'subject_id' => $subject->id,
@@ -387,7 +387,7 @@ class DashboardTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('student/dashboard')
+                ->component('student/dashboard/index')
                 ->where('sessions.0.title', 'Speaking Review')
                 ->where('sessions.0.program', 'IELTS Intensive')
                 ->where('stats.activePrograms', 1)

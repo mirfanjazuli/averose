@@ -8,7 +8,16 @@ import Navbar from '@/components/landing/navbar';
 import ProgramsSection from '@/components/landing/programs-section';
 import SuccessStoriesSection from '@/components/landing/success-stories-section';
 
-export default function Welcome() {
+type LandingProgram = {
+    description: string | null;
+    eyebrow: string;
+    id: number;
+    slug: string;
+    thumbnailUrl: string | null;
+    title: string;
+};
+
+export default function Welcome({ programs }: { programs: LandingProgram[] }) {
     const { auth } = usePage().props;
 
     return (
@@ -24,7 +33,7 @@ export default function Welcome() {
                 <Navbar isAuthenticated={Boolean(auth.user)} />
                 <main>
                     <HeroSection />
-                    <ProgramsSection />
+                    <ProgramsSection programs={programs} />
                     <AdvantagesSection />
                     <SuccessStoriesSection />
                     <ArticlesSection />

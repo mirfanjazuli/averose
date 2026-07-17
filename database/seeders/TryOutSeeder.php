@@ -16,7 +16,7 @@ class TryOutSeeder extends Seeder
             ->hasQuestions(10)
             ->create([
                 'duration_minutes' => 120,
-                'status' => 'published',
+                'status' => 'public',
                 'title' => 'Sample Try Out',
             ]);
     }

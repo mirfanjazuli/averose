@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\N8n;
 
 use App\Http\Controllers\Controller;
-use App\Models\SessionBooking;
-use App\Models\SessionRecording;
+use App\Models\Recording;
+use App\Models\Schedule;
 use App\Models\ZoomAccount;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -41,27 +41,28 @@ class YoutubeRecordingController extends Controller
             'Zoom account_id does not match the app_key.',
         );
 
-        $booking = SessionBooking::query()
+        $booking = Schedule::query()
             ->where('zoom_account_id', $zoomAccount->id)
             ->where('zoom_meeting_id', $validated['meeting_id'])
             ->first();
 
         if (! $booking) {
             return response()->json([
-                'message' => 'No session booking matches this Zoom meeting.',
+                'message' => 'No schedule matches this Zoom meeting.',
                 'received' => Arr::only($validated, ['app_key', 'account_id', 'meeting_id', 'meeting_uuid', 'start_time', 'youtube_video_id']),
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $youtubeUrl = $this->youtubeUrl($validated);
 
-        $recording = SessionRecording::query()->updateOrCreate(
+        $recording = Recording::query()->updateOrCreate(
             ['youtube_video_id' => $validated['youtube_video_id']],
             [
                 'duration' => $validated['duration'] ?? null,
                 'metadata' => Arr::only($validated, ['recording_type']),
                 'recorded_at' => $validated['start_time'] ?? null,
-                'session_booking_id' => $booking->id,
+                'schedule_id' => $booking->id,
+                'status' => 'active',
                 'title' => $validated['title'] ?? ($booking->subject?->name ?? 'Session recording'),
                 'user_id' => $booking->user_id,
                 'youtube_url' => $youtubeUrl,

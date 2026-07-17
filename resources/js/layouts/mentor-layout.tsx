@@ -1,7 +1,7 @@
 import { AppContent } from '@/components/app-content';
 import { AppShell } from '@/components/app-shell';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
-import { MentorSidebar } from '@/components/mentor-sidebar';
+import { MentorSidebar } from '@/components/mentor/mentor-sidebar';
 import type { AppLayoutProps } from '@/types';
 
 export default function MentorLayout({

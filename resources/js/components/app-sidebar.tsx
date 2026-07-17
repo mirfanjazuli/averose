@@ -1,6 +1,8 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
+    Activity,
     BookOpenText,
+    BriefcaseBusiness,
     CalendarOff,
     CalendarClock,
     CalendarDays,
@@ -11,11 +13,12 @@ import {
     LayoutGrid,
     Layers3,
     LibraryBig,
+    KeyRound,
+    Play,
     Repeat2,
     NotebookPen,
     Shapes,
     UserRoundCheck,
-    UsersRound,
     Users,
     Video,
 } from 'lucide-react';
@@ -43,23 +46,51 @@ import { dashboard } from '@/routes';
 
 export function AppSidebar() {
     const page = usePage<{
+        auth?: {
+            user?: {
+                permissions?: string[];
+            } | null;
+        };
         navigation?: {
             pendingRescheduleRequests?: number;
         };
     }>();
     const { isCurrentUrl } = useCurrentUrl();
+    const permissions = page.props.auth?.user?.permissions ?? [];
+    const can = (permission: string) => permissions.includes(permission);
+    const canAny = (items: string[]) => items.some((item) => can(item));
     const pendingRescheduleRequests =
         page.props.navigation?.pendingRescheduleRequests ?? 0;
     const isSchedulesOpen = isCurrentUrl('/scheduling', undefined, true);
     const isUsersOpen =
+        isCurrentUrl('/users/internal', undefined, true) ||
         isCurrentUrl('/users/students', undefined, true) ||
-        isCurrentUrl('/users/mentors', undefined, true);
+        isCurrentUrl('/users/mentors', undefined, true) ||
+        isCurrentUrl('/users/roles', undefined, true);
     const isAcademicsOpen =
         isCurrentUrl('/academics/fields', undefined, true) ||
         isCurrentUrl('/academics/programs', undefined, true) ||
         isCurrentUrl('/academics/subjects', undefined, true) ||
         isCurrentUrl('/academics/try-outs', undefined, true);
     const isMentoringOpen = isCurrentUrl('/monitoring', undefined, true);
+    const showDashboard = can('dashboard.view');
+    const showScheduling = can('schedules.view');
+    const showUsers = canAny([
+        'internal.view',
+        'students.view',
+        'mentors.view',
+        'roles.view',
+    ]);
+    const showAcademics = canAny([
+        'fields.view',
+        'programs.view',
+        'subjects.view',
+        'try_outs.view',
+    ]);
+    const showMonitoring = canAny([
+        'mentor_journals.view',
+        'recordings.view',
+    ]);
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -77,20 +108,23 @@ export function AppSidebar() {
 
             <SidebarContent>
                 <SidebarMenu className="px-2">
-                    <SidebarMenuItem>
-                        <SidebarMenuButton
-                            asChild
-                            isActive={isCurrentUrl(dashboard())}
-                            tooltip={{ children: 'Dashboard' }}
-                        >
-                            <Link href={dashboard()} prefetch>
-                                <LayoutGrid />
-                                <span>Dashboard</span>
-                            </Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
+                    {showDashboard && (
+                        <SidebarMenuItem>
+                            <SidebarMenuButton
+                                asChild
+                                isActive={isCurrentUrl(dashboard())}
+                                tooltip={{ children: 'Dashboard' }}
+                            >
+                                <Link href={dashboard()} prefetch>
+                                    <LayoutGrid />
+                                    <span>Dashboard</span>
+                                </Link>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
+                    )}
 
-                    <Collapsible
+                    {showScheduling && (
+                        <Collapsible
                         asChild
                         defaultOpen={isSchedulesOpen}
                         className="group/collapsible"
@@ -121,22 +155,6 @@ export function AppSidebar() {
                                             >
                                                 <CalendarClock />
                                                 <span>Schedules</span>
-                                            </Link>
-                                        </SidebarMenuSubButton>
-                                    </SidebarMenuSubItem>
-                                    <SidebarMenuSubItem>
-                                        <SidebarMenuSubButton
-                                            asChild
-                                            isActive={isCurrentUrl(
-                                                '/scheduling/mentor-assignments',
-                                            )}
-                                        >
-                                            <Link
-                                                href="/scheduling/mentor-assignments"
-                                                prefetch
-                                            >
-                                                <UsersRound />
-                                                <span>Mentor Assignment</span>
                                             </Link>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
@@ -202,8 +220,10 @@ export function AppSidebar() {
                             </CollapsibleContent>
                         </SidebarMenuItem>
                     </Collapsible>
+                    )}
 
-                    <Collapsible
+                    {showUsers && (
+                        <Collapsible
                         asChild
                         defaultOpen={isUsersOpen}
                         className="group/collapsible"
@@ -221,7 +241,25 @@ export function AppSidebar() {
                             </CollapsibleTrigger>
                             <CollapsibleContent>
                                 <SidebarMenuSub>
-                                    <SidebarMenuSubItem>
+                                    {can('internal.view') && (
+                                        <SidebarMenuSubItem>
+                                            <SidebarMenuSubButton
+                                                asChild
+                                                isActive={isCurrentUrl(
+                                                    '/users/internal',
+                                                    undefined,
+                                                    true,
+                                                )}
+                                            >
+                                                <Link href="/users/internal" prefetch>
+                                                    <BriefcaseBusiness />
+                                                    <span>Internal</span>
+                                                </Link>
+                                            </SidebarMenuSubButton>
+                                        </SidebarMenuSubItem>
+                                    )}
+                                    {can('students.view') && (
+                                        <SidebarMenuSubItem>
                                         <SidebarMenuSubButton
                                             asChild
                                             isActive={isCurrentUrl(
@@ -239,7 +277,9 @@ export function AppSidebar() {
                                             </Link>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
-                                    <SidebarMenuSubItem>
+                                    )}
+                                    {can('mentors.view') && (
+                                        <SidebarMenuSubItem>
                                         <SidebarMenuSubButton
                                             asChild
                                             isActive={isCurrentUrl(
@@ -257,11 +297,31 @@ export function AppSidebar() {
                                             </Link>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
+                                    )}
+                                    {can('roles.view') && (
+                                        <SidebarMenuSubItem>
+                                            <SidebarMenuSubButton
+                                                asChild
+                                                isActive={isCurrentUrl(
+                                                    '/users/roles',
+                                                    undefined,
+                                                    true,
+                                            )}
+                                        >
+                                            <Link href="/users/roles" prefetch>
+                                                    <KeyRound />
+                                                    <span>Roles & Permissions</span>
+                                                </Link>
+                                            </SidebarMenuSubButton>
+                                        </SidebarMenuSubItem>
+                                    )}
                                 </SidebarMenuSub>
                             </CollapsibleContent>
                         </SidebarMenuItem>
                     </Collapsible>
-                    <Collapsible
+                    )}
+                    {showAcademics && (
+                        <Collapsible
                         asChild
                         defaultOpen={isAcademicsOpen}
                         className="group/collapsible"
@@ -279,7 +339,8 @@ export function AppSidebar() {
                             </CollapsibleTrigger>
                             <CollapsibleContent>
                                 <SidebarMenuSub>
-                                    <SidebarMenuSubItem>
+                                    {can('fields.view') && (
+                                        <SidebarMenuSubItem>
                                         <SidebarMenuSubButton
                                             asChild
                                             isActive={isCurrentUrl(
@@ -295,7 +356,9 @@ export function AppSidebar() {
                                             </Link>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
-                                    <SidebarMenuSubItem>
+                                    )}
+                                    {can('programs.view') && (
+                                        <SidebarMenuSubItem>
                                         <SidebarMenuSubButton
                                             asChild
                                             isActive={isCurrentUrl(
@@ -313,7 +376,9 @@ export function AppSidebar() {
                                             </Link>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
-                                    <SidebarMenuSubItem>
+                                    )}
+                                    {can('subjects.view') && (
+                                        <SidebarMenuSubItem>
                                         <SidebarMenuSubButton
                                             asChild
                                             isActive={isCurrentUrl(
@@ -329,7 +394,9 @@ export function AppSidebar() {
                                             </Link>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
-                                    <SidebarMenuSubItem>
+                                    )}
+                                    {can('try_outs.view') && (
+                                        <SidebarMenuSubItem>
                                         <SidebarMenuSubButton
                                             asChild
                                             isActive={isCurrentUrl(
@@ -345,12 +412,15 @@ export function AppSidebar() {
                                             </Link>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
+                                    )}
                                 </SidebarMenuSub>
                             </CollapsibleContent>
                         </SidebarMenuItem>
                     </Collapsible>
+                    )}
 
-                    <Collapsible
+                    {showMonitoring && (
+                        <Collapsible
                         asChild
                         defaultOpen={isMentoringOpen}
                         className="group/collapsible"
@@ -361,14 +431,15 @@ export function AppSidebar() {
                                     isActive={isMentoringOpen}
                                     tooltip={{ children: 'Monitoring' }}
                                 >
-                                    <UserRoundCheck />
+                                    <Activity />
                                     <span>Monitoring</span>
                                     <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                                 </SidebarMenuButton>
                             </CollapsibleTrigger>
                             <CollapsibleContent>
                                 <SidebarMenuSub>
-                                    <SidebarMenuSubItem>
+                                    {can('mentor_journals.view') && (
+                                        <SidebarMenuSubItem>
                                         <SidebarMenuSubButton
                                             asChild
                                             isActive={isCurrentUrl(
@@ -386,7 +457,9 @@ export function AppSidebar() {
                                             </Link>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
-                                    <SidebarMenuSubItem>
+                                    )}
+                                    {can('recordings.view') && (
+                                        <SidebarMenuSubItem>
                                         <SidebarMenuSubButton
                                             asChild
                                             isActive={isCurrentUrl(
@@ -399,17 +472,20 @@ export function AppSidebar() {
                                                 href="/monitoring/recordings"
                                                 prefetch
                                             >
-                                                <Video />
+                                                <Play />
                                                 <span>Recordings</span>
                                             </Link>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
+                                    )}
                                 </SidebarMenuSub>
                             </CollapsibleContent>
                         </SidebarMenuItem>
                     </Collapsible>
+                    )}
 
-                    <SidebarMenuItem>
+                    {can('zoom_accounts.view') && (
+                        <SidebarMenuItem>
                         <SidebarMenuButton
                             asChild
                             isActive={isCurrentUrl(
@@ -425,6 +501,7 @@ export function AppSidebar() {
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
+                    )}
                 </SidebarMenu>
             </SidebarContent>
 

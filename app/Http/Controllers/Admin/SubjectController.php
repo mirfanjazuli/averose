@@ -13,7 +13,7 @@ class SubjectController extends Controller
 {
     public function index(): Response
     {
-        return Inertia::render('admin/academics/subjects', [
+        return Inertia::render('admin/academics/subjects/index', [
             'subjects' => Subject::query()
                 ->withCount('programs')
                 ->latest()
@@ -52,7 +52,7 @@ class SubjectController extends Controller
 
     public function destroy(Subject $subject): RedirectResponse
     {
-        $subject->delete();
+        $subject->update(['status' => 'inactive']);
 
         return back();
     }

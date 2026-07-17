@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('client_id');
             $table->text('client_secret');
             $table->text('token_secret');
+            $table->string('status')->default('active')->index();
             $table->timestamps();
         });
     }

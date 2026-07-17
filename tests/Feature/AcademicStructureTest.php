@@ -4,10 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\AcademicField;
 use App\Models\Program;
+use App\Models\ProgramEnrollment;
 use App\Models\ProgramVariant;
 use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AcademicStructureTest extends TestCase
@@ -115,6 +118,8 @@ class AcademicStructureTest extends TestCase
 
     public function test_admin_can_store_program_with_academic_relationships(): void
     {
+        Storage::fake('public');
+
         $admin = User::factory()->admin()->create();
         $field = AcademicField::factory()->create();
         $subject = Subject::factory()->create();
@@ -124,6 +129,7 @@ class AcademicStructureTest extends TestCase
                 'name' => 'Frontend Engineering',
                 'description' => 'Build production frontend skills.',
                 'max_reschedule' => 3,
+                'thumbnail' => UploadedFile::fake()->image('program.jpg', 800, 450),
                 'fields' => [$field->id],
                 'subjects' => [$subject->id],
                 'variants' => [
@@ -139,6 +145,9 @@ class AcademicStructureTest extends TestCase
 
         $program = Program::query()->where('slug', 'frontend-engineering')->firstOrFail();
         $variant = ProgramVariant::query()->where('name', '6 x 90 Minutes')->firstOrFail();
+
+        $this->assertNotNull($program->thumbnail);
+        Storage::disk('public')->assertExists($program->thumbnail);
 
         $this->assertDatabaseHas('field_program', [
             'field_id' => $field->id,
@@ -189,7 +198,7 @@ class AcademicStructureTest extends TestCase
             ->get("/academics/programs/{$program->slug}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('admin/academics/program-detail')
+                ->component('admin/academics/programs/show')
                 ->where('breadcrumbs.2.title', 'Frontend Engineering')
                 ->where('program.name', 'Frontend Engineering')
                 ->where('program.variants.0.duration', 90)
@@ -231,6 +240,8 @@ class AcademicStructureTest extends TestCase
 
     public function test_admin_can_update_academic_field_subject_and_program(): void
     {
+        Storage::fake('public');
+
         $admin = User::factory()->admin()->create();
         $field = AcademicField::factory()->create([
             'name' => 'Technology',
@@ -240,7 +251,9 @@ class AcademicStructureTest extends TestCase
         ]);
         $program = Program::factory()->create([
             'name' => 'Backend Engineering',
+            'thumbnail' => UploadedFile::fake()->image('old-program.jpg', 800, 450)->store('program-thumbnails', 'public'),
         ]);
+        $oldThumbnail = $program->thumbnail;
 
         $this->actingAs($admin)
             ->put("/academics/fields/{$field->slug}", [
@@ -263,6 +276,7 @@ class AcademicStructureTest extends TestCase
                 'name' => 'Backend Bootcamp',
                 'description' => 'Backend program.',
                 'max_reschedule' => 2,
+                'thumbnail' => UploadedFile::fake()->image('new-program.webp', 800, 450),
                 'fields' => [$field->id],
                 'subjects' => [$subject->id],
                 'variants' => [
@@ -290,6 +304,11 @@ class AcademicStructureTest extends TestCase
             'slug' => 'backend-bootcamp',
             'max_reschedule' => 2,
         ]);
+        $program->refresh();
+        $this->assertNotSame($oldThumbnail, $program->thumbnail);
+        $this->assertNotNull($program->thumbnail);
+        Storage::disk('public')->assertMissing($oldThumbnail);
+        Storage::disk('public')->assertExists($program->thumbnail);
         $this->assertDatabaseHas('program_variants', [
             'field_id' => $field->id,
             'name' => '8 x 120 Minutes',
@@ -299,7 +318,100 @@ class AcademicStructureTest extends TestCase
         ]);
     }
 
-    public function test_admin_can_delete_academic_field_subject_and_program(): void
+    public function test_updating_program_preserves_existing_student_enrollments_and_variant_history(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $student = User::factory()->student()->create();
+        $field = AcademicField::factory()->create();
+        $newField = AcademicField::factory()->create();
+        $subject = Subject::factory()->create();
+        $newSubject = Subject::factory()->create();
+        $program = Program::factory()->create([
+            'name' => 'Stable Program',
+        ]);
+        $variant = ProgramVariant::factory()->for($field, 'field')->create([
+            'name' => '6 x 90 Minutes',
+            'session' => 6,
+            'duration' => 90,
+            'price' => 1500000,
+        ]);
+        $enrollment = ProgramEnrollment::factory()->for($student)->create([
+            'program_id' => $program->id,
+            'field_id' => $field->id,
+            'program_variant_id' => $variant->id,
+            'sessions_used' => 2,
+        ]);
+
+        $program->fields()->attach($field);
+        $program->subjects()->attach($subject);
+        $program->variants()->attach($variant);
+
+        $this->actingAs($admin)
+            ->put("/academics/programs/{$program->slug}", [
+                'name' => 'Stable Program',
+                'description' => 'Updated description.',
+                'max_reschedule' => 2,
+                'fields' => [$newField->id],
+                'subjects' => [$newSubject->id],
+                'variants' => [
+                    [
+                        'id' => $variant->id,
+                        'field_id' => $newField->id,
+                        'session' => 8,
+                        'duration' => 120,
+                        'price' => 2400000,
+                    ],
+                ],
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('program_enrollments', [
+            'id' => $enrollment->id,
+            'program_id' => $program->id,
+            'program_variant_id' => $variant->id,
+            'sessions_used' => 2,
+        ]);
+        $this->assertDatabaseHas('program_variants', [
+            'id' => $variant->id,
+            'field_id' => $field->id,
+            'name' => '6 x 90 Minutes',
+            'session' => 6,
+            'duration' => 90,
+            'price' => 1500000,
+            'status' => 'active',
+        ]);
+        $this->assertDatabaseHas('program_variants', [
+            'field_id' => $newField->id,
+            'name' => '8 x 120 Minutes',
+            'session' => 8,
+            'duration' => 120,
+            'price' => 2400000,
+            'status' => 'active',
+        ]);
+        $this->assertDatabaseHas('program_variant_program', [
+            'program_id' => $program->id,
+            'program_variant_id' => $variant->id,
+        ]);
+        $this->assertDatabaseHas('field_program', [
+            'program_id' => $program->id,
+            'field_id' => $field->id,
+        ]);
+        $this->assertDatabaseHas('field_program', [
+            'program_id' => $program->id,
+            'field_id' => $newField->id,
+        ]);
+        $this->assertDatabaseHas('program_subject', [
+            'program_id' => $program->id,
+            'subject_id' => $subject->id,
+        ]);
+        $this->assertDatabaseHas('program_subject', [
+            'program_id' => $program->id,
+            'subject_id' => $newSubject->id,
+        ]);
+        $this->assertDatabaseCount('program_variants', 2);
+    }
+
+    public function test_admin_can_deactivate_academic_field_subject_and_program(): void
     {
         $admin = User::factory()->admin()->create();
         $field = AcademicField::factory()->create();
@@ -318,14 +430,17 @@ class AcademicStructureTest extends TestCase
             ->delete("/academics/programs/{$program->slug}")
             ->assertRedirect();
 
-        $this->assertSoftDeleted('fields', [
+        $this->assertDatabaseHas('fields', [
             'id' => $field->id,
+            'status' => 'inactive',
         ]);
-        $this->assertSoftDeleted('subjects', [
+        $this->assertDatabaseHas('subjects', [
             'id' => $subject->id,
+            'status' => 'inactive',
         ]);
-        $this->assertSoftDeleted('programs', [
+        $this->assertDatabaseHas('programs', [
             'id' => $program->id,
+            'status' => 'inactive',
         ]);
     }
 }

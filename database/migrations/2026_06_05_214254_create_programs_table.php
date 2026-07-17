@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('slug')->unique();
+            $table->string('thumbnail')->nullable();
             $table->text('description')->nullable();
             $table->unsignedSmallInteger('max_reschedule')->default(0);
             $table->string('status')->default('active');

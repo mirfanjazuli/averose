@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\AcademicField;
 use App\Models\Program;
 use App\Models\ProgramVariant;
-use App\Models\SessionBooking;
+use App\Models\Schedule;
 use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -51,7 +51,7 @@ class StudentEnrollmentsTest extends TestCase
             ->get(route('enrollments'))
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('student/enrollments')
+                ->component('student/enrollments/index')
                 ->where('enrollments.0.program', 'UI Design')
                 ->where('enrollments.0.field', 'Design')
                 ->where('enrollments.0.variant', '6 x 90 Minutes')
@@ -83,10 +83,10 @@ class StudentEnrollmentsTest extends TestCase
         ]);
 
         $this->actingAs($student)
-            ->get(route('schedules'))
+            ->get('/schedules')
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('student/schedules')
+                ->component('student/schedules/index')
                 ->where('subjects.0.label', 'IELTS Speaking')
                 ->where('subjects.0.duration', 90)
                 ->where('subjects.0.enrollmentId', (string) $enrollment->id)
@@ -117,7 +117,7 @@ class StudentEnrollmentsTest extends TestCase
             'status' => 'active',
         ]);
 
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'user_id' => $student->id,
             'program_enrollment_id' => $enrollment->id,
             'subject_id' => $subject->id,
@@ -127,10 +127,10 @@ class StudentEnrollmentsTest extends TestCase
         ]);
 
         $this->actingAs($student)
-            ->get(route('schedules'))
+            ->get('/schedules')
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('student/schedules')
+                ->component('student/schedules/index')
                 ->where('sessions.0.title', 'Reading Drill')
                 ->where('sessions.0.program', 'TOEFL Prep')
                 ->where('sessions.0.status', 'Assigned')

@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\Models\SessionBooking;
+use App\Models\Schedule;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -13,11 +13,11 @@ class StoreMentorJournalRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        $sessionBooking = $this->route('session_booking');
+        $schedule = $this->route('schedule');
 
-        return $sessionBooking instanceof SessionBooking
+        return $schedule instanceof Schedule
             && $this->user()?->isMentor()
-            && $sessionBooking->mentor_id === $this->user()->id;
+            && $schedule->mentor_id === $this->user()->id;
     }
 
     /**

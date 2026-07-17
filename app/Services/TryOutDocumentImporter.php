@@ -4,6 +4,10 @@ namespace App\Services;
 
 use App\Models\Subject;
 use App\Models\TryOut;
+use App\Models\TryOutAsset;
+use App\Models\User;
+use App\TryOutQuestionType;
+use App\TryOutScoringMode;
 use DOMDocument;
 use DOMElement;
 use DOMNode;
@@ -16,12 +20,28 @@ use ZipArchive;
 
 class TryOutDocumentImporter
 {
+    /** @var array<string, TryOutAsset> */
+    private array $embeddedAssets = [];
+
+    /** @var array<string, array{contents: string, name: string}> */
+    private array $imageRelationships = [];
+
+    private ?string $previewToken = null;
+
+    private ?User $uploader = null;
+
+    public function __construct(
+        private TryOutAssetStorage $assetStorage,
+        private TryOutScoringService $scoring,
+    ) {}
+
     /**
      * @param  array{title?: string|null, duration_minutes?: int|null, status?: string|null}  $attributes
      */
     public function import(UploadedFile $document, array $attributes = []): TryOut
     {
-        $parsedQuestions = $this->parse($document->getRealPath());
+        $mode = TryOutScoringMode::tryFrom($attributes['scoring_mode'] ?? '') ?? TryOutScoringMode::RawScore;
+        $parsedQuestions = $this->parse($document->getRealPath(), scoringMode: $mode);
 
         return $this->importParsed(
             $parsedQuestions,
@@ -34,18 +54,30 @@ class TryOutDocumentImporter
      * @param  array<int, array{answer: string|null, number: int, options: array<string, string>, options_html: array<string, string>, question_html: string, question_text: string, subject_name: string|null}>  $parsedQuestions
      * @param  array{title?: string|null, duration_minutes?: int|null, status?: string|null}  $attributes
      */
-    public function importParsed(array $parsedQuestions, string $sourceFileName, array $attributes = []): TryOut
-    {
+    public function importParsed(
+        array $parsedQuestions,
+        string $sourceFileName,
+        array $attributes = [],
+        ?string $previewToken = null,
+        ?User $uploader = null,
+    ): TryOut {
         if ($parsedQuestions === []) {
             throw ValidationException::withMessages([
                 'document' => 'No questions were found in this document.',
             ]);
         }
 
-        return DB::transaction(function () use ($attributes, $sourceFileName, $parsedQuestions): TryOut {
+        $mode = TryOutScoringMode::tryFrom($attributes['scoring_mode'] ?? '') ?? TryOutScoringMode::RawScore;
+        $this->validateParsedQuestions($parsedQuestions, $mode);
+
+        return DB::transaction(function () use ($attributes, $sourceFileName, $parsedQuestions, $previewToken, $uploader): TryOut {
             $tryOut = TryOut::query()->create([
                 'duration_minutes' => $attributes['duration_minutes'] ?? null,
                 'source_file_name' => null,
+                'scoring_mode' => $attributes['scoring_mode'] ?? TryOutScoringMode::RawScore->value,
+                'correct_points' => $attributes['correct_points'] ?? null,
+                'wrong_points' => $attributes['wrong_points'] ?? null,
+                'unanswered_points' => $attributes['unanswered_points'] ?? null,
                 'status' => $attributes['status'] ?? 'draft',
                 'title' => filled($attributes['title'] ?? null)
                     ? $attributes['title']
@@ -55,14 +87,26 @@ class TryOutDocumentImporter
             foreach ($parsedQuestions as $question) {
                 $tryOut->questions()->create([
                     'answer' => $question['answer'],
+                    'correct_answers' => $question['correct_answers'] ?? (filled($question['answer']) ? [$question['answer']] : []),
                     'number' => $question['number'],
+                    'question_type' => $question['question_type'] ?? TryOutQuestionType::SingleChoice->value,
                     'options' => $question['options'],
                     'options_html' => $question['options_html'],
+                    'points' => $question['points'] ?? 1,
                     'question_html' => $question['question_html'],
                     'question_text' => $question['question_text'],
+                    'status' => 'active',
                     'subject_id' => $this->matchingSubjectId($question['subject_name']),
                     'subject_name' => $question['subject_name'],
                 ]);
+            }
+
+            if ($tryOut->status !== 'draft') {
+                $this->scoring->validateReadyForPublication($tryOut->load('questions'));
+            }
+
+            if ($previewToken !== null && $uploader !== null) {
+                $this->assetStorage->promotePreview($previewToken, $tryOut, $uploader);
             }
 
             return $tryOut->load('questions');
@@ -70,42 +114,25 @@ class TryOutDocumentImporter
     }
 
     /**
-     * @param  array<int, array{answer: string|null, number: int, options: array<string, string>, options_html: array<string, string>, question_html: string, question_text: string, subject_name: string|null}>  $parsedQuestions
-     */
-    public function replaceQuestions(TryOut $tryOut, array $parsedQuestions): TryOut
-    {
-        if ($parsedQuestions === []) {
-            throw ValidationException::withMessages([
-                'document' => 'No questions were found in this document.',
-            ]);
-        }
-
-        return DB::transaction(function () use ($parsedQuestions, $tryOut): TryOut {
-            $tryOut->questions()->delete();
-
-            foreach ($parsedQuestions as $question) {
-                $tryOut->questions()->create([
-                    'answer' => $question['answer'],
-                    'number' => $question['number'],
-                    'options' => $question['options'],
-                    'options_html' => $question['options_html'],
-                    'question_html' => $question['question_html'],
-                    'question_text' => $question['question_text'],
-                    'subject_id' => $this->matchingSubjectId($question['subject_name']),
-                    'subject_name' => $question['subject_name'],
-                ]);
-            }
-
-            return $tryOut->refresh()->load('questions');
-        });
-    }
-
-    /**
      * @return array<int, array{answer: string|null, number: int, options: array<string, string>, options_html: array<string, string>, question_html: string, question_text: string, subject_name: string|null}>
      */
-    public function parse(string $path): array
-    {
-        $lines = $this->paragraphLines($path);
+    public function parse(
+        string $path,
+        ?User $uploader = null,
+        ?string $previewToken = null,
+        TryOutScoringMode $scoringMode = TryOutScoringMode::RawScore,
+    ): array {
+        $this->embeddedAssets = [];
+        $this->imageRelationships = [];
+        $this->previewToken = $previewToken;
+        $this->uploader = $uploader;
+
+        try {
+            $lines = $this->paragraphLines($path);
+        } finally {
+            $this->imageRelationships = [];
+        }
+        $questionNumberingIds = $this->questionNumberingIds($lines);
         $questions = [];
         $answers = [];
         $currentQuestion = null;
@@ -125,8 +152,9 @@ class TryOutDocumentImporter
             }
 
             if ($isAnswerSection) {
-                preg_match_all('/\b[A-E]\b/iu', $line['text'], $matches);
-                array_push($answers, ...array_map('strtoupper', $matches[0]));
+                if (filled($line['text'])) {
+                    $answers[] = $line['text'];
+                }
 
                 continue;
             }
@@ -137,7 +165,8 @@ class TryOutDocumentImporter
 
             if (
                 $currentQuestion !== null
-                && $this->hasOptions($currentQuestion['raw_text'])
+                && $line['numbering']['num_id'] === null
+                && $this->questionHasOptions($currentQuestion)
                 && $this->looksLikeSubjectHeading($line['text'])
             ) {
                 $questions[] = $currentQuestion;
@@ -145,6 +174,61 @@ class TryOutDocumentImporter
                 $currentSubject = $this->normalizeLine($line['text']);
 
                 continue;
+            }
+
+            if ($line['numbering']['num_id'] !== null) {
+                $numberingId = $line['numbering']['num_id'];
+                $isQuestionNumbering = $questionNumberingIds[$numberingId] ?? false;
+
+                if (
+                    $currentQuestion === null
+                    || $isQuestionNumbering
+                ) {
+                    if ($currentQuestion !== null) {
+                        $questions[] = $currentQuestion;
+                    }
+
+                    $currentQuestion = [
+                        'is_auto_numbered' => true,
+                        'number' => count($questions) + 1,
+                        'options' => [],
+                        'options_html' => [],
+                        'question_num_id' => $numberingId,
+                        'raw_html' => $line['html'],
+                        'raw_text' => $line['text'],
+                        'subject_name' => $currentSubject,
+                    ];
+
+                    continue;
+                }
+
+                if ($currentQuestion['is_auto_numbered'] ?? false) {
+                    $optionKey = $this->optionKeyForIndex(count($currentQuestion['options']));
+
+                    if ($optionKey !== null) {
+                        $currentQuestion['options'][$optionKey] = $line['text'];
+                        $currentQuestion['options_html'][$optionKey] = $line['html'];
+
+                        continue;
+                    }
+
+                    if ($this->questionHasOptions($currentQuestion)) {
+                        $questions[] = $currentQuestion;
+
+                        $currentQuestion = [
+                            'is_auto_numbered' => true,
+                            'number' => count($questions) + 1,
+                            'options' => [],
+                            'options_html' => [],
+                            'question_num_id' => $numberingId,
+                            'raw_html' => $line['html'],
+                            'raw_text' => $line['text'],
+                            'subject_name' => $currentSubject,
+                        ];
+
+                        continue;
+                    }
+                }
             }
 
             if (preg_match('/^(\d+)\.\s*(.+)$/u', $line['text'], $matches) === 1) {
@@ -176,27 +260,113 @@ class TryOutDocumentImporter
             $questions[] = $currentQuestion;
         }
 
-        return collect($questions)
+        $parsedQuestions = collect($questions)
             ->map(function (array $question, int $index) use ($answers): array {
-                $splitQuestion = $this->splitQuestionOptions($question['raw_text'], $question['raw_html'] ?? null);
+                $splitQuestion = $this->splitQuestionOptions($question);
+                $type = $this->questionType($splitQuestion['question_text']);
+                $answerData = $this->parseAnswerKey($answers[$index] ?? '', $type);
+                $questionText = preg_replace('/^\[(?:SINGLE(?: CHOICE)?|MULTIPLE(?: ANSWER)?|NUMERIC(?: ANSWER)?)\]\s*/i', '', $splitQuestion['question_text']) ?? $splitQuestion['question_text'];
+                $questionHtml = preg_replace('/^\[(?:SINGLE(?: CHOICE)?|MULTIPLE(?: ANSWER)?|NUMERIC(?: ANSWER)?)\]\s*/i', '', $splitQuestion['question_html']) ?? $splitQuestion['question_html'];
 
                 return [
-                    'answer' => $answers[$index] ?? null,
+                    'answer' => $answerData[0] ?? null,
+                    'correct_answers' => $answerData,
                     'number' => $question['number'],
+                    'question_type' => $type->value,
                     'options' => $splitQuestion['options'],
                     'options_html' => $splitQuestion['options_html'],
-                    'question_html' => $splitQuestion['question_html'],
-                    'question_text' => $splitQuestion['question_text'],
+                    'question_html' => $questionHtml,
+                    'question_text' => trim($questionText),
                     'subject_name' => $question['subject_name'],
                 ];
             })
-            ->filter(fn (array $question): bool => filled($question['question_text']) && $question['options'] !== [])
+            ->filter(fn (array $question): bool => filled($question['question_text']) && ($question['question_type'] === TryOutQuestionType::NumericAnswer->value || $question['options'] !== []))
             ->values()
+            ->all();
+
+        return collect($parsedQuestions)
+            ->map(function (array $question): array {
+                $question['points'] = 1;
+
+                return $question;
+            })
             ->all();
     }
 
+    /** @param array<int, array<string, mixed>> $questions */
+    private function validateParsedQuestions(array $questions, TryOutScoringMode $mode): void
+    {
+        foreach ($questions as $index => $question) {
+            $number = $question['number'] ?? $index + 1;
+            $options = $question['options'] ?? [];
+            $answers = $question['correct_answers'] ?? (filled($question['answer'] ?? null) ? [$question['answer']] : []);
+
+            $type = TryOutQuestionType::tryFrom($question['question_type'] ?? '') ?? TryOutQuestionType::SingleChoice;
+
+            if ($type !== TryOutQuestionType::NumericAnswer && (! is_array($options) || $options === [] || array_diff(array_keys($options), ['A', 'B', 'C', 'D', 'E']) !== [])) {
+                throw ValidationException::withMessages([
+                    'questions' => "Question {$number} contains an unsupported option.",
+                ]);
+            }
+
+            if ($type === TryOutQuestionType::NumericAnswer) {
+                if (count($answers) !== 1 || $this->scoring->normalizeNumericAnswer($answers[0] ?? null) === null) {
+                    throw ValidationException::withMessages(['questions' => "Question {$number} needs one numeric answer key."]);
+                }
+
+                continue;
+            }
+
+            $allowedAnswers = ['A', 'B', 'C', 'D', 'E'];
+
+            if (! is_array($answers) || $answers === [] || count($answers) !== count(array_unique($answers)) || array_diff($answers, $allowedAnswers) !== []) {
+                throw ValidationException::withMessages([
+                    'questions' => "Question {$number} has an invalid answer key.",
+                ]);
+            }
+
+            if ($type !== TryOutQuestionType::MultipleAnswer && count($answers) !== 1) {
+                throw ValidationException::withMessages([
+                    'questions' => "Question {$number} must have exactly one answer key.",
+                ]);
+            }
+
+            if ($type === TryOutQuestionType::MultipleAnswer && count($answers) < 2) {
+                throw ValidationException::withMessages(['questions' => "Question {$number} needs at least two answer keys."]);
+            }
+        }
+    }
+
+    private function questionType(string $questionText): TryOutQuestionType
+    {
+        return match (true) {
+            preg_match('/^\[MULTIPLE(?: ANSWER)?\]/i', $questionText) === 1 => TryOutQuestionType::MultipleAnswer,
+            preg_match('/^\[NUMERIC(?: ANSWER)?\]/i', $questionText) === 1 => TryOutQuestionType::NumericAnswer,
+            default => TryOutQuestionType::SingleChoice,
+        };
+    }
+
+    /** @return array<int, string> */
+    private function parseAnswerKey(string $line, TryOutQuestionType $type): array
+    {
+        if ($type === TryOutQuestionType::NumericAnswer) {
+            if (preg_match('/^\s*\d+\.\s*([+-]?\d+(?:[.,]\d+)?)\s*$/', $line, $matches) !== 1) {
+                return [];
+            }
+
+            $answer = $this->scoring->normalizeNumericAnswer($matches[1]);
+
+            return $answer === null ? [] : [$answer];
+        }
+
+        preg_match_all('/\b[A-E]\b/i', $line, $matches);
+        $answers = array_values(array_unique(array_map('strtoupper', $matches[0])));
+
+        return $type === TryOutQuestionType::MultipleAnswer ? $answers : array_slice($answers, 0, 1);
+    }
+
     /**
-     * @return array<int, array{html: string, text: string}>
+     * @return array<int, array{html: string, numbering: array{ilvl: string|null, num_id: string|null}, text: string}>
      */
     private function paragraphLines(string $path): array
     {
@@ -209,13 +379,17 @@ class TryOutDocumentImporter
         }
 
         $xml = $zip->getFromName('word/document.xml');
-        $zip->close();
 
         if ($xml === false) {
+            $zip->close();
+
             throw ValidationException::withMessages([
                 'document' => 'The uploaded document is not a valid Word document.',
             ]);
         }
+
+        $this->imageRelationships = $this->documentImageRelationships($zip);
+        $zip->close();
 
         $document = new DOMDocument;
         $document->loadXML($xml);
@@ -231,16 +405,32 @@ class TryOutDocumentImporter
             }
 
             $line = $this->normalizeLine($this->nodeText($paragraph));
+            $html = $this->normalizeRichHtml($this->nodeHtml($paragraph));
 
-            if ($line !== '') {
+            if ($line !== '' || $html !== '') {
                 $lines[] = [
-                    'html' => $this->normalizeRichHtml($this->nodeHtml($paragraph)),
+                    'html' => $html,
+                    'numbering' => $this->paragraphNumbering($xpath, $paragraph),
                     'text' => $line,
                 ];
             }
         }
 
         return $lines;
+    }
+
+    /**
+     * @return array{ilvl: string|null, num_id: string|null}
+     */
+    private function paragraphNumbering(DOMXPath $xpath, DOMElement $paragraph): array
+    {
+        $numId = $xpath->evaluate('string(.//w:numPr/w:numId/@w:val)', $paragraph);
+        $ilvl = $xpath->evaluate('string(.//w:numPr/w:ilvl/@w:val)', $paragraph);
+
+        return [
+            'ilvl' => $ilvl === '' ? null : $ilvl,
+            'num_id' => $numId === '' ? null : $numId,
+        ];
     }
 
     private function nodeText(DOMNode $node): string
@@ -287,6 +477,10 @@ class TryOutDocumentImporter
             return $this->mathHtml($node);
         }
 
+        if (in_array($node->localName, ['drawing', 'pict'], true)) {
+            return $this->imageHtml($node);
+        }
+
         $html = '';
 
         foreach ($node->childNodes as $child) {
@@ -312,6 +506,166 @@ class TryOutDocumentImporter
         }
 
         return $html;
+    }
+
+    /** @return array<string, array{contents: string, name: string}> */
+    private function documentImageRelationships(ZipArchive $zip): array
+    {
+        $relationshipsXml = $zip->getFromName('word/_rels/document.xml.rels');
+
+        if ($relationshipsXml === false) {
+            return [];
+        }
+
+        $document = new DOMDocument;
+        $document->loadXML($relationshipsXml);
+        $relationships = [];
+
+        foreach ($document->getElementsByTagName('Relationship') as $relationship) {
+            if (! $relationship instanceof DOMElement) {
+                continue;
+            }
+
+            $type = $relationship->getAttribute('Type');
+
+            if (! str_ends_with($type, '/image') || $relationship->getAttribute('TargetMode') === 'External') {
+                continue;
+            }
+
+            $target = str_replace('\\', '/', $relationship->getAttribute('Target'));
+            $path = str_starts_with($target, '/') ? ltrim($target, '/') : 'word/'.ltrim($target, '/');
+            $path = $this->normalizeZipPath($path);
+
+            if (! str_starts_with($path, 'word/media/')) {
+                continue;
+            }
+
+            $contents = $zip->getFromName($path);
+
+            if ($contents === false) {
+                throw ValidationException::withMessages([
+                    'document' => "Embedded image {$target} could not be read from the Word document.",
+                ]);
+            }
+
+            $relationships[$relationship->getAttribute('Id')] = [
+                'contents' => $contents,
+                'name' => basename($path),
+            ];
+        }
+
+        return $relationships;
+    }
+
+    private function normalizeZipPath(string $path): string
+    {
+        $segments = [];
+
+        foreach (explode('/', $path) as $segment) {
+            if ($segment === '' || $segment === '.') {
+                continue;
+            }
+
+            if ($segment === '..') {
+                array_pop($segments);
+
+                continue;
+            }
+
+            $segments[] = $segment;
+        }
+
+        return implode('/', $segments);
+    }
+
+    private function imageHtml(DOMNode $node): string
+    {
+        $relationshipId = $this->embeddedImageRelationshipId($node);
+
+        if ($relationshipId === null) {
+            if ($this->linkedImageRelationshipId($node) !== null) {
+                throw ValidationException::withMessages([
+                    'document' => 'The Word document contains a linked image. Embed the image directly before importing.',
+                ]);
+            }
+
+            return '';
+        }
+
+        $image = $this->imageRelationships[$relationshipId] ?? null;
+
+        if ($image === null) {
+            throw ValidationException::withMessages([
+                'document' => "Embedded image relationship {$relationshipId} is missing from the Word document.",
+            ]);
+        }
+
+        if ($this->uploader === null || $this->previewToken === null) {
+            throw ValidationException::withMessages([
+                'document' => 'This document contains images and must be imported through the preview flow.',
+            ]);
+        }
+
+        $asset = $this->embeddedAssets[$relationshipId] ??= $this->assetStorage->storeEmbedded(
+            $image['contents'],
+            $image['name'],
+            $this->uploader,
+            $this->previewToken,
+        );
+        $alt = $this->embeddedImageAlt($node);
+
+        return '<img src="'.e($this->assetStorage->url($asset)).'" alt="'.e($alt).'" loading="lazy" decoding="async">';
+    }
+
+    private function embeddedImageRelationshipId(DOMNode $node): ?string
+    {
+        return $this->relationshipAttribute($node, 'embed');
+    }
+
+    private function linkedImageRelationshipId(DOMNode $node): ?string
+    {
+        return $this->relationshipAttribute($node, 'link');
+    }
+
+    private function relationshipAttribute(DOMNode $node, string $name): ?string
+    {
+        if ($node instanceof DOMElement) {
+            $value = $node->getAttributeNS(
+                'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
+                $name,
+            );
+
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        foreach ($node->childNodes as $child) {
+            $value = $this->relationshipAttribute($child, $name);
+
+            if ($value !== null) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    private function embeddedImageAlt(DOMNode $node): string
+    {
+        if ($node instanceof DOMElement && $node->localName === 'docPr') {
+            return $node->getAttribute('descr') ?: $node->getAttribute('name');
+        }
+
+        foreach ($node->childNodes as $child) {
+            $alt = $this->embeddedImageAlt($child);
+
+            if ($alt !== '') {
+                return $alt;
+            }
+        }
+
+        return '';
     }
 
     private function mathHtml(DOMNode $node): string
@@ -730,6 +1084,71 @@ class TryOutDocumentImporter
         return preg_match('/A\.\s*.+B\.\s*.+/iu', $line) === 1;
     }
 
+    private function questionHasOptions(array $question): bool
+    {
+        if (($question['is_auto_numbered'] ?? false) && count($question['options'] ?? []) >= 5) {
+            return true;
+        }
+
+        return $this->hasOptions($question['raw_text']);
+    }
+
+    /**
+     * Word automatic numbering stores visible numbers/letters as metadata, not text.
+     * Question lists usually reappear between option lists, while option lists are
+     * contiguous A-E runs. Detecting that shape keeps imports stable across templates.
+     *
+     * @param  array<int, array{html: string, numbering: array{ilvl: string|null, num_id: string|null}, text: string}>  $lines
+     * @return array<string, bool>
+     */
+    private function questionNumberingIds(array $lines): array
+    {
+        $positionsByNumberingId = [];
+
+        foreach ($lines as $position => $line) {
+            if (preg_match('/^BAGIAN\s*2\b/i', $line['text']) === 1) {
+                break;
+            }
+
+            $numberingId = $line['numbering']['num_id'];
+
+            if ($numberingId === null) {
+                continue;
+            }
+
+            $positionsByNumberingId[$numberingId][] = $position;
+        }
+
+        $questionNumberingIds = [];
+
+        foreach ($positionsByNumberingId as $numberingId => $positions) {
+            if (count($positions) > 5 || $this->hasSeparatedNumberingOccurrences($positions)) {
+                $questionNumberingIds[$numberingId] = true;
+            }
+        }
+
+        return $questionNumberingIds;
+    }
+
+    /**
+     * @param  array<int, int>  $positions
+     */
+    private function hasSeparatedNumberingOccurrences(array $positions): bool
+    {
+        foreach (array_slice($positions, 1) as $index => $position) {
+            if ($position - $positions[$index] > 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function optionKeyForIndex(int $index): ?string
+    {
+        return ['A', 'B', 'C', 'D', 'E'][$index] ?? null;
+    }
+
     private function looksLikeSubjectHeading(string $line): bool
     {
         return preg_match('/^\d+\./u', $line) !== 1
@@ -740,8 +1159,19 @@ class TryOutDocumentImporter
     /**
      * @return array{options: array<string, string>, options_html: array<string, string>, question_html: string, question_text: string}
      */
-    private function splitQuestionOptions(string $rawText, ?string $rawHtml = null): array
+    private function splitQuestionOptions(array $question): array
     {
+        if ($question['is_auto_numbered'] ?? false) {
+            return [
+                'options' => $question['options'] ?? [],
+                'options_html' => $question['options_html'] ?? [],
+                'question_html' => $this->normalizeRichHtml($question['raw_html'] ?? e($question['raw_text'])),
+                'question_text' => $this->normalizeLine($question['raw_text']),
+            ];
+        }
+
+        $rawText = $question['raw_text'];
+        $rawHtml = $question['raw_html'] ?? null;
         $normalizedText = $this->normalizeLine($rawText);
         $normalizedHtml = $this->normalizeRichHtml($rawHtml ?? e($normalizedText));
         $options = [];

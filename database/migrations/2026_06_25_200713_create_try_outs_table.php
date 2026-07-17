@@ -19,6 +19,10 @@ return new class extends Migration
             $table->string('source_file_name')->nullable();
             $table->unsignedSmallInteger('duration_minutes')->nullable();
             $table->string('status')->default('draft');
+            $table->string('scoring_mode')->default('raw_score');
+            $table->decimal('correct_points', 10, 2)->nullable();
+            $table->decimal('wrong_points', 10, 2)->nullable();
+            $table->decimal('unanswered_points', 10, 2)->nullable();
             $table->timestamps();
         });
     }

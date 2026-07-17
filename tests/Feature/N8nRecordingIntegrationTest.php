@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\ProgramEnrollment;
-use App\Models\SessionBooking;
+use App\Models\Schedule;
 use App\Models\Subject;
 use App\Models\User;
 use App\Models\ZoomAccount;
@@ -27,7 +27,7 @@ class N8nRecordingIntegrationTest extends TestCase
         $account = ZoomAccount::factory()->create([
             'account_id' => 'zoom-account-id',
             'name' => 'Main Zoom',
-            'token_secret' => 'zoom-event-secret',
+            'token_secret' => 'zoom-group-secret',
         ]);
 
         $this->withHeader('X-N8N-Token', 'n8n-secret')
@@ -38,7 +38,7 @@ class N8nRecordingIntegrationTest extends TestCase
                 'appKey' => $account->slug,
                 'enabled' => true,
                 'name' => 'Main Zoom',
-                'secretToken' => 'zoom-event-secret',
+                'secretToken' => 'zoom-group-secret',
             ]);
     }
 
@@ -52,7 +52,7 @@ class N8nRecordingIntegrationTest extends TestCase
 
     public function test_n8n_can_store_youtube_recording_for_matching_zoom_meeting(): void
     {
-        [$student, $booking, $account] = $this->bookingFixture();
+        [$student, $booking, $account] = $this->scheduleFixture();
 
         $this->withHeader('X-N8N-Token', 'n8n-secret')
             ->postJson(route('n8n.youtube-recordings.store'), [
@@ -71,8 +71,8 @@ class N8nRecordingIntegrationTest extends TestCase
             ->assertOk()
             ->assertJson(['status' => 'created']);
 
-        $this->assertDatabaseHas('session_recordings', [
-            'session_booking_id' => $booking->id,
+        $this->assertDatabaseHas('recordings', [
+            'schedule_id' => $booking->id,
             'user_id' => $student->id,
             'youtube_video_id' => 'abc123DEF45',
             'zoom_account_id' => $account->id,
@@ -83,7 +83,7 @@ class N8nRecordingIntegrationTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('student/dashboard')
+                ->component('student/dashboard/index')
                 ->where('recordings.0.title', 'IELTS Speaking - 2026-06-18')
                 ->where('recordings.0.youtubeUrl', 'https://www.youtube.com/watch?v=abc123DEF45')
                 ->where('recordings.0.youtubeEmbedUrl', 'https://www.youtube-nocookie.com/embed/abc123DEF45')
@@ -106,7 +106,7 @@ class N8nRecordingIntegrationTest extends TestCase
 
     public function test_n8n_rejects_recording_when_meeting_id_differs_even_with_start_time(): void
     {
-        [, , $account] = $this->bookingFixture();
+        [, , $account] = $this->scheduleFixture();
 
         $this->withHeader('X-N8N-Token', 'n8n-secret')
             ->postJson(route('n8n.youtube-recordings.store'), [
@@ -120,11 +120,11 @@ class N8nRecordingIntegrationTest extends TestCase
             ])
             ->assertUnprocessable()
             ->assertJson([
-                'message' => 'No session booking matches this Zoom meeting.',
+                'message' => 'No schedule matches this Zoom meeting.',
             ]);
     }
 
-    private function bookingFixture(): array
+    private function scheduleFixture(): array
     {
         $student = User::factory()->student()->create();
         $account = ZoomAccount::factory()->create([
@@ -136,7 +136,7 @@ class N8nRecordingIntegrationTest extends TestCase
         $enrollment = ProgramEnrollment::factory()->create([
             'user_id' => $student->id,
         ]);
-        $booking = SessionBooking::factory()->create([
+        $booking = Schedule::factory()->create([
             'program_enrollment_id' => $enrollment->id,
             'scheduled_at' => '2026-06-18 17:00:00',
             'status' => 'completed',

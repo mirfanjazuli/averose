@@ -11,11 +11,11 @@ class MentorJournalController extends Controller
 {
     public function index(): Response
     {
-        return Inertia::render('admin/monitoring/mentor-journals', [
+        return Inertia::render('admin/monitoring/mentor-journals/index', [
             'journals' => MentorJournal::query()
                 ->with([
                     'mentor:id,name',
-                    'sessionBooking:id,scheduled_at,duration',
+                    'schedule:id,scheduled_at,duration',
                     'student:id,name',
                     'subject:id,name',
                 ])
@@ -30,12 +30,12 @@ class MentorJournalController extends Controller
     {
         $journal->load([
             'mentor:id,name',
-            'sessionBooking:id,scheduled_at,duration',
+            'schedule:id,scheduled_at,duration',
             'student:id,name',
             'subject:id,name',
         ]);
 
-        return Inertia::render('admin/monitoring/mentor-journal-detail', [
+        return Inertia::render('admin/monitoring/mentor-journals/show', [
             'breadcrumbs' => [
                 [
                     'title' => 'Monitoring',
@@ -56,12 +56,12 @@ class MentorJournalController extends Controller
 
     private function journalData(MentorJournal $journal): array
     {
-        $scheduledAt = $journal->sessionBooking?->scheduled_at;
+        $scheduledAt = $journal->schedule?->scheduled_at;
 
         return [
             'achievement' => $journal->achievement,
             'date' => $scheduledAt?->format('Y-m-d') ?? $journal->created_at->format('Y-m-d'),
-            'duration' => $journal->sessionBooking ? "{$journal->sessionBooking->duration} min" : '-',
+            'duration' => $journal->schedule ? "{$journal->schedule->duration} min" : '-',
             'id' => $journal->id,
             'improvementArea' => $journal->improvement_area,
             'mentor' => $journal->mentor?->name ?? '-',

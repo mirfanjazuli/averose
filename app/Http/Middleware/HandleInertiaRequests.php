@@ -2,7 +2,8 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\SessionRescheduleRequest;
+use App\Models\RescheduleRequest;
+use App\Support\PermissionRegistry;
 use App\UserRole;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -48,7 +49,9 @@ class HandleInertiaRequests extends Middleware
                         'id' => $request->user()->id,
                         'name' => $request->user()->name,
                         'email' => $request->user()->email,
+                        'permissions' => $this->permissions($request),
                         'role' => $request->user()->role->value,
+                        'roleName' => $request->user()->internalRole?->name,
                     ]
                     : null,
             ],
@@ -56,18 +59,46 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'tryOutImportPreview' => $request->session()->get('tryOutImportPreview'),
-                'tryOutReimportPreview' => $request->session()->get('tryOutReimportPreview'),
                 'tryOutResult' => $request->session()->get('tryOutResult'),
             ],
 
             'navigation' => [
                 'pendingRescheduleRequests' => $request->user()?->role === UserRole::Admin
-                    ? SessionRescheduleRequest::query()->where('status', 'pending')->count()
+                    && $request->user()?->hasPermission('schedules.view')
+                    ? RescheduleRequest::query()->where('status', 'pending')->count()
                     : 0,
             ],
 
             'sidebarOpen' => ! $request->hasCookie('sidebar_state')
                 || $request->cookie('sidebar_state') === 'true',
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function permissions(Request $request): array
+    {
+        $user = $request->user();
+
+        if (! $user || ! $user->isAdmin()) {
+            return [];
+        }
+
+        if ($user->isSuperAdmin()) {
+            return PermissionRegistry::keys();
+        }
+
+        $user->loadMissing('internalRole.permissions');
+
+        if ($user->internalRole?->status !== 'active') {
+            return [];
+        }
+
+        return $user->internalRole
+            ->permissions
+            ->pluck('key')
+            ->values()
+            ->all();
     }
 }

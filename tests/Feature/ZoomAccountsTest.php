@@ -6,7 +6,7 @@ use App\Models\AcademicField;
 use App\Models\Program;
 use App\Models\ProgramEnrollment;
 use App\Models\ProgramVariant;
-use App\Models\SessionBooking;
+use App\Models\Schedule;
 use App\Models\Subject;
 use App\Models\User;
 use App\Models\ZoomAccount;
@@ -37,7 +37,7 @@ class ZoomAccountsTest extends TestCase
         $response
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('admin/integrations/zoom-accounts')
+                ->component('admin/zoom-accounts/index')
                 ->has('accounts'));
     }
 
@@ -53,25 +53,25 @@ class ZoomAccountsTest extends TestCase
             'name' => 'Second Full Zoom',
         ]);
 
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'duration' => 60,
             'scheduled_at' => '2026-07-10 09:00:00',
             'status' => 'assigned',
             'zoom_account_id' => $firstFullAccount->id,
         ]);
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'duration' => 120,
             'scheduled_at' => '2026-07-10 09:15:00',
             'status' => 'assigned',
             'zoom_account_id' => $firstFullAccount->id,
         ]);
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'duration' => 120,
             'scheduled_at' => '2026-07-10 09:00:00',
             'status' => 'assigned',
             'zoom_account_id' => $secondFullAccount->id,
         ]);
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'duration' => 120,
             'scheduled_at' => '2026-07-10 09:10:00',
             'status' => 'assigned',
@@ -82,7 +82,7 @@ class ZoomAccountsTest extends TestCase
             ->get(route('zoom-accounts'))
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('admin/integrations/zoom-accounts')
+                ->component('admin/zoom-accounts/index')
                 ->where('capacity.fullAccounts', 2)
                 ->where('capacity.nearestRelease.name', 'First Full Zoom')
                 ->where('capacity.nearestRelease.releaseAt', 'Jul 10, 2026 10:00')
@@ -107,7 +107,7 @@ class ZoomAccountsTest extends TestCase
         $response
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('admin/integrations/zoom-account-detail')
+                ->component('admin/zoom-accounts/show')
                 ->where('account.name', 'AveRose Detail Room')
                 ->where('account.slug', 'averose-detail-room')
                 ->where('account.accountId', 'detail-account')
@@ -146,11 +146,11 @@ class ZoomAccountsTest extends TestCase
             'program_variant_id' => $variant->id,
         ]);
 
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'duration' => 90,
             'mentor_id' => $mentor->id,
             'program_enrollment_id' => $enrollment->id,
-            'scheduled_at' => '2026-07-10 13:00:00',
+            'scheduled_at' => now()->addDay()->setTime(13, 0),
             'status' => 'assigned',
             'subject_id' => $subject->id,
             'user_id' => $student->id,
@@ -158,7 +158,7 @@ class ZoomAccountsTest extends TestCase
             'zoom_link' => 'https://zoom.test/j/123',
             'zoom_meeting_id' => '123',
         ]);
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'duration' => 60,
             'mentor_id' => $mentor->id,
             'program_enrollment_id' => $enrollment->id,
@@ -175,7 +175,7 @@ class ZoomAccountsTest extends TestCase
             ->get(route('zoom-accounts.show', $account))
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('admin/integrations/zoom-account-detail')
+                ->component('admin/zoom-accounts/show')
                 ->where('meetings.0.title', 'IELTS Speaking')
                 ->where('meetings.0.student', 'Sinta Student')
                 ->where('meetings.0.mentor', 'Raka Mentor')
@@ -308,7 +308,7 @@ class ZoomAccountsTest extends TestCase
         $this->assertSame('new-zoom-room', $account->slug);
     }
 
-    public function test_admin_users_can_delete_zoom_accounts(): void
+    public function test_admin_users_can_deactivate_zoom_accounts(): void
     {
         $user = User::factory()->admin()->create();
         $account = ZoomAccount::factory()->create();
@@ -317,8 +317,9 @@ class ZoomAccountsTest extends TestCase
 
         $response->assertRedirect();
 
-        $this->assertDatabaseMissing('zoom_accounts', [
+        $this->assertDatabaseHas('zoom_accounts', [
             'id' => $account->id,
+            'status' => 'inactive',
         ]);
     }
 }

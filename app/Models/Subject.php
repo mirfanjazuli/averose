@@ -32,9 +32,9 @@ class Subject extends Model
         return $this->belongsToMany(Program::class, 'program_subject')->withTimestamps();
     }
 
-    public function bookings(): HasMany
+    public function schedules(): HasMany
     {
-        return $this->hasMany(SessionBooking::class);
+        return $this->hasMany(Schedule::class);
     }
 
     protected static function booted(): void

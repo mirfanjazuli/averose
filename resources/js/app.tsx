@@ -6,6 +6,7 @@ import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import MentorLayout from '@/layouts/mentor-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import SettingsRoleLayout from '@/layouts/settings/role-layout';
 import StudentLayout from '@/layouts/student-layout';
 
 const appName = import.meta.env.VITE_APP_NAME || 'AveRose';
@@ -16,12 +17,14 @@ createInertiaApp({
         switch (true) {
             case name === 'welcome':
                 return null;
-            case name === 'student/try-out-session':
+            case name === 'student/try-outs/session':
+                return null;
+            case name === 'student/try-outs/results/show':
                 return null;
             case name.startsWith('auth/'):
                 return AuthLayout;
             case name.startsWith('settings/'):
-                return [AppLayout, SettingsLayout];
+                return [SettingsRoleLayout, SettingsLayout];
             case name.startsWith('admin/'):
                 return AppLayout;
             case name.startsWith('mentor/'):

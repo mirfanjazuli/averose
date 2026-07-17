@@ -35,9 +35,9 @@ class ProgramEnrollment extends Model
         return $this->belongsTo(ProgramVariant::class, 'program_variant_id');
     }
 
-    public function bookings(): HasMany
+    public function schedules(): HasMany
     {
-        return $this->hasMany(SessionBooking::class);
+        return $this->hasMany(Schedule::class);
     }
 
     public function sessionsRemaining(): int

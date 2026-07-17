@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\UserRole;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -14,7 +13,7 @@ class StoreZoomAccountRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()?->role === UserRole::Admin;
+        return $this->user()?->hasPermission('zoom_accounts.create') ?? false;
     }
 
     /**

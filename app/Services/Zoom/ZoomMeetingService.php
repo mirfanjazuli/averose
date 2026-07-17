@@ -2,14 +2,14 @@
 
 namespace App\Services\Zoom;
 
-use App\Models\SessionBooking;
+use App\Models\Schedule;
 use App\Models\ZoomAccount;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 class ZoomMeetingService
 {
-    public function create(ZoomAccount $account, SessionBooking $booking): ZoomMeetingData
+    public function create(ZoomAccount $account, Schedule $booking): ZoomMeetingData
     {
         if (! config('services.zoom.create_real_meetings')) {
             return $this->fakeMeeting($account, $booking);
@@ -61,7 +61,7 @@ class ZoomMeetingService
         return $response['access_token'];
     }
 
-    private function fakeMeeting(ZoomAccount $account, SessionBooking $booking): ZoomMeetingData
+    private function fakeMeeting(ZoomAccount $account, Schedule $booking): ZoomMeetingData
     {
         $meetingId = Str::of("{$account->id}{$booking->id}")->padLeft(10, '0')->toString();
 
@@ -78,12 +78,12 @@ class ZoomMeetingService
         return rtrim(config('services.zoom.api_url'), '/').$path;
     }
 
-    private function topic(SessionBooking $booking): string
+    private function topic(Schedule $booking): string
     {
         return $booking->subject?->name ?? 'AveRose Session';
     }
 
-    private function agenda(SessionBooking $booking): string
+    private function agenda(Schedule $booking): string
     {
         $program = $booking->enrollment?->program?->name;
 

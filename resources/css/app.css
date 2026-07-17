@@ -2,6 +2,15 @@
 
 @import 'tw-animate-css';
 
+[data-try-out-rich-content] img {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    height: auto;
+    margin-block: 0.75rem;
+    object-fit: contain;
+}
+
 @import 'shadcn/tailwind.css';
 
 @import '@fontsource-variable/inter';
@@ -92,6 +101,12 @@
     body {
         @apply bg-background text-foreground;
     }
+
+    body[data-scroll-locked] {
+        margin-right: 0 !important;
+        padding-right: 0 !important;
+    }
+
     html {
         @apply font-sans;
     }
@@ -148,6 +163,10 @@
 
     .scrollbar-hide::-webkit-scrollbar {
         display: none;
+    }
+
+    .scrollbar-stable {
+        scrollbar-gutter: stable;
     }
 
     math.math-equation {

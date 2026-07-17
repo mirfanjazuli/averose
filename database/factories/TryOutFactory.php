@@ -25,6 +25,7 @@ class TryOutFactory extends Factory
             'duration_minutes' => fake()->numberBetween(60, 180),
             'slug' => Str::slug($title),
             'source_file_name' => null,
+            'scoring_mode' => 'raw_score',
             'status' => 'draft',
             'title' => $title,
         ];

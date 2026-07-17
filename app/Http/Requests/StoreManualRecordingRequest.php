@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests;
 
-use App\UserRole;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\ValidationException;
@@ -14,7 +13,7 @@ class StoreManualRecordingRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()?->role === UserRole::Admin;
+        return $this->user()?->hasPermission('recordings.create') ?? false;
     }
 
     /**
@@ -26,7 +25,7 @@ class StoreManualRecordingRequest extends FormRequest
     {
         return [
             'recorded_at' => ['nullable', 'date'],
-            'session_booking_id' => ['required', 'integer', 'exists:session_bookings,id'],
+            'schedule_id' => ['required', 'integer', 'exists:schedules,id'],
             'title' => ['nullable', 'string', 'max:255'],
             'youtube_url' => ['required', 'url'],
         ];

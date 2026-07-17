@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\TryOutScoringMode;
 use Database\Factories\TryOutFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,11 +10,21 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
-#[Fillable(['title', 'slug', 'description', 'source_file_name', 'duration_minutes', 'status'])]
+#[Fillable(['title', 'slug', 'description', 'source_file_name', 'duration_minutes', 'status', 'scoring_mode', 'correct_points', 'wrong_points', 'unanswered_points'])]
 class TryOut extends Model
 {
     /** @use HasFactory<TryOutFactory> */
     use HasFactory;
+
+    protected function casts(): array
+    {
+        return [
+            'scoring_mode' => TryOutScoringMode::class,
+            'correct_points' => 'float',
+            'wrong_points' => 'float',
+            'unanswered_points' => 'float',
+        ];
+    }
 
     public function questions(): HasMany
     {
@@ -23,6 +34,21 @@ class TryOut extends Model
     public function attempts(): HasMany
     {
         return $this->hasMany(TryOutAttempt::class);
+    }
+
+    public function accesses(): HasMany
+    {
+        return $this->hasMany(TryOutAccess::class);
+    }
+
+    public function groups(): HasMany
+    {
+        return $this->hasMany(TryOutGroup::class);
+    }
+
+    public function assets(): HasMany
+    {
+        return $this->hasMany(TryOutAsset::class);
     }
 
     public function getRouteKeyName(): string

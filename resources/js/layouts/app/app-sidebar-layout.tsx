@@ -3,8 +3,8 @@ import { AppContent } from '@/components/app-content';
 import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
-import { MentorSidebar } from '@/components/mentor-sidebar';
-import { StudentSidebar } from '@/components/student-sidebar';
+import { MentorSidebar } from '@/components/mentor/mentor-sidebar';
+import { StudentSidebar } from '@/components/student/student-sidebar';
 import type { AppLayoutProps } from '@/types';
 
 export default function AppSidebarLayout({

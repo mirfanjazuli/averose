@@ -173,7 +173,8 @@ function LoginForm({ canResetPassword }: { canResetPassword: boolean }) {
 
     return (
         <Form
-            {...loginStore.form()}
+            action={loginStore().url}
+            method="post"
             resetOnSuccess={['password']}
             className="space-y-6"
         >
@@ -277,7 +278,8 @@ function SignupForm({ passwordRules }: { passwordRules?: string }) {
 
     return (
         <Form
-            {...registerStore.form()}
+            action={registerStore().url}
+            method="post"
             resetOnSuccess={['password', 'password_confirmation']}
             disableWhileProcessing
             className="space-y-6"

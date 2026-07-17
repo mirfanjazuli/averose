@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\MentorJournal;
-use App\Models\SessionBooking;
+use App\Models\Schedule;
 use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,7 +23,7 @@ class MentorJournalsTest extends TestCase
         $subject = Subject::factory()->create([
             'name' => 'IELTS Writing',
         ]);
-        $session = SessionBooking::factory()->create([
+        $session = Schedule::factory()->create([
             'mentor_id' => $mentor->id,
             'scheduled_at' => now()->subHour(),
             'status' => 'assigned',
@@ -45,11 +45,11 @@ class MentorJournalsTest extends TestCase
             'mentor_id' => $mentor->id,
             'next_improvement_plan' => 'Draft one essay outline before the next session.',
             'note' => 'completed',
-            'session_booking_id' => $session->id,
+            'schedule_id' => $session->id,
             'student_id' => $student->id,
             'subject_id' => $subject->id,
         ]);
-        $this->assertDatabaseHas('session_bookings', [
+        $this->assertDatabaseHas('schedules', [
             'id' => $session->id,
             'status' => 'completed',
         ]);
@@ -67,7 +67,7 @@ class MentorJournalsTest extends TestCase
         $subject = Subject::factory()->create([
             'name' => 'IELTS Writing',
         ]);
-        $session = SessionBooking::factory()->create([
+        $session = Schedule::factory()->create([
             'duration' => 90,
             'mentor_id' => $mentor->id,
             'scheduled_at' => '2026-06-09 10:00:00',
@@ -80,7 +80,7 @@ class MentorJournalsTest extends TestCase
             'improvement_area' => 'Needs stronger examples.',
             'mentor_id' => $mentor->id,
             'next_improvement_plan' => 'Practice evidence mapping.',
-            'session_booking_id' => $session->id,
+            'schedule_id' => $session->id,
             'slug' => 'ielts-writing-alya-safira',
             'student_id' => $student->id,
             'subject_id' => $subject->id,
@@ -90,7 +90,7 @@ class MentorJournalsTest extends TestCase
             ->get(route('monitoring.mentor-journals'))
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('admin/monitoring/mentor-journals')
+                ->component('admin/monitoring/mentor-journals/index')
                 ->where('journals.0.mentor', 'Nadia Putri')
                 ->where('journals.0.student', 'Alya Safira')
                 ->where('journals.0.sessionName', 'IELTS Writing')
@@ -101,7 +101,7 @@ class MentorJournalsTest extends TestCase
             ->get(route('monitoring.mentor-journals.show', $journal))
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('admin/monitoring/mentor-journal-detail')
+                ->component('admin/monitoring/mentor-journals/show')
                 ->where('journal.achievement', 'Clearer paragraph flow.')
                 ->where('journal.nextImprovementPlan', 'Practice evidence mapping.')
             );
@@ -117,7 +117,7 @@ class MentorJournalsTest extends TestCase
         $subject = Subject::factory()->create([
             'name' => 'IELTS Writing',
         ]);
-        $session = SessionBooking::factory()->create([
+        $session = Schedule::factory()->create([
             'duration' => 90,
             'mentor_id' => $mentor->id,
             'scheduled_at' => '2026-06-09 10:00:00',
@@ -128,7 +128,7 @@ class MentorJournalsTest extends TestCase
         $journal = MentorJournal::factory()->create([
             'mentor_id' => $mentor->id,
             'next_improvement_plan' => 'Practice evidence mapping.',
-            'session_booking_id' => $session->id,
+            'schedule_id' => $session->id,
             'student_id' => $student->id,
             'subject_id' => $subject->id,
         ]);
@@ -140,7 +140,7 @@ class MentorJournalsTest extends TestCase
             ->get(route('mentor.journals'))
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('mentor/journals')
+                ->component('mentor/journals/index')
                 ->has('journals', 1)
                 ->where('journals.0.id', (string) $journal->id)
                 ->where('journals.0.student', 'Alya Safira')
@@ -159,7 +159,7 @@ class MentorJournalsTest extends TestCase
         $subject = Subject::factory()->create([
             'name' => 'IELTS Writing',
         ]);
-        $session = SessionBooking::factory()->create([
+        $session = Schedule::factory()->create([
             'duration' => 90,
             'mentor_id' => $mentor->id,
             'scheduled_at' => '2026-06-09 10:00:00',
@@ -172,7 +172,7 @@ class MentorJournalsTest extends TestCase
             'improvement_area' => 'Needs stronger examples.',
             'mentor_id' => $mentor->id,
             'next_improvement_plan' => 'Practice evidence mapping.',
-            'session_booking_id' => $session->id,
+            'schedule_id' => $session->id,
             'slug' => 'ielts-writing-alya-safira',
             'student_id' => $student->id,
             'subject_id' => $subject->id,
@@ -182,7 +182,7 @@ class MentorJournalsTest extends TestCase
             ->get(route('mentor.journals.show', $journal))
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('mentor/journal-detail')
+                ->component('mentor/journals/show')
                 ->where('journal.student', 'Alya Safira')
                 ->where('journal.sessionName', 'IELTS Writing')
                 ->where('journal.date', 'Tuesday, 09 June 2026')
@@ -230,14 +230,14 @@ class MentorJournalsTest extends TestCase
         $subject = Subject::factory()->create([
             'name' => 'Speaking',
         ]);
-        $pendingSession = SessionBooking::factory()->create([
+        $pendingSession = Schedule::factory()->create([
             'mentor_id' => $mentor->id,
             'scheduled_at' => now()->subMinutes(30),
             'status' => 'assigned',
             'subject_id' => $subject->id,
             'user_id' => $student->id,
         ]);
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'mentor_id' => $mentor->id,
             'scheduled_at' => now()->addHour(),
             'status' => 'assigned',
@@ -249,7 +249,7 @@ class MentorJournalsTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('mentor/dashboard')
+                ->component('mentor/dashboard/index')
                 ->where('completionSession.id', (string) $pendingSession->id)
                 ->where('nextSessions.0.title', 'Speaking')
             );
@@ -266,7 +266,7 @@ class MentorJournalsTest extends TestCase
             ->get(route('dashboard'))
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('mentor/dashboard')
+                ->component('mentor/dashboard/index')
                 ->where('completionSession', null)
                 ->where('nextSessions.0.title', 'Speaking')
                 ->where('nextSessions.0.improvementPlan', 'Practice two timed prompts.')

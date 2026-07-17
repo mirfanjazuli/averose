@@ -8,6 +8,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -16,7 +17,7 @@ use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
-#[Fillable(['name', 'nickname', 'slug', 'email', 'password', 'role', 'status'])]
+#[Fillable(['name', 'nickname', 'slug', 'email', 'password', 'role', 'role_id', 'status'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements PasskeyUser
 {
@@ -53,6 +54,44 @@ class User extends Authenticatable implements PasskeyUser
         return $this->role === UserRole::Admin;
     }
 
+    public function isSuperAdmin(): bool
+    {
+        return $this->isAdmin() && $this->role_id === null;
+    }
+
+    public function hasPermission(string $key): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        if (! $this->isAdmin() || $this->role_id === null) {
+            return false;
+        }
+
+        $this->loadMissing('internalRole.permissions');
+
+        if ($this->internalRole?->status !== 'active') {
+            return false;
+        }
+
+        return $this->internalRole
+            ->permissions
+            ->contains('key', $key);
+    }
+
+    /**
+     * @param  array<int, string>  $keys
+     */
+    public function hasAnyPermission(array $keys): bool
+    {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        return collect($keys)->contains(fn (string $key): bool => $this->hasPermission($key));
+    }
+
     public function getRouteKeyName(): string
     {
         return 'slug';
@@ -73,14 +112,14 @@ class User extends Authenticatable implements PasskeyUser
         return $this->hasMany(ProgramEnrollment::class);
     }
 
-    public function mentorBookings(): HasMany
+    public function mentorSchedules(): HasMany
     {
-        return $this->hasMany(SessionBooking::class, 'mentor_id');
+        return $this->hasMany(Schedule::class, 'mentor_id');
     }
 
     public function rescheduleRequests(): HasMany
     {
-        return $this->hasMany(SessionRescheduleRequest::class);
+        return $this->hasMany(RescheduleRequest::class);
     }
 
     public function mentorJournals(): HasMany
@@ -88,14 +127,24 @@ class User extends Authenticatable implements PasskeyUser
         return $this->hasMany(MentorJournal::class, 'mentor_id');
     }
 
-    public function sessionRecordings(): HasMany
+    public function internalRole(): BelongsTo
     {
-        return $this->hasMany(SessionRecording::class);
+        return $this->belongsTo(Role::class, 'role_id');
+    }
+
+    public function recordings(): HasMany
+    {
+        return $this->hasMany(Recording::class);
     }
 
     public function tryOutAttempts(): HasMany
     {
         return $this->hasMany(TryOutAttempt::class);
+    }
+
+    public function tryOutAccesses(): HasMany
+    {
+        return $this->hasMany(TryOutAccess::class);
     }
 
     protected static function booted(): void

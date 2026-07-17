@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Models\AcademicField;
 use App\Models\Program;
 use App\Models\ProgramVariant;
-use App\Models\SessionBooking;
+use App\Models\Schedule;
 use App\Models\Subject;
 use App\Models\User;
 use App\UserRole;
@@ -109,7 +109,7 @@ class UsersTest extends TestCase
             'sessions_used' => 6,
             'status' => 'active',
         ]);
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'program_enrollment_id' => $enrollment->id,
             'scheduled_at' => '2026-08-01 09:00:00',
             'status' => 'completed',
@@ -121,7 +121,7 @@ class UsersTest extends TestCase
             ->get(route('students.show', $student))
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
-                ->component('admin/users/student-detail')
+                ->component('admin/users/students/show')
                 ->where('user.name', 'Alya Prameswari')
                 ->where('user.nickname', 'Alya')
                 ->where('programOptions.0.label', 'UI Design')
@@ -169,7 +169,7 @@ class UsersTest extends TestCase
         ]);
     }
 
-    public function test_admin_can_create_update_and_delete_mentor(): void
+    public function test_admin_can_create_update_and_deactivate_mentor(): void
     {
         $admin = User::factory()->admin()->create();
 
@@ -201,8 +201,9 @@ class UsersTest extends TestCase
             ->delete(route('users.destroy', $mentor))
             ->assertRedirect();
 
-        $this->assertDatabaseMissing('users', [
+        $this->assertDatabaseHas('users', [
             'id' => $mentor->id,
+            'status' => 'inactive',
         ]);
     }
 
@@ -220,7 +221,7 @@ class UsersTest extends TestCase
         $subject = Subject::factory()->create([
             'name' => 'Speaking Review',
         ]);
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'duration' => 90,
             'mentor_id' => $mentor->id,
             'scheduled_at' => '2026-08-01 09:00:00',
@@ -233,7 +234,7 @@ class UsersTest extends TestCase
             ->get(route('mentors.show', $mentor))
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page): AssertableInertia => $page
-                ->component('admin/users/mentor-detail')
+                ->component('admin/users/mentors/show')
                 ->where('user.name', 'Megan Norton')
                 ->where('user.nickname', 'Megan')
                 ->where('teachingJournals.0.subject', 'Speaking Review')

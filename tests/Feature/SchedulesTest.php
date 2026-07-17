@@ -6,10 +6,12 @@ use App\Models\AcademicField;
 use App\Models\Program;
 use App\Models\ProgramEnrollment;
 use App\Models\ProgramVariant;
-use App\Models\SessionBooking;
-use App\Models\SessionRescheduleRequest;
+use App\Models\PublicHoliday;
+use App\Models\RescheduleRequest;
+use App\Models\Schedule;
 use App\Models\Subject;
 use App\Models\User;
+use App\Models\WorkingHour;
 use App\Models\ZoomAccount;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -22,7 +24,7 @@ class SchedulesTest extends TestCase
 
     public function test_guests_are_redirected_to_the_login_page(): void
     {
-        $response = $this->get(route('mentor.schedules'));
+        $response = $this->get(route('schedules'));
 
         $response->assertRedirect(route('login'));
     }
@@ -37,7 +39,7 @@ class SchedulesTest extends TestCase
 
         $response
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('admin/schedules/index'));
+            ->assertInertia(fn (Assert $page) => $page->component('admin/scheduling/schedules/index'));
     }
 
     public function test_mentor_users_can_visit_the_schedules_page(): void
@@ -46,11 +48,11 @@ class SchedulesTest extends TestCase
 
         $this->actingAs($user);
 
-        $response = $this->get(route('schedules'));
+        $response = $this->get(route('mentor.schedules'));
 
         $response
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('mentor/schedules'));
+            ->assertInertia(fn (Assert $page) => $page->component('mentor/schedules/index'));
     }
 
     public function test_mentor_schedules_receive_database_sessions(): void
@@ -78,7 +80,7 @@ class SchedulesTest extends TestCase
             'program_variant_id' => $variant->id,
         ]);
 
-        SessionBooking::factory()->create([
+        Schedule::factory()->create([
             'mentor_id' => $mentor->id,
             'program_enrollment_id' => $enrollment->id,
             'scheduled_at' => '2026-07-10 13:00:00',
@@ -93,7 +95,7 @@ class SchedulesTest extends TestCase
             ->get(route('mentor.schedules'))
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('mentor/schedules')
+                ->component('mentor/schedules/index')
                 ->where('sessions.0.title', 'Writing Review')
                 ->where('sessions.0.student', 'Sinta Student')
                 ->where('sessions.0.program', 'IELTS Intensive')
@@ -107,22 +109,11 @@ class SchedulesTest extends TestCase
 
         $this->actingAs($user);
 
-        $response = $this->get(route('schedules'));
+        $response = $this->get('/schedules');
 
         $response
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('student/schedules'));
-    }
-
-    public function test_admin_users_can_visit_the_mentor_assignments_page(): void
-    {
-        $user = User::factory()->admin()->create();
-
-        $this->actingAs($user);
-
-        $response = $this->get(route('schedules.mentor-assignments'));
-
-        $response->assertOk();
+            ->assertInertia(fn (Assert $page) => $page->component('student/schedules/index'));
     }
 
     public function test_admin_users_can_visit_the_reschedule_requests_page(): void
@@ -142,7 +133,7 @@ class SchedulesTest extends TestCase
         $student = User::factory()->student()->create(['name' => 'Alya Student']);
         $mentor = User::factory()->mentor()->create(['name' => 'Mira Mentor']);
         $subject = Subject::factory()->create(['name' => 'Math Review']);
-        $booking = SessionBooking::factory()->create([
+        $booking = Schedule::factory()->create([
             'mentor_id' => $mentor->id,
             'scheduled_at' => '2026-07-10 09:00:00',
             'status' => 'assigned',
@@ -150,13 +141,13 @@ class SchedulesTest extends TestCase
             'user_id' => $student->id,
         ]);
 
-        SessionRescheduleRequest::factory()->create([
+        RescheduleRequest::factory()->create([
             'current_scheduled_at' => '2026-07-10 09:00:00',
             'duration' => 60,
             'mentor_id' => $mentor->id,
             'reason' => 'Bentrok sekolah/kampus',
             'requested_scheduled_at' => '2026-07-11 10:00:00',
-            'session_booking_id' => $booking->id,
+            'schedule_id' => $booking->id,
             'user_id' => $student->id,
         ]);
 
@@ -164,7 +155,7 @@ class SchedulesTest extends TestCase
             ->get(route('schedules.reschedule-requests'))
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
-                ->component('admin/schedules/reschedule-requests')
+                ->component('admin/scheduling/reschedule-requests/index')
                 ->where('requests.0.student', 'Alya Student')
                 ->where('requests.0.mentor', 'Mira Mentor')
                 ->where('requests.0.session', 'Math Review')
@@ -182,7 +173,7 @@ class SchedulesTest extends TestCase
         $admin = User::factory()->admin()->create();
         $student = User::factory()->student()->create();
         $mentor = User::factory()->mentor()->create();
-        $booking = SessionBooking::factory()->create([
+        $booking = Schedule::factory()->create([
             'mentor_id' => $mentor->id,
             'scheduled_at' => '2026-07-10 09:00:00',
             'status' => 'assigned',
@@ -191,16 +182,16 @@ class SchedulesTest extends TestCase
         ]);
 
         $this->actingAs($student)
-            ->post(route('session-reschedule-requests.store', $booking), [
+            ->post(route('reschedule-requests.store', $booking), [
                 'reason' => 'Bentrok sekolah/kampus',
                 'requested_scheduled_at' => '2026-07-11 10:00:00',
             ])
             ->assertRedirect();
 
-        $request = SessionRescheduleRequest::query()->firstOrFail();
+        $request = RescheduleRequest::query()->firstOrFail();
 
         $this->assertSame('pending', $request->status);
-        $this->assertSame($booking->id, $request->session_booking_id);
+        $this->assertSame($booking->id, $request->schedule_id);
 
         $this->actingAs($admin)
             ->put(route('schedules.reschedule-requests.approve', $request))
@@ -225,25 +216,168 @@ class SchedulesTest extends TestCase
 
         $response = $this->get(route('schedules.working-hours'));
 
-        $response->assertOk();
+        $response
+            ->assertOk()
+            ->assertInertia(fn (Assert $page): Assert => $page
+                ->component('admin/scheduling/working-hours/index')
+                ->where('workingHours.0.dayOfWeek', 1)
+                ->where('workingHours.0.isActive', true)
+                ->where('workingHours.0.startTime', '09:00')
+                ->where('workingHours.0.endTime', '20:00')
+                ->where('workingHours.4.dayOfWeek', 5)
+                ->where('workingHours.4.isActive', true)
+                ->where('workingHours.5.dayOfWeek', 6)
+                ->where('workingHours.5.isActive', false)
+            );
+    }
+
+    public function test_admin_users_can_update_working_hours(): void
+    {
+        $user = User::factory()->admin()->create();
+        $workingHour = WorkingHour::factory()->create([
+            'day_of_week' => 6,
+            'end_time' => null,
+            'is_active' => false,
+            'start_time' => null,
+        ]);
+
+        $this->actingAs($user)
+            ->put(route('schedules.working-hours.update', $workingHour), [
+                'end_time' => '15:00',
+                'is_active' => '1',
+                'start_time' => '10:00',
+            ])
+            ->assertRedirect();
+
+        $workingHour->refresh();
+
+        $this->assertTrue($workingHour->is_active);
+        $this->assertSame('10:00', $workingHour->start_time);
+        $this->assertSame('15:00', $workingHour->end_time);
+
+        $this->actingAs($user)
+            ->put(route('schedules.working-hours.update', $workingHour), [
+                'is_active' => '0',
+            ])
+            ->assertRedirect();
+
+        $workingHour->refresh();
+
+        $this->assertFalse($workingHour->is_active);
+        $this->assertNull($workingHour->start_time);
+        $this->assertNull($workingHour->end_time);
     }
 
     public function test_admin_users_can_visit_the_public_holidays_page(): void
     {
         $user = User::factory()->admin()->create();
+        PublicHoliday::factory()->create([
+            'date' => '2026-08-17',
+            'name' => 'Hari Kemerdekaan Republik Indonesia',
+            'source' => 'manual',
+            'status' => 'active',
+            'type' => 'national',
+        ]);
 
         $this->actingAs($user);
 
         $response = $this->get(route('schedules.public-holidays'));
 
-        $response->assertOk();
+        $response
+            ->assertOk()
+            ->assertInertia(fn (Assert $page): Assert => $page
+                ->component('admin/scheduling/public-holidays/index')
+                ->where('holidays.0.name', 'Hari Kemerdekaan Republik Indonesia')
+                ->where('holidays.0.date', '2026-08-17')
+                ->where('holidays.0.type', 'national')
+            );
+    }
+
+    public function test_admin_users_can_manage_public_holidays(): void
+    {
+        $user = User::factory()->admin()->create();
+
+        $this->actingAs($user);
+
+        $this->post(route('schedules.public-holidays.store'), [
+            'date' => '2026-12-25',
+            'name' => 'Hari Raya Natal',
+            'status' => 'active',
+            'type' => 'national',
+        ])->assertRedirect();
+
+        $holiday = PublicHoliday::query()->firstOrFail();
+
+        $this->assertSame('manual', $holiday->source);
+
+        $this->put(route('schedules.public-holidays.update', $holiday), [
+            'date' => '2026-12-26',
+            'name' => 'Cuti Bersama Natal',
+            'status' => 'inactive',
+            'type' => 'collective_leave',
+        ])->assertRedirect();
+
+        $holiday->refresh();
+
+        $this->assertSame('Cuti Bersama Natal', $holiday->name);
+        $this->assertSame('2026-12-26', $holiday->date);
+        $this->assertSame('inactive', $holiday->status);
+        $this->assertSame('collective_leave', $holiday->type);
+
+        $this->delete(route('schedules.public-holidays.destroy', $holiday))
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('public_holidays', [
+            'id' => $holiday->id,
+            'status' => 'inactive',
+        ]);
+    }
+
+    public function test_admin_users_can_import_public_holidays_idempotently(): void
+    {
+        $user = User::factory()->admin()->create();
+
+        $payload = [
+            'holidays' => [
+                [
+                    'date' => '2026-01-01',
+                    'name' => 'Hari tahun baru',
+                    'type' => 'national',
+                ],
+                [
+                    'date' => '2026-01-01',
+                    'name' => 'Hari tahun baru',
+                    'type' => 'national',
+                ],
+                [
+                    'date' => '2026-08-17',
+                    'name' => 'Hari Kemerdekaan Republik Indonesia',
+                    'type' => 'national',
+                ],
+            ],
+            'year' => 2026,
+        ];
+
+        $this->actingAs($user)
+            ->post(route('schedules.public-holidays.import'), $payload)
+            ->assertRedirect();
+
+        $this->actingAs($user)
+            ->post(route('schedules.public-holidays.import'), $payload)
+            ->assertRedirect();
+
+        $this->assertDatabaseCount('public_holidays', 2);
+        $this->assertDatabaseHas('public_holidays', [
+            'date' => '2026-01-01',
+            'name' => 'Hari tahun baru',
+            'source' => 'library',
+            'status' => 'active',
+            'type' => 'national',
+        ]);
     }
 
     public function test_guests_are_redirected_from_schedule_sub_pages(): void
     {
-        $this->get(route('schedules.mentor-assignments'))
-            ->assertRedirect(route('login'));
-
         $this->get(route('schedules.reschedule-requests'))
             ->assertRedirect(route('login'));
 

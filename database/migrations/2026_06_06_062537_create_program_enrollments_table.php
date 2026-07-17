@@ -19,6 +19,7 @@ return new class extends Migration
             $table->foreignId('program_variant_id')->constrained()->cascadeOnDelete();
             $table->date('start_date');
             $table->unsignedSmallInteger('max_reschedule')->nullable();
+            $table->unsignedSmallInteger('sessions_used')->default(0);
             $table->string('status')->default('active');
             $table->timestamps();
         });

@@ -3,7 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\MentorJournal;
-use App\Models\SessionBooking;
+use App\Models\Schedule;
 use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -21,16 +21,16 @@ class MentorJournalFactory extends Factory
      */
     public function definition(): array
     {
-        $sessionBooking = SessionBooking::factory()->create([
+        $schedule = Schedule::factory()->create([
             'mentor_id' => User::factory()->mentor(),
             'status' => 'completed',
         ]);
 
         return [
-            'session_booking_id' => $sessionBooking->id,
-            'mentor_id' => $sessionBooking->mentor_id,
-            'student_id' => $sessionBooking->user_id,
-            'subject_id' => $sessionBooking->subject_id ?? Subject::factory(),
+            'schedule_id' => $schedule->id,
+            'mentor_id' => $schedule->mentor_id,
+            'student_id' => $schedule->user_id,
+            'subject_id' => $schedule->subject_id ?? Subject::factory(),
             'slug' => Str::slug(fake()->unique()->sentence(4)),
             'note' => 'completed',
             'achievement' => fake()->paragraph(),
