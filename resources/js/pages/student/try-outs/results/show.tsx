@@ -16,6 +16,7 @@ type Question = {
     questionHtml: string;
     questionText: string;
     questionType: 'single_choice' | 'multiple_answer' | 'numeric_answer';
+    subCategoryName: string | null;
     subjectName: string | null;
 };
 
@@ -58,7 +59,7 @@ function RichContent({
     html: string;
     typeset?: boolean;
 }) {
-    const contentRef = useRef<HTMLSpanElement>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
     const containsMath = hasMathSource(html);
 
     useEffect(() => {
@@ -91,7 +92,7 @@ function RichContent({
     }, [containsMath, html, typeset]);
 
     return (
-        <span
+        <div
             key={html}
             ref={contentRef}
             data-try-out-rich-content
@@ -247,6 +248,12 @@ export default function StudentTryOutResultDetail({
                                                 {question.subjectName ??
                                                     'General'}
                                             </p>
+                                            {question.subCategoryName && (
+                                                <p className="-mt-4 text-sm font-medium text-muted-foreground">
+                                                    Sub kategori:{' '}
+                                                    {question.subCategoryName}
+                                                </p>
+                                            )}
 
                                             <RichContent
                                                 className="block text-lg leading-8 whitespace-pre-wrap text-foreground/90"

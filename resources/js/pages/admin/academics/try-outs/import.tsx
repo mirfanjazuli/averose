@@ -39,6 +39,7 @@ type PreviewQuestion = {
     question_text: string;
     points: number | null;
     question_type: QuestionType;
+    sub_category_name: string | null;
     subject_name: string | null;
 };
 
@@ -66,6 +67,7 @@ type EditingQuestion = {
     points: number | null;
     question_type: QuestionType;
     question_text: string;
+    sub_category_name: string;
     subject_name: string;
 };
 
@@ -232,6 +234,7 @@ export default function AdminTryOutImport() {
             points: question.points,
             question_type: question.question_type ?? 'single_choice',
             question_text: question.question_text,
+            sub_category_name: question.sub_category_name ?? '',
             subject_name: question.subject_name ?? '',
         });
     };
@@ -293,6 +296,8 @@ export default function AdminTryOutImport() {
                     question_text: editingQuestion.question_text,
                     points: editingQuestion.points,
                     question_type: editingQuestion.question_type,
+                    sub_category_name:
+                        editingQuestion.sub_category_name.trim() || null,
                     subject_name: editingQuestion.subject_name.trim() || null,
                 };
             }),
@@ -432,6 +437,14 @@ export default function AdminTryOutImport() {
                                                 {question.subject_name ??
                                                     'General'}
                                             </p>
+                                            {question.sub_category_name && (
+                                                <p className="-mt-4 text-sm font-medium text-muted-foreground">
+                                                    Sub kategori:{' '}
+                                                    {
+                                                        question.sub_category_name
+                                                    }
+                                                </p>
+                                            )}
 
                                             <RichContent
                                                 className="block text-lg leading-8 whitespace-pre-wrap text-foreground/90"
@@ -556,6 +569,29 @@ export default function AdminTryOutImport() {
                                                     ? {
                                                           ...current,
                                                           subject_name:
+                                                              event.target
+                                                                  .value,
+                                                      }
+                                                    : current,
+                                            )
+                                        }
+                                    />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label htmlFor="edit-sub-category">
+                                        Sub Category
+                                    </Label>
+                                    <Input
+                                        id="edit-sub-category"
+                                        value={
+                                            editingQuestion.sub_category_name
+                                        }
+                                        onChange={(event) =>
+                                            setEditingQuestion((current) =>
+                                                current
+                                                    ? {
+                                                          ...current,
+                                                          sub_category_name:
                                                               event.target
                                                                   .value,
                                                       }

@@ -111,6 +111,49 @@ class StudentTryOutTest extends TestCase
             );
     }
 
+    public function test_try_out_session_resolves_question_asset_urls_before_rendering(): void
+    {
+        $user = User::factory()->student()->create();
+        $tryOut = TryOut::factory()->create(['status' => 'public']);
+        $asset = TryOutAsset::factory()->create(['try_out_id' => $tryOut->id]);
+
+        TryOutQuestion::factory()->create([
+            'number' => 1,
+            'options_html' => [
+                'A' => "Option image <img src=\"/try-out-assets/{$asset->uuid}\" alt=\"Option\">",
+                'B' => 'No image',
+                'C' => 'No image',
+                'D' => 'No image',
+                'E' => 'No image',
+            ],
+            'question_html' => "Question image <img src=\"/try-out-assets/{$asset->uuid}\" alt=\"Diagram\">",
+            'try_out_id' => $tryOut->id,
+        ]);
+
+        $this->partialMock(
+            TryOutAssetStorage::class,
+            fn (MockInterface $mock) => $mock
+                ->shouldReceive('resolveTryOutAssetUrls')
+                ->once()
+                ->withArgs(fn (TryOut $value, array $htmlValues): bool => $value->is($tryOut)
+                    && count($htmlValues) === 6
+                    && str_contains($htmlValues[0], "/try-out-assets/{$asset->uuid}"))
+                ->andReturnUsing(fn (TryOut $tryOut, array $htmlValues): array => array_map(
+                    fn (string $html): string => str_replace("/try-out-assets/{$asset->uuid}", 'https://r2.example.test/signed-image', $html),
+                    $htmlValues,
+                )),
+        );
+
+        $this
+            ->actingAs($user)
+            ->get(route('try-outs.show', $tryOut))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('tryOut.questions.0.questionHtml', 'Question image <img src="https://r2.example.test/signed-image" alt="Diagram">')
+                ->where('tryOut.questions.0.optionsHtml.A', 'Option image <img src="https://r2.example.test/signed-image" alt="Option">')
+            );
+    }
+
     public function test_students_can_view_images_from_public_try_outs(): void
     {
         $user = User::factory()->student()->create();

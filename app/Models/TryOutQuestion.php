@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['try_out_id', 'subject_id', 'subject_name', 'number', 'question_type', 'question_text', 'question_html', 'options', 'options_html', 'answer', 'correct_answers', 'points', 'explanation', 'status'])]
+#[Fillable(['try_out_id', 'subject_id', 'subject_name', 'sub_category_name', 'number', 'question_type', 'question_text', 'question_html', 'options', 'options_html', 'answer', 'correct_answers', 'points', 'explanation', 'status'])]
 class TryOutQuestion extends Model
 {
     /** @use HasFactory<TryOutQuestionFactory> */

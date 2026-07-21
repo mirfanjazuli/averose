@@ -36,6 +36,7 @@ type Question = {
     questionHtml: string;
     questionText: string;
     questionType: 'single_choice' | 'multiple_answer' | 'numeric_answer';
+    subCategoryName: string | null;
     subjectName: string | null;
 };
 
@@ -101,7 +102,7 @@ function RichContent({
     html: string;
 }) {
     return (
-        <span
+        <div
             data-try-out-rich-content
             className={className}
             dangerouslySetInnerHTML={{
@@ -555,9 +556,19 @@ export default function StudentTryOutSession({ tryOut }: { tryOut: TryOut }) {
                                 <div className="scrollbar-stable min-h-0 flex-1 overflow-y-auto px-6 py-8 md:px-16 lg:px-32">
                                     <div className="mx-auto max-w-4xl space-y-8">
                                         <div className="flex flex-wrap items-center justify-between gap-3">
-                                            <Badge variant="outline">
-                                                Question {activeQuestion.number}
-                                            </Badge>
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                <Badge variant="outline">
+                                                    Question{' '}
+                                                    {activeQuestion.number}
+                                                </Badge>
+                                                {activeQuestion.subCategoryName && (
+                                                    <span className="text-sm font-medium text-muted-foreground">
+                                                        {
+                                                            activeQuestion.subCategoryName
+                                                        }
+                                                    </span>
+                                                )}
+                                            </div>
                                             <Button
                                                 type="button"
                                                 variant={

@@ -16,6 +16,7 @@ return new class extends Migration
             $table->foreignId('try_out_id')->constrained()->cascadeOnDelete();
             $table->foreignId('subject_id')->nullable()->constrained()->nullOnDelete();
             $table->string('subject_name')->nullable();
+            $table->string('sub_category_name')->nullable();
             $table->unsignedInteger('number');
             $table->string('question_type')->default('single_choice');
             $table->longText('question_text');

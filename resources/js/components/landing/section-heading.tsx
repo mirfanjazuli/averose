@@ -22,16 +22,16 @@ export default function SectionHeading({
             }
         >
             <div
-                className={`mb-4 flex items-center gap-2 text-xs font-semibold tracking-[0.2em] text-primary uppercase ${centered ? 'justify-center' : ''}`}
+                className={`mb-4 flex items-center gap-2 text-xs font-semibold tracking-[0.2em] text-[#0f8f7a] uppercase ${centered ? 'justify-center' : ''}`}
             >
                 <Sparkles className="size-4" />
                 {eyebrow}
             </div>
-            <h2 className="font-heading text-3xl leading-tight font-semibold tracking-tight text-balance sm:text-4xl lg:text-[2.75rem]">
+            <h2 className="font-heading text-3xl leading-tight font-semibold tracking-tight text-balance text-[#102a3a] sm:text-4xl lg:text-[2.75rem]">
                 {title}
             </h2>
             {description && (
-                <p className="mt-4 text-base leading-7 text-muted-foreground">
+                <p className="mt-4 text-base leading-7 text-[#526b7b]">
                     {description}
                 </p>
             )}

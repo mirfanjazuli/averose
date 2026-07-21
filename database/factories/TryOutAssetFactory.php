@@ -25,7 +25,7 @@ class TryOutAssetFactory extends Factory
         return [
             'disk' => 'local',
             'mime_type' => 'image/png',
-            'path' => "try-outs/1/{$uuid}.png",
+            'path' => "try-outs/1-try-out/{$uuid}.png",
             'size' => 1024,
             'status' => 'permanent',
             'try_out_id' => TryOut::factory(),

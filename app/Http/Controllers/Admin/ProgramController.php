@@ -9,6 +9,7 @@ use App\Models\Program;
 use App\Models\ProgramEnrollment;
 use App\Models\ProgramVariant;
 use App\Models\Subject;
+use App\Support\StorageUrl;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -49,7 +50,7 @@ class ProgramController extends Controller
                     'name' => $program->name,
                     'slug' => $program->slug,
                     'thumbnail' => $program->thumbnail,
-                    'thumbnailUrl' => $program->thumbnail ? Storage::disk('public')->url($program->thumbnail) : null,
+                    'thumbnailUrl' => StorageUrl::forPath($program->thumbnail),
                     'description' => $program->description,
                     'maxReschedule' => $program->max_reschedule,
                     'field' => $program->fields->pluck('name')->join(', ') ?: 'No field',
@@ -117,7 +118,7 @@ class ProgramController extends Controller
                 'name' => $program->name,
                 'slug' => $program->slug,
                 'thumbnail' => $program->thumbnail,
-                'thumbnailUrl' => $program->thumbnail ? Storage::disk('public')->url($program->thumbnail) : null,
+                'thumbnailUrl' => StorageUrl::forPath($program->thumbnail),
                 'description' => $program->description,
                 'maxReschedule' => $program->max_reschedule,
                 'field' => $program->fields->pluck('name')->join(', ') ?: 'No field',
@@ -298,15 +299,20 @@ class ProgramController extends Controller
             return null;
         }
 
-        return $thumbnail->store('program-thumbnails', 'public');
+        return $thumbnail->store('program-thumbnails', $this->assetDiskName());
     }
 
     private function replaceThumbnail(Program $program, UploadedFile $thumbnail): string
     {
         if ($program->thumbnail) {
-            Storage::disk('public')->delete($program->thumbnail);
+            Storage::disk($this->assetDiskName())->delete($program->thumbnail);
         }
 
-        return $thumbnail->store('program-thumbnails', 'public');
+        return $thumbnail->store('program-thumbnails', $this->assetDiskName());
+    }
+
+    private function assetDiskName(): string
+    {
+        return (string) config('filesystems.default', 'local');
     }
 }

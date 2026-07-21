@@ -51,7 +51,7 @@ class TryOutDocumentImporter
     }
 
     /**
-     * @param  array<int, array{answer: string|null, number: int, options: array<string, string>, options_html: array<string, string>, question_html: string, question_text: string, subject_name: string|null}>  $parsedQuestions
+     * @param  array<int, array{answer: string|null, number: int, options: array<string, string>, options_html: array<string, string>, question_html: string, question_text: string, sub_category_name?: string|null, subject_name: string|null}>  $parsedQuestions
      * @param  array{title?: string|null, duration_minutes?: int|null, status?: string|null}  $attributes
      */
     public function importParsed(
@@ -96,6 +96,7 @@ class TryOutDocumentImporter
                     'question_html' => $question['question_html'],
                     'question_text' => $question['question_text'],
                     'status' => 'active',
+                    'sub_category_name' => $question['sub_category_name'] ?? null,
                     'subject_id' => $this->matchingSubjectId($question['subject_name']),
                     'subject_name' => $question['subject_name'],
                 ]);
@@ -114,7 +115,7 @@ class TryOutDocumentImporter
     }
 
     /**
-     * @return array<int, array{answer: string|null, number: int, options: array<string, string>, options_html: array<string, string>, question_html: string, question_text: string, subject_name: string|null}>
+     * @return array<int, array{answer: string|null, number: int, options: array<string, string>, options_html: array<string, string>, question_html: string, question_text: string, sub_category_name?: string|null, subject_name: string|null}>
      */
     public function parse(
         string $path,
@@ -137,7 +138,10 @@ class TryOutDocumentImporter
         $answers = [];
         $currentQuestion = null;
         $currentSubject = null;
+        $currentSubCategory = null;
+        $currentPassage = [];
         $isAnswerSection = false;
+        $isQuestionSection = false;
 
         foreach ($lines as $line) {
             if (preg_match('/^BAGIAN\s*2\b/i', $line['text']) === 1) {
@@ -160,18 +164,42 @@ class TryOutDocumentImporter
             }
 
             if (preg_match('/^BAGIAN\s*1\b/i', $line['text']) === 1) {
+                $isQuestionSection = true;
+
+                continue;
+            }
+
+            if (! $isQuestionSection) {
                 continue;
             }
 
             if (
                 $currentQuestion !== null
                 && $line['numbering']['num_id'] === null
-                && $this->questionHasOptions($currentQuestion)
-                && $this->looksLikeSubjectHeading($line['text'])
+                && ! $this->looksLikeQuestionNumberLine($line['text'])
+                && ! $this->looksLikeOptionLine($line['text'])
+                && (
+                    $this->questionHasOptions($currentQuestion)
+                    || $this->looksLikeCategoryHeading($this->lineHeadingText($line), $currentSubject)
+                    || $this->lineStartsWithPassageHeading($line)
+                )
             ) {
                 $questions[] = $currentQuestion;
                 $currentQuestion = null;
-                $currentSubject = $this->normalizeLine($line['text']);
+
+                if ($this->looksLikeCategoryHeading($this->lineHeadingText($line), $currentSubject)) {
+                    $currentSubject = $this->normalizeCategoryName($this->lineHeadingText($line));
+                    $currentSubCategory = null;
+                    $currentPassage = [];
+                } elseif ($this->lineStartsWithPassageHeading($line)) {
+                    $currentSubCategory = $this->readingSubCategoryName($currentSubject);
+                    $currentPassage = [$line];
+                } elseif ($this->looksLikeSubjectHeading($this->lineHeadingText($line))) {
+                    $currentSubCategory = $this->normalizeSubCategoryName($this->lineHeadingText($line));
+                    $currentPassage = ($line['first_text'] ?? null) !== null ? [$line] : [];
+                } else {
+                    $currentPassage = [$line];
+                }
 
                 continue;
             }
@@ -194,8 +222,9 @@ class TryOutDocumentImporter
                         'options' => [],
                         'options_html' => [],
                         'question_num_id' => $numberingId,
-                        'raw_html' => $line['html'],
-                        'raw_text' => $line['text'],
+                        'raw_html' => $this->questionHtmlWithPassage($currentPassage, $line['html']),
+                        'raw_text' => $this->questionTextWithPassage($currentPassage, $line['text']),
+                        'sub_category_name' => $currentSubCategory,
                         'subject_name' => $currentSubject,
                     ];
 
@@ -221,8 +250,9 @@ class TryOutDocumentImporter
                             'options' => [],
                             'options_html' => [],
                             'question_num_id' => $numberingId,
-                            'raw_html' => $line['html'],
-                            'raw_text' => $line['text'],
+                            'raw_html' => $this->questionHtmlWithPassage($currentPassage, $line['html']),
+                            'raw_text' => $this->questionTextWithPassage($currentPassage, $line['text']),
+                            'sub_category_name' => $currentSubCategory,
                             'subject_name' => $currentSubject,
                         ];
 
@@ -238,8 +268,12 @@ class TryOutDocumentImporter
 
                 $currentQuestion = [
                     'number' => (int) $matches[1],
-                    'raw_html' => $this->stripLeadingQuestionNumberHtml($line['html'], (int) $matches[1]),
-                    'raw_text' => $matches[2],
+                    'raw_html' => $this->questionHtmlWithPassage(
+                        $currentPassage,
+                        $this->stripLeadingQuestionNumberHtml($line['html'], (int) $matches[1]),
+                    ),
+                    'raw_text' => $this->questionTextWithPassage($currentPassage, $matches[2]),
+                    'sub_category_name' => $currentSubCategory,
                     'subject_name' => $currentSubject,
                 ];
 
@@ -247,7 +281,19 @@ class TryOutDocumentImporter
             }
 
             if ($currentQuestion === null) {
-                $currentSubject = $this->normalizeLine($line['text']);
+                if ($this->looksLikeCategoryHeading($this->lineHeadingText($line), $currentSubject)) {
+                    $currentSubject = $this->normalizeCategoryName($this->lineHeadingText($line));
+                    $currentSubCategory = null;
+                    $currentPassage = [];
+                } elseif ($this->lineStartsWithPassageHeading($line)) {
+                    $currentSubCategory = $this->readingSubCategoryName($currentSubject);
+                    $currentPassage = [$line];
+                } elseif ($this->looksLikeSubjectHeading($this->lineHeadingText($line))) {
+                    $currentSubCategory = $this->normalizeSubCategoryName($this->lineHeadingText($line));
+                    $currentPassage = ($line['first_text'] ?? null) !== null ? [$line] : [];
+                } else {
+                    $currentPassage[] = $line;
+                }
 
                 continue;
             }
@@ -277,6 +323,7 @@ class TryOutDocumentImporter
                     'options_html' => $splitQuestion['options_html'],
                     'question_html' => $questionHtml,
                     'question_text' => trim($questionText),
+                    'sub_category_name' => $question['sub_category_name'] ?? null,
                     'subject_name' => $question['subject_name'],
                 ];
             })
@@ -350,7 +397,7 @@ class TryOutDocumentImporter
     private function parseAnswerKey(string $line, TryOutQuestionType $type): array
     {
         if ($type === TryOutQuestionType::NumericAnswer) {
-            if (preg_match('/^\s*\d+\.\s*([+-]?\d+(?:[.,]\d+)?)\s*$/', $line, $matches) !== 1) {
+            if (preg_match('/^\s*(?:\d+\.\s*)?([+-]?\d+(?:[.,]\d+)?)\s*$/', $line, $matches) !== 1) {
                 return [];
             }
 
@@ -399,24 +446,190 @@ class TryOutDocumentImporter
 
         $lines = [];
 
-        foreach ($xpath->query('//w:p') as $paragraph) {
-            if (! $paragraph instanceof DOMElement) {
+        foreach ($xpath->query('/w:document/w:body/*') as $bodyChild) {
+            if (! $bodyChild instanceof DOMElement) {
                 continue;
             }
 
-            $line = $this->normalizeLine($this->nodeText($paragraph));
-            $html = $this->normalizeRichHtml($this->nodeHtml($paragraph));
+            if ($bodyChild->localName === 'tbl') {
+                $isLayoutTable = $this->isSingleColumnTable($xpath, $bodyChild);
+                $line = $isLayoutTable
+                    ? $this->singleColumnTableText($xpath, $bodyChild)
+                    : $this->tableText($xpath, $bodyChild);
+                $html = $isLayoutTable
+                    ? $this->singleColumnTableHtml($xpath, $bodyChild)
+                    : $this->tableHtml($xpath, $bodyChild);
+                $firstLine = $isLayoutTable ? $this->singleColumnTableFirstLine($xpath, $bodyChild) : null;
+
+                if ($line !== '' || $html !== '') {
+                    $lines[] = [
+                        'html' => $html,
+                        'first_text' => $firstLine,
+                        'numbering' => ['ilvl' => null, 'num_id' => null],
+                        'starts_with_passage_heading' => $firstLine !== null && $this->looksLikePassageHeading($firstLine),
+                        'text' => $line,
+                    ];
+                }
+
+                continue;
+            }
+
+            if ($bodyChild->localName !== 'p') {
+                continue;
+            }
+
+            $line = $this->normalizeLine($this->nodeText($bodyChild));
+            $html = $this->normalizeRichHtml($this->nodeHtml($bodyChild));
 
             if ($line !== '' || $html !== '') {
                 $lines[] = [
                     'html' => $html,
-                    'numbering' => $this->paragraphNumbering($xpath, $paragraph),
+                    'first_text' => null,
+                    'numbering' => $this->paragraphNumbering($xpath, $bodyChild),
+                    'starts_with_passage_heading' => false,
                     'text' => $line,
                 ];
             }
         }
 
         return $lines;
+    }
+
+    private function isSingleColumnTable(DOMXPath $xpath, DOMElement $table): bool
+    {
+        $hasRow = false;
+
+        foreach ($xpath->query('./w:tr', $table) as $row) {
+            if (! $row instanceof DOMElement) {
+                continue;
+            }
+
+            $hasRow = true;
+
+            if ($xpath->query('./w:tc', $row)->length > 1) {
+                return false;
+            }
+        }
+
+        return $hasRow;
+    }
+
+    private function singleColumnTableText(DOMXPath $xpath, DOMElement $table): string
+    {
+        $paragraphs = [];
+
+        foreach ($xpath->query('./w:tr/w:tc/w:p', $table) as $paragraph) {
+            if (! $paragraph instanceof DOMElement) {
+                continue;
+            }
+
+            $text = $this->normalizeLine($this->nodeText($paragraph));
+
+            if ($text !== '') {
+                $paragraphs[] = $text;
+            }
+        }
+
+        return $this->normalizeLine(implode(' ', $paragraphs));
+    }
+
+    private function singleColumnTableHtml(DOMXPath $xpath, DOMElement $table): string
+    {
+        $paragraphs = [];
+
+        foreach ($xpath->query('./w:tr/w:tc/w:p', $table) as $paragraph) {
+            if (! $paragraph instanceof DOMElement) {
+                continue;
+            }
+
+            $html = $this->normalizeRichHtml($this->nodeHtml($paragraph));
+
+            if ($html !== '') {
+                $paragraphs[] = '<p>'.$html.'</p>';
+            }
+        }
+
+        return implode('', $paragraphs);
+    }
+
+    private function singleColumnTableFirstLine(DOMXPath $xpath, DOMElement $table): ?string
+    {
+        foreach ($xpath->query('./w:tr/w:tc/w:p', $table) as $paragraph) {
+            if (! $paragraph instanceof DOMElement) {
+                continue;
+            }
+
+            $text = $this->normalizeLine($this->nodeText($paragraph));
+
+            if ($text !== '') {
+                return $text;
+            }
+        }
+
+        return null;
+    }
+
+    private function tableText(DOMXPath $xpath, DOMElement $table): string
+    {
+        $rows = [];
+
+        foreach ($xpath->query('./w:tr', $table) as $row) {
+            if (! $row instanceof DOMElement) {
+                continue;
+            }
+
+            $cells = [];
+
+            foreach ($xpath->query('./w:tc', $row) as $cell) {
+                if (! $cell instanceof DOMElement) {
+                    continue;
+                }
+
+                $text = $this->normalizeLine($this->nodeText($cell));
+
+                if ($text !== '') {
+                    $cells[] = $text;
+                }
+            }
+
+            if ($cells !== []) {
+                $rows[] = implode(' | ', $cells);
+            }
+        }
+
+        return $this->normalizeLine(implode(' ', $rows));
+    }
+
+    private function tableHtml(DOMXPath $xpath, DOMElement $table): string
+    {
+        $rows = [];
+
+        foreach ($xpath->query('./w:tr', $table) as $row) {
+            if (! $row instanceof DOMElement) {
+                continue;
+            }
+
+            $cells = [];
+
+            foreach ($xpath->query('./w:tc', $row) as $cell) {
+                if (! $cell instanceof DOMElement) {
+                    continue;
+                }
+
+                $cellHtml = $this->normalizeRichHtml($this->nodeHtml($cell));
+                $cells[] = '<td>'.$cellHtml.'</td>';
+            }
+
+            if ($cells !== []) {
+                $rows[] = '<tr>'.implode('', $cells).'</tr>';
+            }
+        }
+
+        if ($rows === []) {
+            return '';
+        }
+
+        return '<div class="try-out-table-wrapper"><table class="try-out-table"><tbody>'.implode('', $rows).'</tbody></table></div>';
     }
 
     /**
@@ -1151,9 +1364,175 @@ class TryOutDocumentImporter
 
     private function looksLikeSubjectHeading(string $line): bool
     {
-        return preg_match('/^\d+\./u', $line) !== 1
-            && preg_match('/[A-E]\./iu', $line) !== 1
-            && mb_strlen($line) <= 60;
+        $normalized = $this->normalizeLine($line);
+
+        if (
+            $normalized === ''
+            || $this->looksLikeQuestionNumberLine($normalized)
+            || $this->looksLikeOptionLine($normalized)
+            || $this->looksLikePassageHeading($normalized)
+            || mb_strlen($normalized) > 80
+        ) {
+            return false;
+        }
+
+        if (preg_match('/[.!?;:]{1,}/u', $normalized) === 1) {
+            return false;
+        }
+
+        $words = preg_split('/\s+/u', $normalized) ?: [];
+
+        if (count($words) <= 4) {
+            return true;
+        }
+
+        $letters = preg_replace('/[^\pL]/u', '', $normalized) ?? '';
+        $uppercaseLetters = preg_replace('/[^\p{Lu}]/u', '', $letters) ?? '';
+
+        return $letters !== '' && mb_strlen($uppercaseLetters) / max(mb_strlen($letters), 1) > 0.8;
+    }
+
+    private function looksLikeCategoryHeading(string $line, ?string $currentSubject): bool
+    {
+        if (! $this->looksLikeSubjectHeading($line)) {
+            return false;
+        }
+
+        if ($currentSubject === null) {
+            return true;
+        }
+
+        $normalized = Str::lower($this->normalizeLine($line));
+
+        if ($this->matchingSubjectId($normalized) !== null) {
+            return true;
+        }
+
+        $knownCategories = [
+            'bahasa indonesia',
+            'bahasa inggris',
+            'biologi',
+            'ekonomi',
+            'fisika',
+            'geografi',
+            'kimia',
+            'matematika',
+            'matematika dasar',
+            'matematika ipa',
+            'penalaran matematika',
+            'sosiologi',
+            'tes potensi akademik',
+            'tpa',
+        ];
+
+        return in_array($normalized, $knownCategories, true);
+    }
+
+    private function looksLikePassageHeading(string $line): bool
+    {
+        return preg_match('/^(?:PASSAGE|TEXT|TEKS|BACAAN|WACANA)\b/iu', $line) === 1;
+    }
+
+    /**
+     * @param  array{starts_with_passage_heading?: bool, text: string}  $line
+     */
+    private function lineStartsWithPassageHeading(array $line): bool
+    {
+        return ($line['starts_with_passage_heading'] ?? false)
+            || $this->looksLikePassageHeading($line['text']);
+    }
+
+    /**
+     * @param  array{first_text?: string|null, text: string}  $line
+     */
+    private function lineHeadingText(array $line): string
+    {
+        return filled($line['first_text'] ?? null)
+            ? $line['first_text']
+            : $line['text'];
+    }
+
+    private function readingSubCategoryName(?string $currentSubject): string
+    {
+        if (Str::lower((string) $currentSubject) === 'bahasa inggris') {
+            return 'Reading';
+        }
+
+        return 'Bacaan';
+    }
+
+    private function normalizeSubCategoryName(string $line): string
+    {
+        $normalized = $this->normalizeLine($line);
+
+        return match (Str::lower($normalized)) {
+            'structure and vocabulary' => 'Structure',
+            default => $this->formatAcademicLabel($normalized),
+        };
+    }
+
+    private function normalizeCategoryName(string $line): string
+    {
+        return $this->formatAcademicLabel($this->normalizeLine($line));
+    }
+
+    private function formatAcademicLabel(string $label): string
+    {
+        $formatted = Str::of($label)
+            ->lower()
+            ->headline()
+            ->toString();
+
+        return preg_replace_callback('/\b(Ipa|Ips|Tpa|Utbk|Snbt|Fk|Ui|Uny)\b/u', function (array $matches): string {
+            return Str::upper($matches[1]);
+        }, $formatted) ?? $formatted;
+    }
+
+    private function looksLikeOptionLine(string $line): bool
+    {
+        return preg_match('/^\s*[A-E]\.\s+/iu', $line) === 1;
+    }
+
+    private function looksLikeQuestionNumberLine(string $line): bool
+    {
+        return preg_match('/^\s*\d+\.\s+/u', $line) === 1;
+    }
+
+    /**
+     * @param  array<int, array{html: string, numbering: array{ilvl: string|null, num_id: string|null}, text: string}>  $passage
+     */
+    private function questionTextWithPassage(array $passage, string $questionText): string
+    {
+        $passageText = collect($passage)
+            ->pluck('text')
+            ->filter(fn (string $text): bool => filled($text))
+            ->implode(' ');
+
+        return $this->normalizeLine(trim($passageText.' '.$questionText));
+    }
+
+    /**
+     * @param  array<int, array{html: string, numbering: array{ilvl: string|null, num_id: string|null}, text: string}>  $passage
+     */
+    private function questionHtmlWithPassage(array $passage, string $questionHtml): string
+    {
+        if ($passage === []) {
+            return $questionHtml;
+        }
+
+        $passageHtml = collect($passage)
+            ->pluck('html')
+            ->filter(fn (string $html): bool => filled($html))
+            ->map(function (string $html): string {
+                $normalized = $this->normalizeRichHtml($html);
+
+                return str_starts_with($normalized, '<p>')
+                    ? $normalized
+                    : '<p>'.$normalized.'</p>';
+            })
+            ->implode('');
+
+        return '<div class="try-out-passage">'.$passageHtml.'</div>'.$questionHtml;
     }
 
     /**
@@ -1178,6 +1557,7 @@ class TryOutDocumentImporter
         $optionsHtml = [];
 
         preg_match_all('/(?:(?<![A-Za-z])|(?=[A-E]\.\s))([A-E])\.\s*/iu', $normalizedText, $matches, PREG_OFFSET_CAPTURE);
+        $matches = $this->sequentialOptionMatches($matches);
         $textStartIndex = $this->firstAnswerOptionMarkerIndex($matches[1]);
 
         if ($textStartIndex > 0) {
@@ -1198,6 +1578,7 @@ class TryOutDocumentImporter
         $questionHtml = e($questionText);
 
         preg_match_all('/(?:(?<![A-Za-z])|(?=[A-E]\.\s))([A-E])\.\s*/iu', $normalizedHtml, $htmlMatches, PREG_OFFSET_CAPTURE);
+        $htmlMatches = $this->sequentialOptionMatches($htmlMatches);
         $htmlStartIndex = $this->firstAnswerOptionMarkerIndex($htmlMatches[1]);
 
         if ($htmlStartIndex > 0) {
@@ -1208,6 +1589,8 @@ class TryOutDocumentImporter
         $canSplitHtml = count($htmlMatches[0]) === count($matches[0]);
 
         if ($canSplitHtml) {
+            $questionHtml = $this->normalizeRichHtml(substr($normalizedHtml, 0, $htmlMatches[0][0][1]));
+        } elseif (($htmlMatches[0][0][1] ?? null) !== null) {
             $questionHtml = $this->normalizeRichHtml(substr($normalizedHtml, 0, $htmlMatches[0][0][1]));
         }
 
@@ -1247,6 +1630,35 @@ class TryOutDocumentImporter
         }
 
         return 0;
+    }
+
+    /**
+     * @param  array{0: array<int, array{0: string, 1: int}>, 1: array<int, array{0: string, 1: int}>}  $matches
+     * @return array{0: array<int, array{0: string, 1: int}>, 1: array<int, array{0: string, 1: int}>}
+     */
+    private function sequentialOptionMatches(array $matches): array
+    {
+        $filtered = [[], []];
+        $expected = ['A', 'B', 'C', 'D', 'E'];
+        $expectedIndex = 0;
+
+        foreach ($matches[1] as $index => $letterMatch) {
+            $letter = strtoupper($letterMatch[0]);
+
+            if ($letter !== ($expected[$expectedIndex] ?? null)) {
+                continue;
+            }
+
+            $filtered[0][] = $matches[0][$index];
+            $filtered[1][] = $letterMatch;
+            $expectedIndex++;
+
+            if ($expectedIndex >= count($expected)) {
+                break;
+            }
+        }
+
+        return $filtered;
     }
 
     private function matchingSubjectId(?string $subjectName): ?int

@@ -27,8 +27,8 @@ use App\Http\Controllers\Student\RescheduleRequestController as StudentReschedul
 use App\Http\Controllers\Student\ScheduleController as StudentScheduleController;
 use App\Http\Controllers\Student\TryOutController as StudentTryOutController;
 use App\Models\Program;
+use App\Support\StorageUrl;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 Route::get('/', function () {
@@ -43,7 +43,7 @@ Route::get('/', function () {
                 'eyebrow' => $program->fields->pluck('name')->join(', ') ?: 'Program belajar',
                 'id' => $program->id,
                 'slug' => $program->slug,
-                'thumbnailUrl' => $program->thumbnail ? Storage::disk('public')->url($program->thumbnail) : null,
+                'thumbnailUrl' => StorageUrl::forPath($program->thumbnail),
                 'title' => $program->name,
             ]),
     ]);

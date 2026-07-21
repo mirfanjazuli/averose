@@ -118,7 +118,8 @@ class AcademicStructureTest extends TestCase
 
     public function test_admin_can_store_program_with_academic_relationships(): void
     {
-        Storage::fake('public');
+        config()->set('filesystems.default', 'local');
+        Storage::fake('local');
 
         $admin = User::factory()->admin()->create();
         $field = AcademicField::factory()->create();
@@ -147,7 +148,7 @@ class AcademicStructureTest extends TestCase
         $variant = ProgramVariant::query()->where('name', '6 x 90 Minutes')->firstOrFail();
 
         $this->assertNotNull($program->thumbnail);
-        Storage::disk('public')->assertExists($program->thumbnail);
+        Storage::disk('local')->assertExists($program->thumbnail);
 
         $this->assertDatabaseHas('field_program', [
             'field_id' => $field->id,
@@ -240,7 +241,8 @@ class AcademicStructureTest extends TestCase
 
     public function test_admin_can_update_academic_field_subject_and_program(): void
     {
-        Storage::fake('public');
+        config()->set('filesystems.default', 'local');
+        Storage::fake('local');
 
         $admin = User::factory()->admin()->create();
         $field = AcademicField::factory()->create([
@@ -251,7 +253,7 @@ class AcademicStructureTest extends TestCase
         ]);
         $program = Program::factory()->create([
             'name' => 'Backend Engineering',
-            'thumbnail' => UploadedFile::fake()->image('old-program.jpg', 800, 450)->store('program-thumbnails', 'public'),
+            'thumbnail' => UploadedFile::fake()->image('old-program.jpg', 800, 450)->store('program-thumbnails', 'local'),
         ]);
         $oldThumbnail = $program->thumbnail;
 
@@ -307,8 +309,8 @@ class AcademicStructureTest extends TestCase
         $program->refresh();
         $this->assertNotSame($oldThumbnail, $program->thumbnail);
         $this->assertNotNull($program->thumbnail);
-        Storage::disk('public')->assertMissing($oldThumbnail);
-        Storage::disk('public')->assertExists($program->thumbnail);
+        Storage::disk('local')->assertMissing($oldThumbnail);
+        Storage::disk('local')->assertExists($program->thumbnail);
         $this->assertDatabaseHas('program_variants', [
             'field_id' => $field->id,
             'name' => '8 x 120 Minutes',

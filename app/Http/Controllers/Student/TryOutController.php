@@ -9,13 +9,16 @@ use App\Models\TryOutAccess;
 use App\Models\TryOutAttempt;
 use App\Models\TryOutGroup;
 use App\Models\User;
+use App\Services\TryOutAssetStorage;
 use App\Services\TryOutScoringService;
 use App\TryOutQuestionType;
 use App\TryOutScoringMode;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -29,14 +32,15 @@ class TryOutController extends Controller
         /** @var User $user */
         $user = Auth::user();
         $today = now()->toDateString();
-        $attempts = TryOutAttempt::query()
-            ->whereBelongsTo($user)
-            ->get();
+        $attempts = TryOutAttempt::query()->whereBelongsTo($user);
+        $bestScore = (clone $attempts)
+            ->selectRaw('MAX(COALESCE(percentage_score, score)) as best_score')
+            ->value('best_score');
 
         return Inertia::render('student/try-outs/index', [
             'summary' => [
-                'bestScore' => $attempts->max(fn (TryOutAttempt $attempt): float => $this->percentageScore($attempt)),
-                'completed' => $attempts->count(),
+                'bestScore' => $bestScore === null ? null : (float) $bestScore,
+                'completed' => (clone $attempts)->count(),
             ],
             'tryOuts' => TryOut::query()
                 ->withCount('questions')
@@ -161,34 +165,16 @@ class TryOutController extends Controller
         return back()->with('success', $message);
     }
 
-    public function show(TryOut $tryOut): Response
+    public function show(TryOut $tryOut, TryOutAssetStorage $assetStorage): Response
     {
         abort_unless($this->activeAccessFor($tryOut, Auth::user()) !== false, 404);
 
-        $tryOut->load('questions');
-
         return Inertia::render('student/try-outs/session', [
-            'tryOut' => [
-                'durationMinutes' => $tryOut->duration_minutes,
-                'id' => (string) $tryOut->id,
-                'scoringMode' => ($tryOut->scoring_mode ?? TryOutScoringMode::RawScore)->value,
-                'questions' => $tryOut->questions->map(fn ($question): array => [
-                    'id' => (string) $question->id,
-                    'number' => $question->number,
-                    'options' => $question->options,
-                    'optionsHtml' => $question->options_html ?? $question->options,
-                    'questionHtml' => $question->question_html ?? e($question->question_text),
-                    'questionText' => $question->question_text,
-                    'questionType' => ($question->question_type ?? TryOutQuestionType::SingleChoice)->value,
-                    'subjectName' => $question->subject_name,
-                ])->values()->all(),
-                'slug' => $tryOut->slug,
-                'title' => $tryOut->title,
-            ],
+            'tryOut' => $this->tryOutSessionData($tryOut, $assetStorage),
         ]);
     }
 
-    public function result(TryOut $tryOut, TryOutAttempt $tryOutAttempt): Response
+    public function result(TryOut $tryOut, TryOutAttempt $tryOutAttempt, TryOutAssetStorage $assetStorage): Response
     {
         abort_unless($tryOutAttempt->try_out_id === $tryOut->id, 404);
         abort_unless($tryOutAttempt->user_id === Auth::id(), 403);
@@ -208,8 +194,10 @@ class TryOutController extends Controller
                 'questionHtml' => $question->question_html ?? e($question->question_text),
                 'questionText' => $question->question_text,
                 'questionType' => ($question->question_type ?? TryOutQuestionType::SingleChoice)->value,
+                'subCategoryName' => $question->sub_category_name,
                 'subjectName' => $question->subject_name,
             ])->values()->all();
+        $questions = $this->resolveSessionAssetUrls($tryOut, $assetStorage, ['questions' => $questions])['questions'];
 
         return Inertia::render('student/try-outs/results/show', [
             'attempt' => [
@@ -243,28 +231,35 @@ class TryOutController extends Controller
         TryOut $tryOut,
         TryOutScoringService $scoring,
     ): RedirectResponse {
-        $attempt = DB::transaction(function () use ($request, $scoring, $tryOut): TryOutAttempt {
-            $access = $this->activeAccessFor($tryOut, $request->user(), true);
-            abort_unless($access !== false, 404);
+        try {
+            $attempt = Cache::lock("try-out-submit:{$tryOut->id}:{$request->user()->id}", 30)
+                ->block(10, fn (): TryOutAttempt => DB::transaction(function () use ($request, $scoring, $tryOut): TryOutAttempt {
+                    $access = $this->activeAccessFor($tryOut, $request->user(), true);
+                    abort_unless($access !== false, 404);
 
-            $questions = $tryOut->questions()->get();
-            $result = $scoring->score($tryOut, $questions, $request->validated('answers'));
-            $attempt = TryOutAttempt::query()->create([
-                ...$result,
-                'question_count' => $questions->count(),
-                'submitted_at' => now(),
-                'try_out_id' => $tryOut->id,
-                'try_out_access_id' => $access?->id,
-                'user_id' => $request->user()->id,
-                'scoring_mode' => ($tryOut->scoring_mode ?? TryOutScoringMode::RawScore)->value,
+                    $questions = $tryOut->questions()->get();
+                    $result = $scoring->score($tryOut, $questions, $request->validated('answers'));
+                    $attempt = TryOutAttempt::query()->create([
+                        ...$result,
+                        'question_count' => $questions->count(),
+                        'submitted_at' => now(),
+                        'try_out_id' => $tryOut->id,
+                        'try_out_access_id' => $access?->id,
+                        'user_id' => $request->user()->id,
+                        'scoring_mode' => ($tryOut->scoring_mode ?? TryOutScoringMode::RawScore)->value,
+                    ]);
+
+                    if ($access instanceof TryOutAccess) {
+                        $access->increment('attempts_used');
+                    }
+
+                    return $attempt;
+                }, 3));
+        } catch (LockTimeoutException) {
+            throw ValidationException::withMessages([
+                'answers' => 'Your previous submission is still being processed. Please wait a moment.',
             ]);
-
-            if ($access instanceof TryOutAccess) {
-                $access->increment('attempts_used');
-            }
-
-            return $attempt;
-        }, 3);
+        }
 
         return redirect()
             ->route('try-outs.results.show', [$tryOut, $attempt])
@@ -319,5 +314,77 @@ class TryOutController extends Controller
             'status' => $tryOut->status === 'private' ? 'Private' : 'Public',
             'title' => $tryOut->title,
         ];
+    }
+
+    private function tryOutSessionData(TryOut $tryOut, TryOutAssetStorage $assetStorage): array
+    {
+        $data = Cache::remember(
+            "try-out-session:{$tryOut->id}:{$tryOut->updated_at?->timestamp}",
+            now()->addMinutes(30),
+            function () use ($tryOut): array {
+                $tryOut->loadMissing('questions');
+
+                return [
+                    'durationMinutes' => $tryOut->duration_minutes,
+                    'id' => (string) $tryOut->id,
+                    'scoringMode' => ($tryOut->scoring_mode ?? TryOutScoringMode::RawScore)->value,
+                    'questions' => $tryOut->questions->map(fn ($question): array => [
+                        'id' => (string) $question->id,
+                        'number' => $question->number,
+                        'options' => $question->options,
+                        'optionsHtml' => $question->options_html ?? $question->options,
+                        'questionHtml' => $question->question_html ?? e($question->question_text),
+                        'questionText' => $question->question_text,
+                        'questionType' => ($question->question_type ?? TryOutQuestionType::SingleChoice)->value,
+                        'subCategoryName' => $question->sub_category_name,
+                        'subjectName' => $question->subject_name,
+                    ])->values()->all(),
+                    'slug' => $tryOut->slug,
+                    'title' => $tryOut->title,
+                ];
+            },
+        );
+
+        return $this->resolveSessionAssetUrls($tryOut, $assetStorage, $data);
+    }
+
+    private function resolveSessionAssetUrls(TryOut $tryOut, TryOutAssetStorage $assetStorage, array $data): array
+    {
+        $htmlValues = [];
+        $locations = [];
+
+        foreach ($data['questions'] ?? [] as $questionIndex => $question) {
+            if (isset($question['questionHtml']) && is_string($question['questionHtml'])) {
+                $locations[] = [$questionIndex, 'questionHtml', null];
+                $htmlValues[] = $question['questionHtml'];
+            }
+
+            foreach (($question['optionsHtml'] ?? []) as $optionKey => $optionHtml) {
+                if (! is_string($optionHtml)) {
+                    continue;
+                }
+
+                $locations[] = [$questionIndex, 'optionsHtml', $optionKey];
+                $htmlValues[] = $optionHtml;
+            }
+        }
+
+        if ($htmlValues === []) {
+            return $data;
+        }
+
+        $resolvedValues = $assetStorage->resolveTryOutAssetUrls($tryOut, $htmlValues);
+
+        foreach ($locations as $index => [$questionIndex, $field, $optionKey]) {
+            if ($optionKey === null) {
+                $data['questions'][$questionIndex][$field] = $resolvedValues[$index];
+
+                continue;
+            }
+
+            $data['questions'][$questionIndex][$field][$optionKey] = $resolvedValues[$index];
+        }
+
+        return $data;
     }
 }

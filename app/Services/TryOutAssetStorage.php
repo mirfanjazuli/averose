@@ -8,6 +8,7 @@ use App\Models\User;
 use DOMDocument;
 use DOMElement;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -45,7 +46,7 @@ class TryOutAssetStorage
             contents: $contents,
             sourceName: $image->getClientOriginalName(),
             uploader: $uploader,
-            directory: "try-outs/{$tryOut->id}/pending",
+            directory: "try-outs/{$this->tryOutDirectoryName($tryOut)}/pending",
             status: 'pending',
             tryOut: $tryOut,
         );
@@ -53,14 +54,16 @@ class TryOutAssetStorage
 
     public function promotePreview(string $previewToken, TryOut $tryOut, User $uploader): void
     {
-        TryOutAsset::query()
+        $assets = TryOutAsset::query()
             ->where('preview_token', $previewToken)
             ->whereBelongsTo($uploader, 'uploader')
             ->where('status', 'preview')
-            ->get()
+            ->get();
+
+        $assets
             ->each(function (TryOutAsset $asset) use ($tryOut): void {
                 $extension = pathinfo($asset->path, PATHINFO_EXTENSION);
-                $permanentPath = "try-outs/{$tryOut->id}/{$asset->uuid}.{$extension}";
+                $permanentPath = "try-outs/{$this->tryOutDirectoryName($tryOut)}/{$asset->uuid}.{$extension}";
                 $disk = Storage::disk($asset->disk);
 
                 if (! $disk->move($asset->path, $permanentPath)) {
@@ -74,6 +77,11 @@ class TryOutAssetStorage
                     'try_out_id' => $tryOut->id,
                 ]);
             });
+
+        $assets
+            ->pluck('disk')
+            ->unique()
+            ->each(fn (string $disk): bool => Storage::disk($disk)->deleteDirectory("try-out-previews/{$previewToken}"));
     }
 
     public function finalizeReferencedAssets(TryOut $tryOut, User $uploader, string ...$htmlValues): void
@@ -121,7 +129,46 @@ class TryOutAssetStorage
 
     public function temporaryUrl(TryOutAsset $asset): string
     {
-        return Storage::disk($asset->disk)->temporaryUrl($asset->path, now()->addMinutes(30));
+        return Cache::remember(
+            "try-out-asset-url:{$asset->uuid}:{$asset->updated_at?->timestamp}",
+            now()->addMinutes(25),
+            fn (): string => Storage::disk($asset->disk)->temporaryUrl($asset->path, now()->addMinutes(30)),
+        );
+    }
+
+    /**
+     * @param  array<int, string>  $htmlValues
+     * @return array<int, string>
+     */
+    public function resolveTryOutAssetUrls(TryOut $tryOut, array $htmlValues): array
+    {
+        $uuids = collect($htmlValues)
+            ->flatMap(fn (string $html): array => $this->referencedAssetUuids($html))
+            ->unique()
+            ->values();
+
+        if ($uuids->isEmpty()) {
+            return $htmlValues;
+        }
+
+        $replacements = TryOutAsset::query()
+            ->whereBelongsTo($tryOut)
+            ->where('status', 'permanent')
+            ->whereIn('uuid', $uuids)
+            ->get()
+            ->mapWithKeys(fn (TryOutAsset $asset): array => [
+                "/try-out-assets/{$asset->uuid}" => $this->temporaryUrl($asset),
+            ])
+            ->all();
+
+        if ($replacements === []) {
+            return $htmlValues;
+        }
+
+        return array_map(
+            fn (string $html): string => str_replace(array_keys($replacements), array_values($replacements), $html),
+            $htmlValues,
+        );
     }
 
     public function url(TryOutAsset $asset): string
@@ -254,7 +301,7 @@ class TryOutAssetStorage
             ]);
         }
 
-        $diskName = (string) config('filesystems.try_out_assets_disk', 'local');
+        $diskName = (string) config('filesystems.default', 'local');
         $uuid = (string) Str::uuid();
         $path = "{$directory}/{$uuid}.{$extension}";
         $disk = Storage::disk($diskName);
@@ -285,6 +332,13 @@ class TryOutAssetStorage
     {
         Storage::disk($asset->disk)->delete($asset->path);
         $asset->delete();
+    }
+
+    private function tryOutDirectoryName(TryOut $tryOut): string
+    {
+        $slug = Str::slug($tryOut->slug ?: $tryOut->title) ?: 'try-out';
+
+        return "{$tryOut->id}-{$slug}";
     }
 
     private function assetUuidFromUrl(string $url): ?string

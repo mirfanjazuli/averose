@@ -40,6 +40,7 @@ type TryOutQuestion = {
     questionType: 'single_choice' | 'multiple_answer' | 'numeric_answer';
     questionHtml: string;
     questionText: string;
+    subCategoryName: string | null;
     subjectName: string | null;
 };
 
@@ -601,6 +602,12 @@ export default function AdminTryOutQuestions({
                                             Kategori:{' '}
                                             {question.subjectName ?? 'General'}
                                         </p>
+                                        {question.subCategoryName && (
+                                            <p className="-mt-4 text-sm font-medium text-muted-foreground">
+                                                Sub kategori:{' '}
+                                                {question.subCategoryName}
+                                            </p>
+                                        )}
 
                                         <div className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3">
                                             <span className="pt-0.5 text-lg leading-8 font-semibold text-foreground/90">
@@ -818,6 +825,24 @@ export default function AdminTryOutQuestions({
                                             />
                                             <InputError
                                                 message={errors.subject_name}
+                                            />
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label htmlFor="sub_category_name">
+                                                Sub Category
+                                            </Label>
+                                            <Input
+                                                id="sub_category_name"
+                                                name="sub_category_name"
+                                                defaultValue={
+                                                    editingQuestion.subCategoryName ??
+                                                    ''
+                                                }
+                                            />
+                                            <InputError
+                                                message={
+                                                    errors.sub_category_name
+                                                }
                                             />
                                         </div>
                                         {editingQuestion.questionType !==

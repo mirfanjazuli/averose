@@ -15,8 +15,6 @@ return [
 
     'default' => env('FILESYSTEM_DISK', 'local'),
 
-    'try_out_assets_disk' => env('TRY_OUT_ASSET_DISK', 'local'),
-
     /*
     |--------------------------------------------------------------------------
     | Filesystem Disks

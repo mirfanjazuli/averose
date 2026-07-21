@@ -119,7 +119,7 @@ class AdminTryOutTest extends TestCase
     public function test_admin_users_can_import_embedded_docx_images(): void
     {
         Storage::fake('local');
-        config()->set('filesystems.try_out_assets_disk', 'local');
+        config()->set('filesystems.default', 'local');
         $user = User::factory()->admin()->create();
 
         $this
@@ -135,6 +135,7 @@ class AdminTryOutTest extends TestCase
 
         $preview = session('tryOutImportPreview');
         $asset = TryOutAsset::query()->sole();
+        $previewPath = $asset->path;
 
         $this->assertSame('preview', $asset->status);
         $this->assertStringContainsString("/try-out-assets/{$asset->uuid}", $preview['questions'][0]['question_html']);
@@ -150,8 +151,9 @@ class AdminTryOutTest extends TestCase
         $this->assertSame('permanent', $asset->status);
         $this->assertNotNull($asset->try_out_id);
         $this->assertNull($asset->preview_token);
-        $this->assertStringStartsWith("try-outs/{$asset->try_out_id}/", $asset->path);
+        $this->assertStringStartsWith("try-outs/{$asset->try_out_id}-try-out-with-image/", $asset->path);
         Storage::disk('local')->assertExists($asset->path);
+        Storage::disk('local')->assertMissing($previewPath);
         $this->assertDatabaseHas('questions', [
             'question_html' => "Diagram berikut <img src=\"/try-out-assets/{$asset->uuid}\" alt=\"Diagram soal\" loading=\"lazy\" decoding=\"async\"> menunjukkan ...",
         ]);
@@ -160,7 +162,7 @@ class AdminTryOutTest extends TestCase
     public function test_admin_users_can_upload_and_attach_images_in_question_editor(): void
     {
         Storage::fake('local');
-        config()->set('filesystems.try_out_assets_disk', 'local');
+        config()->set('filesystems.default', 'local');
         $user = User::factory()->admin()->create();
         $tryOut = TryOut::factory()->create();
         $question = TryOutQuestion::factory()->create(['try_out_id' => $tryOut->id]);
@@ -197,7 +199,7 @@ class AdminTryOutTest extends TestCase
     public function test_try_out_image_upload_rejects_unsupported_files(): void
     {
         Storage::fake('local');
-        config()->set('filesystems.try_out_assets_disk', 'local');
+        config()->set('filesystems.default', 'local');
         $user = User::factory()->admin()->create();
         $tryOut = TryOut::factory()->create();
 
@@ -1047,19 +1049,29 @@ class AdminTryOutTest extends TestCase
 
         @unlink($path);
 
-        $this->assertCount(3, $questions);
-        $this->assertSame('Matematika Dasar', $questions[0]['subject_name']);
+        $this->assertCount(4, $questions);
+        $this->assertSame('Bahasa Indonesia', $questions[0]['subject_name']);
         $this->assertSame('D', $questions[0]['answer']);
         $this->assertSame(['A', 'B', 'C', 'D', 'E'], array_keys($questions[0]['options']));
+        $this->assertSame('Matematika', $questions[1]['subject_name']);
         $this->assertSame(['A', 'C', 'E'], $questions[1]['correct_answers']);
         $this->assertSame('numeric_answer', $questions[2]['question_type']);
         $this->assertSame('12', $questions[2]['answer']);
         $this->assertSame([], $questions[2]['options']);
+        $this->assertSame('Bahasa Inggris', $questions[3]['subject_name']);
+        $this->assertSame('Reading', $questions[3]['sub_category_name']);
+        $this->assertSame(['A', 'B', 'C', 'D', 'E'], array_keys($questions[3]['options']));
+        $this->assertSame('Exams should be avoided.', $questions[3]['options']['B']);
+        $this->assertSame('Concepts are impossible to remember.', $questions[3]['options']['D']);
+        $this->assertStringContainsString('PASSAGE 1', $questions[3]['question_text']);
         $this->assertIsString($documentXml);
         $this->assertStringContainsString('Raw Score.', $documentXml);
         $this->assertStringContainsString('Negative Marking.', $documentXml);
         $this->assertStringContainsString('2. A,C,E', $documentXml);
         $this->assertStringContainsString('[NUMERIC ANSWER]', $documentXml);
+        $this->assertStringContainsString('Template Try Out Averose', $documentXml);
+        $this->assertStringContainsString('BAGIAN 1: SOAL', $documentXml);
+        $this->assertStringContainsString('Soal bacaan.', $documentXml);
     }
 
     public function test_importer_parses_comma_separated_multiple_answer_keys(): void
@@ -1084,6 +1096,120 @@ XML, 'multiple-answer.docx');
 
         $this->assertSame(['A', 'C'], $questions[0]['correct_answers']);
         $this->assertSame(1, $questions[0]['points']);
+    }
+
+    public function test_importer_keeps_reading_passages_with_following_questions(): void
+    {
+        $document = $this->docxUploadFromXml(<<<'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:body>
+        <w:p><w:r><w:t>BAGIAN 1: LEMBAR SOAL</w:t></w:r></w:p>
+        <w:p><w:r><w:t>BAHASA INGGRIS</w:t></w:r></w:p>
+        <w:p><w:r><w:t>PASSAGE 1 — SLEEP AND LEARNING</w:t></w:r></w:p>
+        <w:p><w:r><w:t>Sleep helps students consolidate new memories after deliberate practice.</w:t></w:r></w:p>
+        <w:p><w:r><w:t>1. What is the main idea of the passage?</w:t></w:r></w:p>
+        <w:p><w:r><w:t>A. Sleep supports learning.</w:t><w:br/><w:t>B. Sleep replaces study.</w:t><w:br/><w:t>C. Sleep stops memory.</w:t><w:br/><w:t>D. Sleep wastes time.</w:t><w:br/><w:t>E. Sleep removes books.</w:t></w:r></w:p>
+        <w:p><w:r><w:t>2. The word consolidate is closest in meaning to ….</w:t></w:r></w:p>
+        <w:p><w:r><w:t>A. erase</w:t><w:br/><w:t>B. strengthen</w:t><w:br/><w:t>C. separate</w:t><w:br/><w:t>D. ignore</w:t><w:br/><w:t>E. delay</w:t></w:r></w:p>
+        <w:p><w:r><w:t>STRUCTURE AND VOCABULARY</w:t></w:r></w:p>
+        <w:p><w:r><w:t>Choose the best answer to complete the sentence.</w:t></w:r></w:p>
+        <w:p><w:r><w:t>3. Each student ___ required to attend class.</w:t></w:r></w:p>
+        <w:p><w:r><w:t>A. are</w:t><w:br/><w:t>B. were</w:t><w:br/><w:t>C. is</w:t><w:br/><w:t>D. be</w:t><w:br/><w:t>E. being</w:t></w:r></w:p>
+        <w:p><w:r><w:t>BAGIAN 2: KUNCI JAWABAN</w:t></w:r></w:p>
+        <w:p><w:r><w:t>1. A</w:t></w:r></w:p>
+        <w:p><w:r><w:t>2. B</w:t></w:r></w:p>
+        <w:p><w:r><w:t>3. C</w:t></w:r></w:p>
+    </w:body>
+</w:document>
+XML, 'reading-passage.docx');
+
+        $questions = app(TryOutDocumentImporter::class)->parse($document->getRealPath());
+
+        $this->assertCount(3, $questions);
+        $this->assertSame('Bahasa Inggris', $questions[0]['subject_name']);
+        $this->assertSame('Reading', $questions[0]['sub_category_name']);
+        $this->assertStringContainsString('PASSAGE 1', $questions[0]['question_text']);
+        $this->assertStringContainsString('Sleep helps students', $questions[1]['question_text']);
+        $this->assertStringContainsString('try-out-passage', $questions[1]['question_html']);
+        $this->assertSame('Bahasa Inggris', $questions[2]['subject_name']);
+        $this->assertSame('Structure', $questions[2]['sub_category_name']);
+        $this->assertStringContainsString('Choose the best answer', $questions[2]['question_text']);
+    }
+
+    public function test_importer_preserves_word_tables_inside_questions(): void
+    {
+        $document = $this->docxUploadFromXml(<<<'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:body>
+        <w:p><w:r><w:t>BAGIAN 1: SOAL</w:t></w:r></w:p>
+        <w:p><w:r><w:t>Matematika</w:t></w:r></w:p>
+        <w:p><w:r><w:t>1. Perhatikan data berikut. Bulan dengan pendaftar terbesar adalah ....</w:t></w:r></w:p>
+        <w:tbl>
+            <w:tr>
+                <w:tc><w:p><w:r><w:t>Bulan</w:t></w:r></w:p></w:tc>
+                <w:tc><w:p><w:r><w:t>Pendaftar</w:t></w:r></w:p></w:tc>
+            </w:tr>
+            <w:tr>
+                <w:tc><w:p><w:r><w:t>Januari</w:t></w:r></w:p></w:tc>
+                <w:tc><w:p><w:r><w:t>120</w:t></w:r></w:p></w:tc>
+            </w:tr>
+            <w:tr>
+                <w:tc><w:p><w:r><w:t>Februari</w:t></w:r></w:p></w:tc>
+                <w:tc><w:p><w:r><w:t>150</w:t></w:r></w:p></w:tc>
+            </w:tr>
+        </w:tbl>
+        <w:p><w:r><w:t>A. Januari</w:t><w:br/><w:t>B. Februari</w:t><w:br/><w:t>C. Maret</w:t><w:br/><w:t>D. April</w:t><w:br/><w:t>E. Mei</w:t></w:r></w:p>
+        <w:p><w:r><w:t>BAGIAN 2: KUNCI JAWABAN</w:t></w:r></w:p>
+        <w:p><w:r><w:t>1. B</w:t></w:r></w:p>
+    </w:body>
+</w:document>
+XML, 'table-question.docx');
+
+        $questions = app(TryOutDocumentImporter::class)->parse($document->getRealPath());
+
+        $this->assertCount(1, $questions);
+        $this->assertSame('Matematika', $questions[0]['subject_name']);
+        $this->assertSame('B', $questions[0]['answer']);
+        $this->assertSame(['A', 'B', 'C', 'D', 'E'], array_keys($questions[0]['options']));
+        $this->assertStringContainsString('Bulan | Pendaftar', $questions[0]['question_text']);
+        $this->assertStringContainsString('try-out-table', $questions[0]['question_html']);
+        $this->assertStringContainsString('<td>Bulan</td>', $questions[0]['question_html']);
+    }
+
+    public function test_importer_flattens_single_column_layout_tables_in_reading_passages(): void
+    {
+        $document = $this->docxUploadFromXml(<<<'XML'
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+    <w:body>
+        <w:p><w:r><w:t>BAGIAN 1: SOAL</w:t></w:r></w:p>
+        <w:p><w:r><w:t>Bahasa Inggris</w:t></w:r></w:p>
+        <w:tbl>
+            <w:tr>
+                <w:tc>
+                    <w:p><w:r><w:t>PASSAGE 1 — STUDY HABITS</w:t></w:r></w:p>
+                    <w:p><w:r><w:t>Students who review regularly remember concepts better.</w:t></w:r></w:p>
+                    <w:p><w:r><w:t>Short reviews also help students prepare calmly.</w:t></w:r></w:p>
+                </w:tc>
+            </w:tr>
+        </w:tbl>
+        <w:p><w:r><w:t>1. What is the main idea of the passage?</w:t></w:r></w:p>
+        <w:p><w:r><w:t>A. Regular review supports memory.</w:t><w:br/><w:t>B. Study should be avoided.</w:t><w:br/><w:t>C. Concepts cannot be learned.</w:t><w:br/><w:t>D. Reviews always create stress.</w:t><w:br/><w:t>E. Exams do not need preparation.</w:t></w:r></w:p>
+        <w:p><w:r><w:t>BAGIAN 2: KUNCI JAWABAN</w:t></w:r></w:p>
+        <w:p><w:r><w:t>1. A</w:t></w:r></w:p>
+    </w:body>
+</w:document>
+XML, 'single-column-layout-table.docx');
+
+        $questions = app(TryOutDocumentImporter::class)->parse($document->getRealPath());
+
+        $this->assertCount(1, $questions);
+        $this->assertSame('Reading', $questions[0]['sub_category_name']);
+        $this->assertStringNotContainsString('try-out-table', $questions[0]['question_html']);
+        $this->assertStringContainsString('<p>PASSAGE 1', $questions[0]['question_html']);
+        $this->assertStringContainsString('<p>Students who review', $questions[0]['question_html']);
     }
 
     public function test_mentors_cannot_visit_the_admin_try_out_page(): void

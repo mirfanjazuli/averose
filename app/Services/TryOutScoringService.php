@@ -309,6 +309,7 @@ class TryOutScoringService
             'questionHtml' => $question->question_html ?? e($question->question_text),
             'questionText' => $question->question_text,
             'questionType' => ($question->question_type ?? TryOutQuestionType::SingleChoice)->value,
+            'subCategoryName' => $question->sub_category_name,
             'subjectName' => $question->subject_name,
         ];
     }

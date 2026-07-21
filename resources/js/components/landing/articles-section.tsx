@@ -7,7 +7,7 @@ export default function ArticlesSection() {
     return (
         <section
             id="artikel"
-            className="scroll-mt-16 bg-muted/45 py-16 sm:scroll-mt-20 sm:py-24 lg:py-28"
+            className="scroll-mt-16 bg-[#f8fbfa] py-16 sm:scroll-mt-20 sm:py-24 lg:py-28"
         >
             <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
                 <div className="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
@@ -19,7 +19,7 @@ export default function ArticlesSection() {
                         href={instagramUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-primary"
+                        className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-[#0f8f7a]"
                     >
                         Lihat konten di Instagram
                         <ArrowRight className="size-4" />
@@ -32,15 +32,15 @@ export default function ArticlesSection() {
                         return (
                             <article
                                 key={article.title}
-                                className="group overflow-hidden rounded-[1.75rem] border bg-background shadow-sm transition hover:-translate-y-1 hover:shadow-lg sm:rounded-[2rem]"
+                                className="group overflow-hidden rounded-[1.75rem] border border-[#dcece7] bg-white shadow-sm shadow-[#102a3a]/[0.03] transition hover:-translate-y-1 hover:shadow-lg sm:rounded-[2rem]"
                             >
                                 <div
                                     className={`flex aspect-[16/10] items-center justify-center ${
                                         index === 0
-                                            ? 'bg-[#dcefe7] text-[#176b52] dark:bg-primary/15 dark:text-primary'
+                                            ? 'bg-[#e4f5f0] text-[#0f8f7a]'
                                             : index === 1
-                                              ? 'bg-[#e2edf5] text-[#285e78] dark:bg-sky-400/15 dark:text-sky-300'
-                                              : 'bg-[#fef0cd] text-[#9a6800] dark:bg-amber-400/15 dark:text-amber-300'
+                                              ? 'bg-[#eef5f8] text-[#102a3a]'
+                                              : 'bg-[#fff3d5] text-[#9b6a13]'
                                     }`}
                                 >
                                     <Icon
@@ -49,20 +49,20 @@ export default function ArticlesSection() {
                                     />
                                 </div>
                                 <div className="p-5 sm:p-6">
-                                    <p className="text-xs font-semibold tracking-[0.15em] text-primary uppercase">
+                                    <p className="text-xs font-semibold tracking-[0.15em] text-[#0f8f7a] uppercase">
                                         {article.category}
                                     </p>
-                                    <h3 className="mt-3 font-heading text-xl leading-snug font-semibold">
+                                    <h3 className="mt-3 font-heading text-xl leading-snug font-semibold text-[#102a3a]">
                                         {article.title}
                                     </h3>
-                                    <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                                    <p className="mt-3 text-sm leading-6 text-[#526b7b]">
                                         {article.description}
                                     </p>
                                     <a
                                         href={instagramUrl}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="mt-5 inline-flex items-center gap-2 text-sm font-semibold"
+                                        className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#102a3a]"
                                     >
                                         Baca selengkapnya
                                         <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" />

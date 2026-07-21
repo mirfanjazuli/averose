@@ -31,6 +31,10 @@ return new class extends Migration
             $table->json('score_breakdown')->nullable();
             $table->timestamp('submitted_at');
             $table->timestamps();
+
+            $table->index(['user_id', 'submitted_at'], 'try_out_attempts_user_submitted_index');
+            $table->index(['try_out_id', 'percentage_score', 'submitted_at'], 'try_out_attempts_leaderboard_index');
+            $table->index(['try_out_id', 'user_id'], 'try_out_attempts_try_out_user_index');
         });
     }
 

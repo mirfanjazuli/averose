@@ -377,6 +377,7 @@ class TryOutController extends Controller
             'question_text' => ['required', 'string'],
             'question_type' => ['nullable', 'in:single_choice,multiple_answer,numeric_answer'],
             'points' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'sub_category_name' => ['nullable', 'string', 'max:255'],
             'subject_name' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -431,6 +432,7 @@ class TryOutController extends Controller
             'question_type' => $questionType,
             'question_html' => $questionHtml,
             'question_text' => $questionText,
+            'sub_category_name' => filled($validated['sub_category_name'] ?? null) ? $validated['sub_category_name'] : null,
             'subject_id' => $this->matchingSubjectId($validated['subject_name'] ?? null),
             'subject_name' => filled($validated['subject_name'] ?? null) ? $validated['subject_name'] : null,
         ]);
@@ -441,6 +443,7 @@ class TryOutController extends Controller
             $questionHtml,
             ...array_values($optionsHtml),
         );
+        $tryOut->touch();
 
         return back()->with('success', "Question {$question->number} updated successfully.");
     }
@@ -527,6 +530,7 @@ class TryOutController extends Controller
             'questionHtml' => $question->question_html,
             'questionText' => $question->question_text,
             'questionType' => ($question->question_type ?? TryOutQuestionType::SingleChoice)->value,
+            'subCategoryName' => $question->sub_category_name,
             'subjectName' => $question->subject_name,
         ];
     }

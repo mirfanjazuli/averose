@@ -38,6 +38,7 @@ class TryOutQuestionFactory extends Factory
             'points' => 1,
             'question_html' => fake()->sentence(),
             'question_text' => fake()->sentence(),
+            'sub_category_name' => null,
             'subject_name' => fake()->randomElement(['Matematika IPA', 'Fisika', 'Kimia', 'Biologi']),
             'try_out_id' => TryOut::factory(),
         ];

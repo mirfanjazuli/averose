@@ -2,10 +2,12 @@ import { Head, usePage } from '@inertiajs/react';
 import AdvantagesSection from '@/components/landing/advantages-section';
 import ArticlesSection from '@/components/landing/articles-section';
 import CtaSection from '@/components/landing/cta-section';
+import FaqSection from '@/components/landing/faq-section';
 import Footer from '@/components/landing/footer';
 import HeroSection from '@/components/landing/hero-section';
 import Navbar from '@/components/landing/navbar';
 import ProgramsSection from '@/components/landing/programs-section';
+import SectionConnector from '@/components/landing/section-connector';
 import SuccessStoriesSection from '@/components/landing/success-stories-section';
 
 type LandingProgram = {
@@ -29,14 +31,27 @@ export default function Welcome({ programs }: { programs: LandingProgram[] }) {
                 />
             </Head>
 
-            <div className="min-h-screen overflow-x-clip bg-background text-foreground">
+            <div className="min-h-screen overflow-x-clip bg-[#f8fbfa] text-[#102a3a]">
                 <Navbar isAuthenticated={Boolean(auth.user)} />
                 <main>
                     <HeroSection />
-                    <ProgramsSection programs={programs} />
+                    {programs.length > 0 && (
+                        <>
+                            <SectionConnector tone="whiteToSoft" />
+                            <ProgramsSection programs={programs} />
+                        </>
+                    )}
+                    <SectionConnector
+                        tone={programs.length > 0 ? 'softToWhite' : 'whiteToSoft'}
+                    />
                     <AdvantagesSection />
+                    <SectionConnector tone="whiteToSoft" />
                     <SuccessStoriesSection />
+                    <SectionConnector tone="soft" />
                     <ArticlesSection />
+                    <SectionConnector tone="soft" />
+                    <FaqSection />
+                    <SectionConnector tone="soft" />
                     <CtaSection />
                 </main>
                 <Footer />
