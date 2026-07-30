@@ -19,7 +19,7 @@ export default defineConfig({
         }),
         tailwindcss(),
         wayfinder({
-            command: 'php8.5',
+            command: `${process.env.WAYFINDER_PHP ?? 'php'} artisan wayfinder:generate`,
             formVariants: true,
         }),
     ],
