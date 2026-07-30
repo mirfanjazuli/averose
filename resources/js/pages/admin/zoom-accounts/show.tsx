@@ -1,32 +1,10 @@
 import { Head } from '@inertiajs/react';
-import {
-    CalendarClock,
-    KeyRound,
-    Pencil,
-    ShieldCheck,
-    Video,
-} from 'lucide-react';
+import { Eye, EyeOff, Pencil } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
-import PasswordInput from '@/components/password-input';
+import { TableScrollArea } from '@/components/admin/table-scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
 import {
     Table,
     TableBody,
@@ -35,6 +13,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
 import { UpdateDialogZoomAccount } from '@/pages/admin/zoom-accounts/components/update-dialog-zoom-account';
 
 type ZoomAccount = {
@@ -70,6 +49,32 @@ const meetingTabs = [
 
 type MeetingTab = (typeof meetingTabs)[number]['value'];
 
+function SecretValue({ value }: { value: string }) {
+    const [revealed, setRevealed] = useState(false);
+
+    return (
+        <div className="flex h-10 max-w-2xl items-center gap-2">
+            <p className="min-w-0 truncate font-mono text-sm">
+                {revealed ? value : '••••••••••••••••'}
+            </p>
+            <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="rounded-full"
+                onClick={() => setRevealed((current) => !current)}
+                aria-label={revealed ? 'Hide secret' : 'Show secret'}
+            >
+                {revealed ? (
+                    <EyeOff className="size-4" />
+                ) : (
+                    <Eye className="size-4" />
+                )}
+            </Button>
+        </div>
+    );
+}
+
 export default function ZoomAccountDetail({
     account,
     meetings,
@@ -78,7 +83,6 @@ export default function ZoomAccountDetail({
     meetings: ScheduledMeeting[];
 }) {
     const [editAccountDialogOpen, setEditAccountDialogOpen] = useState(false);
-    const [credentialsOpen, setCredentialsOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<MeetingTab>('active');
     const meetingCounts = useMemo(
         () => ({
@@ -101,7 +105,7 @@ export default function ZoomAccountDetail({
     return (
         <>
             <Head title={account.name} />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
+            <div className="flex h-full min-w-0 max-w-full flex-1 flex-col gap-6 overflow-hidden p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h1 className="font-heading text-2xl font-semibold">
@@ -132,245 +136,136 @@ export default function ZoomAccountDetail({
                     />
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-3">
-                    <Card>
-                        <CardContent className="flex items-center gap-4 px-6 py-5">
-                            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                                <Video className="size-5" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Account
-                                </p>
-                                <p className="font-medium">
-                                    {account.accountId}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-4 px-6 py-5">
-                            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                                <KeyRound className="size-5" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Client
-                                </p>
-                                <p className="font-medium">
-                                    {account.clientId}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-4 px-6 py-5">
-                            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                                <CalendarClock className="size-5" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Scheduled meetings
-                                </p>
-                                <p className="font-medium">{meetings.length}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <Card>
-                    <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-                        <div>
-                            <CardTitle>Account information</CardTitle>
-                            <CardDescription>
-                                Core credentials and update history.
-                            </CardDescription>
+                <section className="space-y-4">
+                    <div className="space-y-1.5">
+                        <div className="grid min-h-10 gap-2 md:grid-cols-[14rem_1fr] md:items-center">
+                            <p className="text-sm text-muted-foreground">
+                                Account ID
+                            </p>
+                            <p className="text-sm">{account.accountId}</p>
                         </div>
-                        <Dialog
-                            open={credentialsOpen}
-                            onOpenChange={setCredentialsOpen}
-                        >
-                            <DialogTrigger asChild>
-                                <Button variant="outline" className="gap-2">
-                                    <ShieldCheck className="size-4" />
-                                    View secrets
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Zoom credentials</DialogTitle>
-                                    <DialogDescription>
-                                        Secrets are encrypted at rest. Rotate
-                                        them from Zoom Marketplace if exposed.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-4">
-                                    <div className="grid gap-2">
-                                        <p className="text-sm text-muted-foreground">
-                                            Client Secret
-                                        </p>
-                                        <PasswordInput
-                                            value={account.clientSecret}
-                                            readOnly
-                                            className="font-mono"
-                                        />
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <p className="text-sm text-muted-foreground">
-                                            Token Secret
-                                        </p>
-                                        <PasswordInput
-                                            value={account.tokenSecret}
-                                            readOnly
-                                            className="font-mono"
-                                        />
-                                    </div>
-                                </div>
-                            </DialogContent>
-                        </Dialog>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Name
-                                </p>
-                                <p className="mt-1 font-medium">
-                                    {account.name}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Account ID
-                                </p>
-                                <p className="mt-1 font-medium">
-                                    {account.accountId}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Created
-                                </p>
-                                <p className="mt-1 font-medium">
-                                    {account.createdAt ?? '-'}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Updated
-                                </p>
-                                <p className="mt-1 font-medium">
-                                    {account.updatedAt ?? '-'}
-                                </p>
-                            </div>
+                        <div className="grid min-h-10 gap-2 md:grid-cols-[14rem_1fr] md:items-center">
+                            <p className="text-sm text-muted-foreground">
+                                Client ID
+                            </p>
+                            <p className="text-sm">{account.clientId}</p>
                         </div>
-                    </CardContent>
-                </Card>
+                        <div className="grid min-h-10 gap-2 md:grid-cols-[14rem_1fr] md:items-center">
+                            <p className="text-sm text-muted-foreground">
+                                Client Secret
+                            </p>
+                            <SecretValue value={account.clientSecret} />
+                        </div>
+                        <div className="grid min-h-10 gap-2 md:grid-cols-[14rem_1fr] md:items-center">
+                            <p className="text-sm text-muted-foreground">
+                                Token Secret
+                            </p>
+                            <SecretValue value={account.tokenSecret} />
+                        </div>
+                        <div className="grid min-h-10 gap-2 md:grid-cols-[14rem_1fr] md:items-center">
+                            <p className="text-sm text-muted-foreground">
+                                Created
+                            </p>
+                            <p className="text-sm">
+                                {account.createdAt ?? '-'}
+                            </p>
+                        </div>
+                    </div>
+                </section>
 
-                <Card>
-                    <CardHeader>
-                        <div className="flex flex-wrap items-start justify-between gap-4">
-                            <div>
-                                <CardTitle>Scheduled meetings</CardTitle>
-                                <CardDescription>
-                                    Active, remaining today, and upcoming
-                                    meetings assigned to this account.
-                                </CardDescription>
-                            </div>
-                            <div className="flex rounded-2xl border bg-background p-1">
-                                {meetingTabs.map((tab) => (
-                                    <Button
-                                        key={tab.value}
-                                        type="button"
+                <section className="space-y-4">
+                    <div className="flex flex-wrap items-end">
+                        <div className="flex rounded-2xl border bg-background p-1">
+                            {meetingTabs.map((tab) => (
+                                <Button
+                                    key={tab.value}
+                                    type="button"
+                                    variant={
+                                        activeTab === tab.value
+                                            ? 'default'
+                                            : 'ghost'
+                                    }
+                                    size="sm"
+                                    className="gap-2 rounded-xl"
+                                    onClick={() => setActiveTab(tab.value)}
+                                >
+                                    {tab.label}
+                                    <Badge
                                         variant={
                                             activeTab === tab.value
-                                                ? 'default'
-                                                : 'ghost'
+                                                ? 'secondary'
+                                                : 'outline'
                                         }
-                                        size="sm"
-                                        className="gap-2 rounded-xl"
-                                        onClick={() => setActiveTab(tab.value)}
                                     >
-                                        {tab.label}
-                                        <Badge
-                                            variant={
-                                                activeTab === tab.value
-                                                    ? 'secondary'
-                                                    : 'outline'
-                                            }
-                                        >
-                                            {meetingCounts[tab.value]}
-                                        </Badge>
-                                    </Button>
-                                ))}
-                            </div>
+                                        {meetingCounts[tab.value]}
+                                    </Badge>
+                                </Button>
+                            ))}
                         </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="rounded-2xl border">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Session</TableHead>
-                                        <TableHead>Student</TableHead>
-                                        <TableHead>Mentor</TableHead>
-                                        <TableHead>Time</TableHead>
-                                        <TableHead>Meeting ID</TableHead>
-                                        <TableHead>Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {visibleMeetings.length > 0 ? (
-                                        visibleMeetings.map((meeting) => (
-                                            <TableRow key={meeting.id}>
-                                                <TableCell>
-                                                    <p className="font-medium">
-                                                        {meeting.title}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {meeting.program}
-                                                    </p>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {meeting.student}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {meeting.mentor}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {meeting.time}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {meeting.meetingId ?? '-'}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        {...getBadgeProps(
-                                                            'outline',
-                                                        )}
-                                                    >
-                                                        {formatBadgeLabel(
-                                                            meeting.status,
-                                                        )}
-                                                    </Badge>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    ) : (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={6}
-                                                className="h-24 text-center text-sm text-muted-foreground"
-                                            >
-                                                No {activeTab} meetings.
+                    </div>
+                    <TableScrollArea>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Session</TableHead>
+                                    <TableHead>Student</TableHead>
+                                    <TableHead>Mentor</TableHead>
+                                    <TableHead>Time</TableHead>
+                                    <TableHead>Meeting ID</TableHead>
+                                    <TableHead>Status</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {visibleMeetings.length > 0 ? (
+                                    visibleMeetings.map((meeting) => (
+                                        <TableRow key={meeting.id}>
+                                            <TableCell>
+                                                <p className="font-medium">
+                                                    {meeting.title}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {meeting.program}
+                                                </p>
+                                            </TableCell>
+                                            <TableCell>
+                                                {meeting.student}
+                                            </TableCell>
+                                            <TableCell>
+                                                {meeting.mentor}
+                                            </TableCell>
+                                            <TableCell>
+                                                {meeting.time}
+                                            </TableCell>
+                                            <TableCell>
+                                                {meeting.meetingId ?? '-'}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge
+                                                    {...getBadgeProps(
+                                                        'outline',
+                                                    )}
+                                                >
+                                                    {formatBadgeLabel(
+                                                        meeting.status,
+                                                    )}
+                                                </Badge>
                                             </TableCell>
                                         </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
+                                    ))
+                                ) : (
+                                    <TableRow>
+                                        <TableCell
+                                            colSpan={6}
+                                            className="h-24 text-center text-sm text-muted-foreground"
+                                        >
+                                            No {activeTab} meetings.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableScrollArea>
+                </section>
             </div>
         </>
     );

@@ -308,7 +308,7 @@ export default function AdminTryOutImport() {
     return (
         <>
             <Head title="Import Try Out" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
+            <div className="flex h-full min-w-0 max-w-full flex-1 flex-col gap-6 overflow-hidden p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h1 className="font-heading text-2xl font-semibold">
@@ -409,7 +409,7 @@ export default function AdminTryOutImport() {
                                 </p>
                                 <p className="font-medium">
                                     {preview.durationMinutes
-                                        ? `${preview.durationMinutes} min`
+                                        ? `${preview.durationMinutes} minutes`
                                         : '-'}
                                 </p>
                             </div>

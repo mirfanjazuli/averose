@@ -8,6 +8,7 @@ use App\Http\Requests\StoreScheduleRequest;
 use App\Models\ProgramEnrollment;
 use App\Models\Schedule;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -61,7 +62,7 @@ class ScheduleController extends Controller
                             config('app.timezone'),
                         );
 
-                        Schedule::query()->create([
+                        $schedule = Schedule::query()->create([
                             'duration' => $enrollment->variant?->duration ?? 60,
                             'program_enrollment_id' => $enrollment->id,
                             'scheduled_at' => $scheduledAt,
@@ -69,6 +70,10 @@ class ScheduleController extends Controller
                             'subject_id' => $session['subject_id'],
                             'user_id' => $request->user()->id,
                         ]);
+                        $schedule->recordHistory('created', "Booking schedule dibuat oleh {$request->user()->name}.", $request->user(), [
+                            'scheduled_at' => $scheduledAt->toDateTimeString(),
+                            'status' => 'pending',
+                        ], $request->ip());
                     });
 
                     $enrollment->increment('sessions_used', $sessions->count());
@@ -93,24 +98,61 @@ class ScheduleController extends Controller
             'time' => ['required', 'date_format:H:i'],
         ]);
 
+        $previousScheduledAt = $schedule->scheduled_at->copy();
+        $scheduledAt = CarbonImmutable::parse(
+            "{$data['date']} {$data['time']}",
+            config('app.timezone'),
+        );
+
         $schedule->update([
-            'scheduled_at' => CarbonImmutable::parse(
-                "{$data['date']} {$data['time']}",
-                config('app.timezone'),
-            ),
+            'scheduled_at' => $scheduledAt,
         ]);
+        $schedule->recordHistory('updated', sprintf(
+            'Waktu schedule diubah oleh %s dari %s menjadi %s.',
+            $request->user()->name,
+            $this->formatHistoryScheduleTime($previousScheduledAt),
+            $this->formatHistoryScheduleTime($scheduledAt),
+        ), $request->user(), [
+            'scheduled_at' => [
+                'from' => $previousScheduledAt->toDateTimeString(),
+                'to' => $scheduledAt->toDateTimeString(),
+            ],
+        ], $request->ip());
 
         return back()->with('success', 'Session updated.');
     }
 
     private function sessions(Request $request): array
     {
-        return Schedule::query()
-            ->with(['mentor:id,name', 'pendingRescheduleRequest', 'subject:id,name,icon', 'zoomAccount:id,name', 'enrollment.program:id,name'])
+        $schedules = Schedule::query()
+            ->with([
+                'enrollment.program:id,name',
+                'feedback',
+                'mentor:id,name',
+                'mentorJournal.attachments:id,uuid,mentor_journal_id,original_name,mime_type,size',
+                'pendingRescheduleRequest',
+                'subject:id,name,icon',
+                'zoomAccount:id,name',
+            ])
             ->where('user_id', $request->user()->id)
             ->orderBy('scheduled_at')
-            ->get()
-            ->map(fn (Schedule $schedule): array => $this->sessionData($schedule))
+            ->get();
+
+        $mentorRatings = DB::table('schedule_feedback')
+            ->selectRaw('mentor_id, AVG((interactivity_rating + material_clarity_rating + audio_quality_rating + visual_quality_rating) / 4.0) as rating')
+            ->whereIn('mentor_id', $schedules->pluck('mentor_id')->filter()->unique())
+            ->groupBy('mentor_id')
+            ->pluck('rating', 'mentor_id');
+
+        return $schedules
+            ->map(function (Schedule $schedule) use ($mentorRatings): array {
+                $data = $this->sessionData($schedule);
+                $rating = $schedule->mentor_id ? $mentorRatings->get($schedule->mentor_id) : null;
+
+                $data['mentorRating'] = $rating === null ? null : round((float) $rating, 1);
+
+                return $data;
+            })
             ->all();
     }
 
@@ -162,5 +204,10 @@ class ScheduleController extends Controller
                 'subject_id' => (int) $data['subject_id'],
                 'time' => $data['time'],
             ]);
+    }
+
+    private function formatHistoryScheduleTime(CarbonInterface $date): string
+    {
+        return $date->copy()->locale('id')->translatedFormat('d M Y, H:i').' WIB';
     }
 }

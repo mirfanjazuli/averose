@@ -1,8 +1,16 @@
 import { Head, Link, usePage } from '@inertiajs/react';
-import { ArrowRight, ArrowUpRight, BookOpen, PlayCircle } from 'lucide-react';
-import { DynamicIcon } from 'lucide-react/dynamic';
-import type { IconName } from 'lucide-react/dynamic';
+import {
+    ArrowRight,
+    ArrowUpRight,
+    PlayCircle,
+} from 'lucide-react';
+import { useState } from 'react';
 
+import {
+    Alert,
+    AlertDescription,
+    AlertTitle,
+} from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,6 +20,21 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    formatBadgeLabel,
+    getBadgeProps,
+    getStatusBadgeTone,
+} from '@/lib/badge';
+import { ScheduleFeedbackDialog } from '@/pages/student/schedules/components/schedule-feedback-dialog';
+import type { ScheduleFeedbackSession } from '@/pages/student/schedules/components/schedule-feedback-dialog';
 import { StudentBookSessionDialog } from '@/pages/student/schedules/components/student-book-session-dialog';
 import type { BookingSubjectOption } from '@/pages/student/schedules/components/student-book-session-dialog';
 
@@ -19,10 +42,10 @@ type StudentSession = {
     endAt: string;
     id: string;
     mentor: string;
+    mentorRating?: number | null;
     program: string;
     startAt: string;
     status: string;
-    subjectIcon?: IconName | null;
     time: string;
     title: string;
     zoomLink: string | null;
@@ -82,20 +105,6 @@ function formatSessionTimeLabel(startAt: string, endAt: string) {
     return relativeDay ? `${relativeDay}, ${timeRange}` : timeRange;
 }
 
-function formatNextSessionLabel(dateValue: string) {
-    const relativeDay = formatRelativeSessionDay(dateValue);
-
-    if (relativeDay === 'Hari ini') {
-        return 'Kelas hari ini';
-    }
-
-    if (relativeDay === 'Besok') {
-        return 'Kelas besok';
-    }
-
-    return 'Kelas terdekat';
-}
-
 function formatSessionTimeRange(startAt: string, endAt: string) {
     const formatter = new Intl.DateTimeFormat('id-ID', {
         hour: '2-digit',
@@ -126,18 +135,25 @@ function greetingForCurrentTime() {
 }
 
 export default function StudentDashboard({
+    pendingFeedbackSessions,
     recordings,
     sessions,
     stats,
     subjects,
 }: {
+    pendingFeedbackSessions: ScheduleFeedbackSession[];
     recordings: StudentRecording[];
     sessions: StudentSession[];
     stats: StudentStats;
     subjects: BookingSubjectOption[];
 }) {
     const { auth } = usePage().props;
-    const studentName = auth.user?.name ?? 'Siswa';
+    const [bookingOpen, setBookingOpen] = useState(false);
+    const [feedbackOpen, setFeedbackOpen] = useState(false);
+    const [feedbackReminderOpen, setFeedbackReminderOpen] = useState(false);
+    const [feedbackSession, setFeedbackSession] =
+        useState<ScheduleFeedbackSession | null>(null);
+    const studentName = auth.user?.nickname || auth.user?.name || 'Siswa';
     const hasActiveProgram = stats.activePrograms > 0;
     const canBookSession = subjects.some(
         (subject) =>
@@ -148,235 +164,217 @@ export default function StudentDashboard({
         : canBookSession
           ? 'Yuk, atur jadwal belajar berikutnya!'
           : 'Saatnya lanjut ke paket belajar berikutnya';
-    const dashboardDescription = !hasActiveProgram
-        ? 'Program belajarmu belum aktif. Cek status programmu agar kamu bisa mulai booking sesi dengan mentor.'
-        : canBookSession
-          ? 'Pilih mata pelajaran, tentukan waktu, dan siapkan sesi belajar yang paling cocok untuk ritmemu.'
-          : 'Sesi pada paketmu sudah terpakai. Cek paket belajar agar progress kamu tidak berhenti di tengah jalan.';
     const unavailableBookingLabel = hasActiveProgram
         ? 'Lihat paket belajar'
         : 'Lihat status program';
-    const heroSession =
-        sessions.find((session) => formatRelativeSessionDay(session.startAt)) ??
-        null;
     const currentTime = new Date();
-    const canJoinHeroSession =
-        heroSession !== null &&
-        Boolean(heroSession.zoomLink) &&
-        currentTime >= new Date(heroSession.startAt) &&
-        currentTime <= new Date(heroSession.endAt);
-    const canJoinSession = (session: StudentSession) =>
-        Boolean(session.zoomLink) &&
-        currentTime >= new Date(session.startAt) &&
-        currentTime <= new Date(session.endAt);
+    const canJoinSession = (session: StudentSession) => {
+        const joinWindowStart = new Date(session.startAt);
+        joinWindowStart.setMinutes(joinWindowStart.getMinutes() - 5);
+
+        return (
+            Boolean(session.zoomLink) &&
+            currentTime >= joinWindowStart &&
+            currentTime <= new Date(session.endAt)
+        );
+    };
+    const primaryPendingFeedback = pendingFeedbackSessions[0] ?? null;
+    const pendingFeedbackLabel =
+        pendingFeedbackSessions.length > 1
+            ? `${pendingFeedbackSessions.length} sesi menunggu penilaian`
+            : '1 sesi menunggu penilaian';
+    const openFeedbackDialog = (session: ScheduleFeedbackSession) => {
+        setFeedbackReminderOpen(false);
+        setFeedbackSession(session);
+        setFeedbackOpen(true);
+    };
+    const requestBooking = () => {
+        if (primaryPendingFeedback) {
+            setFeedbackReminderOpen(true);
+
+            return;
+        }
+
+        setBookingOpen(true);
+    };
 
     return (
         <>
             <Head title="Dashboard" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4 md:p-6">
-                <div
-                    className={
-                        heroSession
-                            ? 'grid gap-0 xl:grid-cols-[minmax(0,1fr)_24rem]'
-                            : ''
-                    }
-                >
-                    <Card
-                        className={
-                            heroSession
-                                ? 'overflow-hidden rounded-b-none border-primary/15 bg-primary/5 xl:rounded-r-none xl:rounded-bl-2xl'
-                                : 'overflow-hidden border-primary/15 bg-primary/5'
-                        }
-                    >
-                        <CardContent className="flex h-full flex-col p-5 md:p-6">
-                            <div>
-                                <p className="text-sm font-medium">
-                                    {greetingForCurrentTime()}{' '}
-                                    <span className="font-bold text-primary">
-                                        {studentName}
+            <div className="flex h-full min-w-0 max-w-full flex-1 flex-col gap-8 py-4 text-[#102a3a] md:gap-10 md:py-6">
+                <div className="space-y-6">
+                    <section className="flex h-full flex-col gap-5 py-2 md:flex-row md:items-start md:justify-between md:gap-8 md:py-4">
+                        <div className="min-w-0">
+                            <h1 className="max-w-3xl font-heading text-2xl leading-tight font-semibold tracking-tight text-[#102a3a] md:text-4xl">
+                                {greetingForCurrentTime()}{', '}
+                                <span className="font-bold text-[#0f8f7a]">
+                                    {studentName}
+                                </span>
+                                !
+                            </h1>
+                            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#526b7b]">
+                                {dashboardHeadline}
+                            </p>
+                        </div>
+
+                        {canBookSession ? (
+                            <>
+                                <Button
+                                    className="shrink-0 gap-2 rounded-2xl bg-[#d9a441] text-[#102a3a] shadow-lg shadow-[#d9a441]/20 hover:bg-[#c89532]"
+                                    onClick={requestBooking}
+                                >
+                                    Jadwalkan sesi
+                                    <ArrowUpRight className="size-4" />
+                                </Button>
+                                <StudentBookSessionDialog
+                                    open={bookingOpen}
+                                    onOpenChange={setBookingOpen}
+                                    subjects={subjects}
+                                    trigger={null}
+                                />
+                            </>
+                        ) : (
+                            <Button
+                                asChild
+                                className="shrink-0 rounded-2xl bg-[#d9a441] text-[#102a3a] shadow-lg shadow-[#d9a441]/20 hover:bg-[#c89532]"
+                            >
+                                <Link href="/enrollments">
+                                    {unavailableBookingLabel}
+                                </Link>
+                            </Button>
+                        )}
+                    </section>
+
+                    {primaryPendingFeedback ? (
+                        <Alert className="flex flex-col gap-3 rounded-md border-0 bg-[#eafcf4] px-4 py-3 text-[#102a3a] shadow-none md:flex-row md:items-center md:justify-between md:gap-4">
+                            <div className="min-w-0">
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <Badge className="rounded-md border-0 bg-[#45bd91] px-3 py-1 text-xs font-semibold text-white hover:bg-[#45bd91]">
+                                        Baru
+                                    </Badge>
+                                    <AlertTitle className="font-semibold text-[#102a3a]">
+                                        Nilai sesi terakhirmu
+                                    </AlertTitle>
+                                </div>
+                                <AlertDescription className="mt-1.5 min-w-0 text-sm font-medium text-[#102a3a]">
+                                    <span>{pendingFeedbackLabel}.</span>{' '}
+                                    <span>
+                                        Bantu mentor menyiapkan sesi berikutnya.
                                     </span>
-                                    !
-                                </p>
-                                <h1 className="mt-2 max-w-3xl font-heading text-2xl leading-tight font-semibold md:text-4xl">
-                                    {dashboardHeadline}
-                                </h1>
-                                <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">
-                                    {dashboardDescription}
-                                </p>
+                                </AlertDescription>
                             </div>
-
-                            <div className="mt-auto flex flex-wrap gap-3 pt-8">
-                                {canBookSession ? (
-                                    <StudentBookSessionDialog
-                                        subjects={subjects}
-                                        trigger={
-                                            <Button className="gap-2">
-                                                Jadwalkan sesi
-                                                <ArrowUpRight className="size-4" />
-                                            </Button>
-                                        }
-                                    />
-                                ) : (
-                                    <Button asChild>
-                                        <Link href="/enrollments">
-                                            {unavailableBookingLabel}
-                                        </Link>
-                                    </Button>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {heroSession ? (
-                        <Card className="-mt-px rounded-t-none xl:mt-0 xl:-ml-px xl:rounded-l-none xl:rounded-tr-2xl">
-                            <CardContent className="flex h-full flex-col p-5 md:p-6">
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <p className="text-xs font-medium text-muted-foreground uppercase">
-                                            {formatNextSessionLabel(
-                                                heroSession.startAt,
-                                            )}
-                                        </p>
-                                        <p className="shrink-0 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                                            {formatSessionTimeRange(
-                                                heroSession.startAt,
-                                                heroSession.endAt,
-                                            )}
-                                        </p>
-                                    </div>
-
-                                    <div className="flex min-w-0 items-start gap-4">
-                                        <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                                            <DynamicIcon
-                                                name={
-                                                    heroSession.subjectIcon ??
-                                                    'book-open'
-                                                }
-                                                fallback={() => (
-                                                    <BookOpen className="size-6" />
-                                                )}
-                                                className="size-6"
-                                            />
-                                        </div>
-                                        <div className="min-w-0">
-                                            <h2 className="truncate font-heading text-xl font-semibold">
-                                                {heroSession.title}
-                                            </h2>
-                                            <p className="mt-1 truncate text-sm font-medium text-muted-foreground">
-                                                {heroSession.mentor}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="mt-auto pt-5">
-                                    {canJoinHeroSession &&
-                                    heroSession.zoomLink ? (
-                                        <Button asChild className="w-full">
-                                            <a
-                                                href={heroSession.zoomLink}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                            >
-                                                Bergabung sekarang
-                                            </a>
-                                        </Button>
-                                    ) : (
-                                        <Button
-                                            className="w-full"
-                                            variant="outline"
-                                            disabled
-                                        >
-                                            {heroSession.zoomLink
-                                                ? 'Bisa bergabung saat kelas dimulai'
-                                                : 'Link meeting belum tersedia'}
-                                        </Button>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
+                            <button
+                                type="button"
+                                className="inline-flex shrink-0 items-center gap-1 self-start font-semibold text-[#102a3a] underline underline-offset-4 transition-colors hover:text-[#0f8f7a] md:self-center"
+                                onClick={() =>
+                                    openFeedbackDialog(primaryPendingFeedback)
+                                }
+                            >
+                                Nilai sesi
+                                <ArrowRight className="size-4" />
+                            </button>
+                        </Alert>
                     ) : null}
+
                 </div>
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Sesi terdekat</CardTitle>
-                            <CardAction>
-                                <Link
-                                    href="/schedules"
-                                    className="inline-flex items-center gap-1.5 text-sm font-medium text-primary transition-colors hover:text-primary/80"
-                                >
-                                    Lihat semua
-                                    <ArrowRight className="size-4" />
-                                </Link>
-                            </CardAction>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {sessions.length > 0 ? (
-                                sessions.slice(0, 4).map((session) => {
+                    <section className="space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                            <h2 className="font-heading text-md font-semibold text-[#102a3a]">
+                                Sesi terdekat
+                            </h2>
+                            <Link
+                                href="/schedules"
+                                className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0f8f7a] transition-colors hover:text-[#0b7668]"
+                            >
+                                Lihat semua
+                                <ArrowRight className="size-4" />
+                            </Link>
+                        </div>
+
+                        {sessions.length > 0 ? (
+                            <div className="divide-y divide-[#edf3f1] overflow-hidden rounded-md bg-white shadow-sm shadow-[#102a3a]/[0.03] ring-1 ring-[#dcece7]">
+                                {sessions.slice(0, 4).map((session) => {
                                     const sessionDate = formatSessionDate(
                                         session.startAt,
                                     );
+                                    const canJoin = canJoinSession(session);
 
                                     return (
                                         <div
                                             key={session.id}
-                                            className="grid gap-4 rounded-xl border bg-card p-4 transition-colors hover:border-primary/30 md:grid-cols-[5.5rem_minmax(0,1fr)_auto]"
+                                            className="grid gap-5 px-4 py-5 transition-colors hover:bg-[#f8fbfa] sm:px-5 md:grid-cols-[4.75rem_minmax(0,1fr)_7rem] md:items-center"
                                         >
-                                            <div className="flex items-center gap-3 md:block">
-                                                <div className="w-20 rounded-xl bg-primary/10 px-3 py-3 text-center text-primary md:w-auto">
-                                                    <p className="text-2xl leading-none font-semibold">
+                                            <div className="flex items-center gap-4 md:block">
+                                                <div className="w-18 rounded-md bg-[#edf7f4] px-3 py-2.5 text-center text-[#0f8f7a] md:w-auto">
+                                                    <p className="text-xl leading-none font-semibold">
                                                         {sessionDate.day}
                                                     </p>
-                                                    <p className="mt-1 text-xs font-medium uppercase">
+                                                    <p className="mt-1 text-[11px] font-semibold tracking-wide uppercase">
                                                         {sessionDate.month}
                                                     </p>
                                                 </div>
                                                 <div className="md:hidden">
-                                                    <div className="flex flex-wrap items-center gap-2">
-                                                        <p className="text-sm font-semibold">
+                                                    <div className="space-y-1.5">
+                                                        <p className="text-sm font-semibold text-[#0f8f7a]">
                                                             {formatSessionTimeLabel(
                                                                 session.startAt,
                                                                 session.endAt,
                                                             )}
                                                         </p>
                                                         <Badge
-                                                            variant="secondary"
-                                                            className="w-fit"
+                                                            {...getBadgeProps(
+                                                                getStatusBadgeTone(
+                                                                    session.status,
+                                                                ),
+                                                                'w-fit',
+                                                            )}
                                                         >
-                                                            {session.status}
+                                                            {formatBadgeLabel(
+                                                                session.status,
+                                                            )}
                                                         </Badge>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <div className="min-w-0 self-center">
-                                                <div className="hidden items-center gap-2 md:flex">
-                                                    <p className="text-sm font-semibold text-primary">
+                                                <div className="hidden flex-wrap items-center gap-2 md:flex">
+                                                    <p className="text-sm font-semibold text-[#0f8f7a]">
                                                         {formatSessionTimeLabel(
                                                             session.startAt,
                                                             session.endAt,
                                                         )}
                                                     </p>
                                                     <Badge
-                                                        variant="secondary"
-                                                        className="w-fit"
+                                                        {...getBadgeProps(
+                                                            getStatusBadgeTone(
+                                                                session.status,
+                                                            ),
+                                                            'w-fit',
+                                                        )}
                                                     >
-                                                        {session.status}
+                                                        {formatBadgeLabel(
+                                                            session.status,
+                                                        )}
                                                     </Badge>
                                                 </div>
-                                                <p className="mt-2 truncate font-semibold">
+                                                <p className="mt-2 truncate font-semibold leading-6 text-[#102a3a]">
                                                     {session.title}{' '}
-                                                    <span className="font-normal text-muted-foreground">
+                                                    <span className="font-normal text-[#526b7b]">
                                                         · {session.mentor}
                                                     </span>
                                                 </p>
                                             </div>
 
-                                            <div className="flex items-center justify-start md:justify-end">
-                                                {canJoinSession(session) &&
+                                            <div className="flex items-center justify-start md:min-h-9 md:justify-end">
+                                                {canJoin &&
                                                 session.zoomLink ? (
-                                                    <Button asChild size="sm">
+                                                    <Button
+                                                        asChild
+                                                        size="sm"
+                                                        className="rounded-xl bg-[#0f8f7a] hover:bg-[#0b7668]"
+                                                    >
                                                         <a
                                                             href={
                                                                 session.zoomLink
@@ -384,35 +382,37 @@ export default function StudentDashboard({
                                                             target="_blank"
                                                             rel="noreferrer"
                                                         >
-                                                            Masuk
+                                                            Bergabung
                                                         </a>
                                                     </Button>
                                                 ) : null}
                                             </div>
                                         </div>
                                     );
-                                })
-                            ) : (
-                                <div className="rounded-xl border border-dashed p-6">
-                                    <p className="font-medium">
-                                        Belum ada sesi terjadwal
-                                    </p>
-                                    <p className="mt-1 text-sm text-muted-foreground">
-                                        Jadwalkan sesi belajar agar mentor bisa
-                                        menyiapkan kelas untukmu.
-                                    </p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                                })}
+                            </div>
+                        ) : (
+                            <div className="rounded-[1.35rem] border border-dashed border-[#dcece7] bg-white p-6">
+                                <p className="font-medium text-[#102a3a]">
+                                    Belum ada sesi terjadwal
+                                </p>
+                                <p className="mt-1 text-sm text-[#526b7b]">
+                                    Jadwalkan sesi belajar agar mentor bisa
+                                    menyiapkan kelas untukmu.
+                                </p>
+                            </div>
+                        )}
+                    </section>
 
-                    <Card>
+                    <Card className="rounded-[1.5rem] border-[#dcece7] bg-white shadow-sm shadow-[#102a3a]/[0.03]">
                         <CardHeader>
-                            <CardTitle>Rekaman terbaru</CardTitle>
+                            <CardTitle className="text-[#102a3a]">
+                                Rekaman terbaru
+                            </CardTitle>
                             <CardAction>
                                 <Link
                                     href="/recordings"
-                                    className="inline-flex items-center gap-1.5 text-sm font-medium text-primary transition-colors hover:text-primary/80"
+                                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0f8f7a] transition-colors hover:text-[#0b7668]"
                                 >
                                     <ArrowRight className="size-4" />
                                 </Link>
@@ -423,23 +423,23 @@ export default function StudentDashboard({
                                 recordings.slice(0, 3).map((recording) => (
                                     <div
                                         key={recording.id}
-                                        className="flex gap-3 rounded-xl border p-3"
+                                        className="flex gap-3 rounded-[1.15rem] border border-[#dcece7] p-3 transition-colors hover:border-[#bfe4db]"
                                     >
-                                        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#edf7f4] text-[#0f8f7a]">
                                             <PlayCircle className="size-5" />
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <p className="line-clamp-2 text-sm font-medium">
+                                            <p className="line-clamp-2 text-sm font-semibold text-[#102a3a]">
                                                 {recording.title}
                                             </p>
-                                            <p className="mt-1 text-xs text-muted-foreground">
+                                            <p className="mt-1 text-xs text-[#526b7b]">
                                                 {recording.subject} ·{' '}
                                                 {recording.mentor}
                                             </p>
                                             <Button
                                                 asChild
                                                 variant="link"
-                                                className="mt-1 h-auto px-0 text-xs"
+                                                className="mt-1 h-auto px-0 text-xs font-semibold text-[#0f8f7a] hover:text-[#0b7668]"
                                             >
                                                 <a
                                                     href={recording.youtubeUrl}
@@ -453,7 +453,7 @@ export default function StudentDashboard({
                                     </div>
                                 ))
                             ) : (
-                                <div className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
+                                <div className="rounded-[1.15rem] border border-dashed border-[#dcece7] p-6 text-sm text-[#526b7b]">
                                     Belum ada rekaman sesi.
                                 </div>
                             )}
@@ -461,6 +461,49 @@ export default function StudentDashboard({
                     </Card>
                 </div>
             </div>
+
+            <Dialog
+                open={feedbackReminderOpen}
+                onOpenChange={setFeedbackReminderOpen}
+            >
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Nilai sesi sebelumnya?</DialogTitle>
+                        <DialogDescription>
+                            Masukanmu membantu mentor menyesuaikan pembelajaran
+                            berikutnya.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:justify-between">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                                setFeedbackReminderOpen(false);
+                                setBookingOpen(true);
+                            }}
+                        >
+                            Nanti
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={() => {
+                                if (primaryPendingFeedback) {
+                                    openFeedbackDialog(primaryPendingFeedback);
+                                }
+                            }}
+                        >
+                            Nilai sekarang
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <ScheduleFeedbackDialog
+                open={feedbackOpen}
+                onOpenChange={setFeedbackOpen}
+                session={feedbackSession}
+            />
         </>
     );
 }

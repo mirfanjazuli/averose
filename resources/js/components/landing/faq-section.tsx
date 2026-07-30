@@ -49,21 +49,14 @@ export default function FaqSection() {
             id="faq"
             className="scroll-mt-16 bg-[#f8fbfa] py-16 sm:scroll-mt-20 sm:py-24 lg:py-28"
         >
-            <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-8 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16 lg:px-10">
-                <div>
-                    <p className="text-xs font-semibold tracking-[0.18em] text-[#0f8f7a] uppercase">
-                        FAQ
-                    </p>
-                    <h2 className="mt-4 max-w-xl font-heading text-3xl leading-tight font-semibold tracking-tight text-balance text-[#102a3a] sm:text-4xl lg:text-[2.75rem]">
-                        Pertanyaan yang Sering Ditanyakan
+            <div className="mx-auto grid max-w-7xl gap-10 px-4 sm:px-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start lg:gap-16 lg:px-10">
+                <div className="lg:sticky lg:top-28">
+                    <h2 className="mt-4 max-w-xl font-heading text-4xl leading-tight font-semibold tracking-tight text-balance text-[#102a3a] sm:text-5xl">
+                        Hal yang paling sering ditanyakan.
                     </h2>
-                    <p className="mt-5 max-w-md leading-7 text-[#526b7b]">
-                        Jawaban singkat untuk membantu menentukan langkah
-                        belajar yang paling sesuai.
-                    </p>
                 </div>
 
-                <div className="grid gap-3">
+                <div className="grid gap-4">
                     {faqs.map((faq) => {
                         const isOpen = openQuestion === faq.question;
 

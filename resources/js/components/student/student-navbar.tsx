@@ -1,6 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import { Menu } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
+import { NotificationMenu } from '@/components/notifications/notification-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +20,7 @@ import { UserMenuContent } from '@/components/user-menu-content';
 import { useCurrentUrl } from '@/hooks/use-current-url';
 import { useInitials } from '@/hooks/use-initials';
 import { cn } from '@/lib/utils';
+import type { Auth, NotificationFeed } from '@/types';
 
 const navItems = [
     {
@@ -44,20 +46,29 @@ const navItems = [
 ];
 
 export function StudentNavbar() {
-    const { auth } = usePage().props;
+    const { auth, notificationFeed } = usePage<{
+        auth: Auth;
+        notificationFeed: NotificationFeed;
+    }>().props;
     const getInitials = useInitials();
     const { isCurrentUrl } = useCurrentUrl();
 
     return (
-        <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-            <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-4 px-5 md:px-8">
+        <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl">
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                <div
+                    aria-hidden="true"
+                    className="absolute top-0 left-0 h-full w-[54%] bg-[linear-gradient(115deg,rgba(15,143,122,0.28)_0%,rgba(43,191,163,0.16)_46%,rgba(255,255,255,0)_100%)] opacity-100 [clip-path:polygon(0_0,78%_0,95%_36%,82%_100%,0_100%)] sm:w-[42%] lg:w-[32%]"
+                />
+            </div>
+            <div className="relative mx-auto flex h-16 w-full max-w-7xl items-center gap-4 px-4 sm:h-20 sm:px-8 lg:px-10">
                 <div className="lg:hidden">
                     <Sheet>
                         <SheetTrigger asChild>
                             <Button
                                 variant="ghost"
                                 size="icon"
-                                className="-ml-2 size-9"
+                                className="-ml-2 size-10 rounded-full text-[#102a3a] hover:bg-[#edf7f4]"
                                 aria-label="Buka menu"
                             >
                                 <Menu className="size-5" />
@@ -74,9 +85,9 @@ export function StudentNavbar() {
                                         href={item.href}
                                         prefetch
                                         className={cn(
-                                            'flex items-center rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+                                            'flex items-center rounded-xl px-4 py-3 text-sm font-semibold text-[#102a3a] transition-colors hover:bg-[#edf7f4] hover:text-[#0f8f7a]',
                                             isCurrentUrl(item.href) &&
-                                                'bg-muted text-foreground',
+                                                'bg-[#edf7f4] text-[#0f8f7a]',
                                         )}
                                     >
                                         {item.title}
@@ -90,12 +101,12 @@ export function StudentNavbar() {
                 <Link
                     href="/dashboard"
                     prefetch
-                    className="flex shrink-0 items-center"
+                    className="relative z-10 flex shrink-0 items-center"
                 >
                     <AppLogo />
                 </Link>
 
-                <nav className="ml-8 hidden h-16 items-center gap-7 lg:flex">
+                <nav className="ml-8 hidden h-full items-center gap-8 text-sm font-medium lg:flex">
                     {navItems.map((item) => {
                         const isActive = isCurrentUrl(item.href);
 
@@ -105,15 +116,15 @@ export function StudentNavbar() {
                                 href={item.href}
                                 prefetch
                                 className={cn(
-                                    'relative flex h-16 items-center whitespace-nowrap text-sm font-medium text-muted-foreground transition-colors hover:text-foreground',
-                                    isActive && 'text-foreground',
+                                    'group relative flex h-full items-center px-0.5 whitespace-nowrap text-[#102a3a]/75 transition-colors duration-300 hover:text-[#0f8f7a]',
+                                    isActive && 'text-[#0f8f7a]',
                                 )}
                             >
                                 {item.title}
                                 <span
                                     className={cn(
-                                        'absolute bottom-0 left-0 h-0.5 w-full rounded-full bg-primary opacity-0 transition-opacity',
-                                        isActive && 'opacity-100',
+                                        'absolute right-0 bottom-4 left-0 mx-auto h-1 w-0 rounded-full bg-[#0f8f7a] opacity-0 transition-all duration-300 group-hover:w-8 group-hover:opacity-50',
+                                        isActive && 'w-8 opacity-100',
                                     )}
                                 />
                             </Link>
@@ -122,11 +133,17 @@ export function StudentNavbar() {
                 </nav>
 
                 <div className="ml-auto flex items-center gap-2">
+                    <NotificationMenu
+                        initialFeed={notificationFeed}
+                        locale="id"
+                        buttonClassName="size-10 text-[#102a3a] transition-colors hover:bg-[#edf7f4] hover:text-[#0f8f7a]"
+                    />
+
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button
                                 variant="ghost"
-                                className="-mr-2 size-10 rounded-full p-1"
+                                className="-mr-2 size-10 rounded-full p-1 transition-colors hover:bg-[#edf7f4]"
                             >
                                 <Avatar className="size-8 overflow-hidden rounded-full">
                                     <AvatarImage

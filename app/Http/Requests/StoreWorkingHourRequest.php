@@ -25,9 +25,10 @@ class StoreWorkingHourRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'end_time' => ['nullable', 'required_if:is_active,1', 'date_format:H:i', 'after:start_time'],
-            'is_active' => ['required', 'boolean'],
-            'start_time' => ['nullable', 'required_if:is_active,1', 'date_format:H:i'],
+            'days' => ['required', 'array', 'min:1'],
+            'days.*' => ['required', 'integer', 'between:1,7', 'distinct'],
+            'end_time' => ['required', 'date_format:H:i', 'after:start_time'],
+            'start_time' => ['required', 'date_format:H:i'],
         ];
     }
 }

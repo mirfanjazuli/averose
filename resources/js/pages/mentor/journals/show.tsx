@@ -1,59 +1,72 @@
-import { Head } from '@inertiajs/react';
-import { NotebookPen, Target, TrendingUp } from 'lucide-react';
+import { Head, Link } from '@inertiajs/react';
 import type { ReactNode } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
+import { JournalAttachmentList } from '@/components/journal-attachment-list';
+import type { JournalAttachment } from '@/components/journal-attachment-list';
 
 type MentorJournal = {
     achievement: string;
-    date: string;
-    duration: string;
+    attachments: JournalAttachment[];
+    completedAt: string;
     id: string;
     improvementArea: string;
     nextImprovementPlan: string;
     program: string;
-    sessionName: string;
+    scheduleCode: string;
+    scheduleId: string | null;
+    sessionEndAt: string | null;
+    sessionStartAt: string;
     slug: string;
     student: string;
     subject: string;
-    time: string;
 };
 
-function InfoItem({
-    label,
-    value,
-}: {
-    label: string;
-    value: ReactNode;
-}) {
+const dateFormatter = new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+});
+
+const timeFormatter = new Intl.DateTimeFormat('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+});
+
+function formatDate(value: string) {
+    return dateFormatter.format(new Date(value));
+}
+
+function formatTime(value: string) {
+    return timeFormatter.format(new Date(value));
+}
+
+function formatDateTime(value: string) {
+    return `${formatDate(value)}, ${formatTime(value)} WIB`;
+}
+
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
     return (
-        <div>
-            <p className="text-xs font-medium uppercase tracking-normal text-muted-foreground">
-                {label}
-            </p>
-            <div className="mt-1 font-medium">{value}</div>
+        <div className="grid min-h-10 gap-2 md:grid-cols-[14rem_1fr] md:items-center">
+            <p className="text-sm text-muted-foreground">{label}</p>
+            <div className="text-sm font-medium">{value}</div>
         </div>
     );
 }
 
-function ProgressCard({
+function ProgressNote({
     children,
-    icon,
     title,
 }: {
     children: string;
-    icon: ReactNode;
     title: string;
 }) {
     return (
-        <div className="rounded-lg border p-4">
-            <div className="flex items-center gap-2">
-                {icon}
-                <h2 className="font-medium">{title}</h2>
-            </div>
-            <p className="mt-3 whitespace-pre-line text-sm text-muted-foreground">
-                {children}
+        <article className="min-w-0 py-5 md:px-6 md:first:pl-0 md:last:pr-0">
+            <h3 className="text-sm font-semibold">{title}</h3>
+            <p className="mt-2 text-sm leading-6 whitespace-pre-line text-muted-foreground">
+                {children || '-'}
             </p>
-        </div>
+        </article>
     );
 }
 
@@ -64,84 +77,76 @@ export default function MentorJournalDetail({
 }) {
     return (
         <>
-            <Head title={journal.sessionName} />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
-                <div className="min-w-0">
+            <Head title={journal.scheduleCode} />
+            <div className="flex min-h-full max-w-full min-w-0 flex-1 flex-col gap-8 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
                     <h1 className="font-heading text-2xl font-semibold">
-                        {journal.student}
+                        {journal.scheduleCode}
                     </h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        {journal.subject} · {journal.program}
-                    </p>
+                    {journal.scheduleId && (
+                        <Link
+                            href={`/schedules/${journal.scheduleId}`}
+                            className="text-sm font-medium text-primary hover:underline"
+                        >
+                            View schedule
+                        </Link>
+                    )}
                 </div>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Session details</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-                            <InfoItem
-                                label="Student"
-                                value={journal.student}
-                            />
-                            <InfoItem
-                                label="Program"
-                                value={journal.program}
-                            />
-                            <InfoItem
-                                label="Subject"
-                                value={journal.subject}
-                            />
-                            <InfoItem
-                                label="Date"
-                                value={journal.date}
-                            />
-                            <InfoItem
-                                label="Time"
-                                value={journal.time}
-                            />
-                            <InfoItem
-                                label="Duration"
-                                value={journal.duration}
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
+                <section className="space-y-4">
+                    <h2 className="font-heading text-lg font-semibold">
+                        Session details
+                    </h2>
+                    <div className="space-y-1.5">
+                        <DetailRow label="Student" value={journal.student} />
+                        <DetailRow label="Program" value={journal.program} />
+                        <DetailRow label="Subject" value={journal.subject} />
+                        <DetailRow
+                            label="Date"
+                            value={formatDate(journal.sessionStartAt)}
+                        />
+                        <DetailRow
+                            label="Time"
+                            value={
+                                journal.sessionEndAt
+                                    ? `${formatTime(journal.sessionStartAt)} - ${formatTime(journal.sessionEndAt)} WIB`
+                                    : '-'
+                            }
+                        />
+                        <DetailRow
+                            label="Completed at"
+                            value={formatDateTime(journal.completedAt)}
+                        />
+                    </div>
+                </section>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Progress notes</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-4 lg:grid-cols-3">
-                            <ProgressCard
-                                title="Achievement"
-                                icon={
-                                    <TrendingUp className="size-4 text-primary" />
-                                }
-                            >
-                                {journal.achievement}
-                            </ProgressCard>
-                            <ProgressCard
-                                title="Area to improve"
-                                icon={
-                                    <Target className="size-4 text-primary" />
-                                }
-                            >
-                                {journal.improvementArea}
-                            </ProgressCard>
-                            <ProgressCard
-                                title="Next focus"
-                                icon={
-                                    <NotebookPen className="size-4 text-primary" />
-                                }
-                            >
-                                {journal.nextImprovementPlan}
-                            </ProgressCard>
-                        </div>
-                    </CardContent>
-                </Card>
+                <section className="space-y-4">
+                    <h2 className="font-heading text-lg font-semibold">
+                        Learning progress
+                    </h2>
+                    <div className="divide-y border-y md:grid md:grid-cols-3 md:divide-x md:divide-y-0">
+                        <ProgressNote title="Achievement">
+                            {journal.achievement}
+                        </ProgressNote>
+                        <ProgressNote title="Area to improve">
+                            {journal.improvementArea}
+                        </ProgressNote>
+                        <ProgressNote title="Next focus">
+                            {journal.nextImprovementPlan}
+                        </ProgressNote>
+                    </div>
+                </section>
+
+                {journal.attachments.length > 0 && (
+                    <section className="space-y-4">
+                        <h2 className="font-heading text-lg font-semibold">
+                            Attachments
+                        </h2>
+                        <JournalAttachmentList
+                            attachments={journal.attachments}
+                        />
+                    </section>
+                )}
             </div>
         </>
     );
@@ -154,7 +159,7 @@ MentorJournalDetail.layout = {
             href: '/journals',
         },
         {
-            title: 'Detail',
+            title: 'Journal',
             href: '#',
         },
     ],

@@ -480,7 +480,7 @@ class TryOutController extends Controller
     private function tryOutData(TryOut $tryOut): array
     {
         return [
-            'duration' => $tryOut->duration_minutes ? "{$tryOut->duration_minutes} min" : '-',
+            'duration' => $tryOut->duration_minutes ? "{$tryOut->duration_minutes} minutes" : '-',
             'durationMinutes' => $tryOut->duration_minutes,
             'scoringMode' => ($tryOut->scoring_mode ?? TryOutScoringMode::RawScore)->value,
             'correctPoints' => $tryOut->correct_points,

@@ -1,24 +1,32 @@
-import { Head } from '@inertiajs/react';
-import {
-    BookOpenCheck,
-    CalendarDays,
-    Clock3,
-    NotebookPen,
-    Target,
-    TrendingUp,
-    UserRound,
-} from 'lucide-react';
-import { formatBadgeLabel } from '@/lib/badge';
-import { Badge } from '@/components/ui/badge';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import { noteVariants } from './data';
+import { Head, Link } from '@inertiajs/react';
+import type { ReactNode } from 'react';
+
+import { JournalAttachmentList } from '@/components/journal-attachment-list';
+
 import type { MentorJournal } from './data';
+
+const dateFormatter = new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+});
+
+const timeFormatter = new Intl.DateTimeFormat('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+});
+
+function formatDate(value: string) {
+    return dateFormatter.format(new Date(value));
+}
+
+function formatTime(value: string) {
+    return timeFormatter.format(new Date(value));
+}
+
+function formatDateTime(value: string) {
+    return `${formatDate(value)}, ${formatTime(value)} WIB`;
+}
 
 export default function MentorJournalDetail({
     journal,
@@ -27,193 +35,100 @@ export default function MentorJournalDetail({
 }) {
     return (
         <>
-            <Head title={journal.sessionName} />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                        <h1 className="font-heading text-2xl font-semibold">
-                            {journal.sessionName}
-                        </h1>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Mentor journal detail for student progress and next
-                            session planning.
-                        </p>
+            <Head title={journal.scheduleCode} />
+            <div className="flex min-h-full max-w-full min-w-0 flex-1 flex-col gap-8 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <h1 className="font-heading text-2xl font-semibold">
+                        {journal.scheduleCode}
+                    </h1>
+                    {journal.scheduleId && (
+                        <Link
+                            href={`/scheduling/schedules/${journal.scheduleId}`}
+                            className="text-sm font-medium text-primary hover:underline"
+                        >
+                            View schedule
+                        </Link>
+                    )}
+                </div>
+
+                <section className="space-y-4">
+                    <h2 className="text-base font-semibold">
+                        Session Information
+                    </h2>
+                    <div className="grid max-w-4xl gap-x-10 gap-y-3 md:grid-cols-2">
+                        <InfoItem label="Mentor" value={journal.mentor} />
+                        <InfoItem label="Student" value={journal.student} />
+                        <InfoItem label="Program" value={journal.program} />
+                        <InfoItem label="Subject" value={journal.subject} />
+                        <InfoItem
+                            label="Date"
+                            value={formatDate(journal.sessionStartAt)}
+                        />
+                        <InfoItem
+                            label="Time"
+                            value={
+                                journal.sessionEndAt
+                                    ? `${formatTime(journal.sessionStartAt)} - ${formatTime(journal.sessionEndAt)} WIB`
+                                    : '-'
+                            }
+                        />
+                        <InfoItem
+                            label="Completed at"
+                            value={formatDateTime(journal.completedAt)}
+                        />
                     </div>
-                    <Badge variant={noteVariants[journal.note]}>
-                        {formatBadgeLabel(journal.note)}
-                    </Badge>
-                </div>
+                </section>
 
-                <div className="grid gap-4 md:grid-cols-3">
-                    <Card>
-                        <CardContent className="flex items-center gap-4 px-6 py-5">
-                            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                                <CalendarDays className="size-5" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Date
-                                </p>
-                                <p className="font-medium">{journal.date}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-4 px-6 py-5">
-                            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                                <Clock3 className="size-5" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Duration
-                                </p>
-                                <p className="font-medium">
-                                    {journal.duration}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-4 px-6 py-5">
-                            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                                <BookOpenCheck className="size-5" />
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Subject
-                                </p>
-                                <p className="font-medium">{journal.subject}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                <section className="space-y-4">
+                    <h2 className="text-base font-semibold">
+                        Student Progress
+                    </h2>
+                    <div className="grid gap-x-10 gap-y-6 lg:grid-cols-3">
+                        <ProgressItem
+                            label="Achievement"
+                            value={journal.achievement}
+                        />
+                        <ProgressItem
+                            label="Area to improve"
+                            value={journal.improvementArea}
+                        />
+                        <ProgressItem
+                            label="Next focus"
+                            value={journal.nextImprovementPlan}
+                        />
+                    </div>
+                </section>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Session information</CardTitle>
-                        <CardDescription>
-                            Mentor, student, and class context.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Mentor
-                                </p>
-                                <p className="mt-1 font-medium">
-                                    {journal.mentor}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Student
-                                </p>
-                                <p className="mt-1 font-medium">
-                                    {journal.student}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Session name
-                                </p>
-                                <p className="mt-1 font-medium">
-                                    {journal.sessionName}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-muted-foreground">
-                                    Note
-                                </p>
-                                <Badge
-                                    variant={noteVariants[journal.note]}
-                                    className="mt-1"
-                                >
-                                    {formatBadgeLabel(journal.note)}
-                                </Badge>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Student progress</CardTitle>
-                        <CardDescription>
-                            Achievement, focus area, and follow-up plan for the
-                            next meeting.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-4 lg:grid-cols-3">
-                            <div className="rounded-2xl border p-4">
-                                <div className="flex items-center gap-2">
-                                    <TrendingUp className="size-4 text-primary" />
-                                    <h2 className="font-medium">Achievement</h2>
-                                </div>
-                                <p className="mt-3 text-sm text-muted-foreground">
-                                    {journal.achievement}
-                                </p>
-                            </div>
-                            <div className="rounded-2xl border p-4">
-                                <div className="flex items-center gap-2">
-                                    <Target className="size-4 text-primary" />
-                                    <h2 className="font-medium">
-                                        Area to improve
-                                    </h2>
-                                </div>
-                                <p className="mt-3 text-sm text-muted-foreground">
-                                    {journal.improvementArea}
-                                </p>
-                            </div>
-                            <div className="rounded-2xl border p-4">
-                                <div className="flex items-center gap-2">
-                                    <NotebookPen className="size-4 text-primary" />
-                                    <h2 className="font-medium">
-                                        Next improvement plan
-                                    </h2>
-                                </div>
-                                <p className="mt-3 text-sm text-muted-foreground">
-                                    {journal.nextImprovementPlan}
-                                </p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Participants</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-3 md:grid-cols-2">
-                            <div className="flex items-center gap-3 rounded-2xl border p-4">
-                                <UserRound className="size-5 text-primary" />
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Mentor
-                                    </p>
-                                    <p className="font-medium">
-                                        {journal.mentor}
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3 rounded-2xl border p-4">
-                                <UserRound className="size-5 text-primary" />
-                                <div>
-                                    <p className="text-sm text-muted-foreground">
-                                        Student
-                                    </p>
-                                    <p className="font-medium">
-                                        {journal.student}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                {journal.attachments.length > 0 && (
+                    <section className="space-y-4">
+                        <h2 className="text-base font-semibold">Attachments</h2>
+                        <JournalAttachmentList
+                            attachments={journal.attachments}
+                        />
+                    </section>
+                )}
             </div>
         </>
+    );
+}
+
+function InfoItem({ label, value }: { label: string; value: ReactNode }) {
+    return (
+        <div className="grid min-h-10 grid-cols-[8rem_minmax(0,1fr)] items-center gap-4">
+            <p className="text-sm text-muted-foreground">{label}</p>
+            <div className="min-w-0 text-sm font-medium">{value}</div>
+        </div>
+    );
+}
+
+function ProgressItem({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="space-y-2">
+            <h3 className="text-sm font-medium">{label}</h3>
+            <p className="text-sm leading-6 text-muted-foreground">
+                {value || '-'}
+            </p>
+        </div>
     );
 }
 

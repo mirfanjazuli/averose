@@ -1,50 +1,16 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
+import { CircleCheck, Eye, Info, Video } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ActionMenu } from '@/components/admin/action-menu';
+import { StatusBadge } from '@/components/admin/status-badge';
+import { AdminStatusFilter } from '@/components/admin/status-filter';
+import { AdminTableSection } from '@/components/admin/table-section';
+import { CompleteSessionDialog } from '@/components/mentor/complete-session-dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
-    CalendarCheck2,
-    Info,
-    MoreVertical,
-    Repeat2,
-    Search,
-    Video,
-} from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuTrigger,
+    DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import {
-    formatBadgeLabel,
-    getBadgeProps,
-    getStatusBadgeTone,
-} from '@/lib/badge';
-import {
-    Pagination,
-    PaginationButton,
-    PaginationContent,
-    PaginationEllipsis,
-    PaginationItem,
-    PaginationNext,
-    PaginationPrevious,
-} from '@/components/ui/pagination';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import {
     Table,
     TableBody,
@@ -53,9 +19,19 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { useClientPagination } from '@/hooks/use-client-pagination';
+import { formatBadgeLabel } from '@/lib/badge';
 
 type MentorSession = {
+    code: string;
+    deliveryMode: string;
     endAt: string;
+    hasJournal: boolean;
     id: string;
     program: string;
     rescheduleRequest: {
@@ -77,415 +53,350 @@ type MentorSession = {
     zoomStartUrl: string | null;
 };
 
+const completableStatuses = new Set(['assigned', 'rescheduled']);
+
+function formatScheduleDate(value: string) {
+    return new Intl.DateTimeFormat('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    }).format(new Date(value));
+}
+
+function formatScheduleTime(startAt: string, endAt: string) {
+    const formatter = new Intl.DateTimeFormat('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+
+    return `${formatter.format(new Date(startAt))} - ${formatter.format(new Date(endAt))} WIB`;
+}
+
+function useCurrentServerTime(serverNow: string) {
+    const [currentTime, setCurrentTime] = useState(() =>
+        new Date(serverNow).getTime(),
+    );
+
+    useEffect(() => {
+        const serverStartedAt = new Date(serverNow).getTime();
+        const clientStartedAt = Date.now();
+        const updateCurrentTime = () => {
+            setCurrentTime(serverStartedAt + Date.now() - clientStartedAt);
+        };
+        const interval = window.setInterval(updateCurrentTime, 10_000);
+
+        updateCurrentTime();
+
+        return () => window.clearInterval(interval);
+    }, [serverNow]);
+
+    return currentTime;
+}
+
 export default function MentorSchedules({
+    serverNow,
     sessions,
 }: {
+    serverNow: string;
     sessions: MentorSession[];
 }) {
     const [searchQuery, setSearchQuery] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [sessionsPerPage, setSessionsPerPage] = useState(5);
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
+    const [selectedCompletionSession, setSelectedCompletionSession] =
+        useState<MentorSession | null>(null);
+    const currentTime = useCurrentServerTime(serverNow);
 
     const filteredSessions = useMemo(() => {
         const normalizedSearch = searchQuery.trim().toLowerCase();
 
-        if (!normalizedSearch) {
-            return sessions;
-        }
+        return sessions.filter((session) => {
+            const matchesStatus =
+                statusFilter === 'all' || session.status === statusFilter;
+            const matchesSearch =
+                !normalizedSearch ||
+                [
+                    session.code,
+                    session.deliveryMode,
+                    session.title,
+                    session.student,
+                    session.program,
+                    session.status,
+                    session.time,
+                    session.zoomAccount ?? '',
+                ].some((value) =>
+                    value.toLowerCase().includes(normalizedSearch),
+                );
 
-        return sessions.filter((session) =>
-            [
-                session.title,
-                session.student,
-                session.program,
-                session.status,
-                session.time,
-                session.zoomAccount ?? '',
-            ].some((value) => value.toLowerCase().includes(normalizedSearch)),
-        );
-    }, [searchQuery, sessions]);
-    const totalPages = Math.max(
-        1,
-        Math.ceil(filteredSessions.length / sessionsPerPage),
-    );
-    const safeCurrentPage = Math.min(currentPage, totalPages);
-    const firstSessionIndex = (safeCurrentPage - 1) * sessionsPerPage;
-    const visibleSessions = filteredSessions.slice(
-        firstSessionIndex,
-        firstSessionIndex + sessionsPerPage,
-    );
-    const todayCount = sessions.filter((session) => {
-        const scheduledDate = new Date(session.startAt);
-        const today = new Date();
-
-        return scheduledDate.toDateString() === today.toDateString();
-    }).length;
+            return matchesStatus && matchesSearch;
+        });
+    }, [searchQuery, sessions, statusFilter]);
+    const {
+        changeRowsPerPage,
+        firstItemIndex,
+        goToPage,
+        resetPage,
+        rowsPerPage,
+        safeCurrentPage,
+        totalPages,
+        visibleItems: visibleSessions,
+    } = useClientPagination({ items: filteredSessions });
     const pendingRescheduleCount = sessions.filter(
         (session) => session.rescheduleRequest,
     ).length;
-
-    const goToPage = (page: number) => {
-        setCurrentPage(Math.min(Math.max(page, 1), totalPages));
-    };
+    const statusOptions = useMemo(
+        () => [
+            { label: 'All schedules', value: 'all' },
+            ...Array.from(new Set(sessions.map((session) => session.status)))
+                .sort((firstStatus, secondStatus) =>
+                    firstStatus.localeCompare(secondStatus),
+                )
+                .map((status) => ({
+                    label: formatBadgeLabel(status),
+                    value: status,
+                })),
+        ],
+        [sessions],
+    );
 
     return (
         <>
             <Head title="Schedules" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                        <h1 className="font-heading text-2xl font-semibold">
-                            Schedules
-                        </h1>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            View assigned mentoring sessions and Zoom room
-                            access.
-                        </p>
-                    </div>
-                    <Button variant="outline" className="gap-2">
-                        <CalendarCheck2 className="size-4" />
-                        Manage availability
-                    </Button>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-3">
-                    <Card>
-                        <CardContent className="px-6 py-5">
-                            <p className="text-sm text-muted-foreground">
-                                Total sessions
-                            </p>
-                            <p className="mt-1 text-2xl font-semibold">
-                                {sessions.length}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="px-6 py-5">
-                            <p className="text-sm text-muted-foreground">
-                                Today
-                            </p>
-                            <p className="mt-1 text-2xl font-semibold">
-                                {todayCount}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="px-6 py-5">
-                            <p className="text-sm text-muted-foreground">
-                                Reschedule requests
-                            </p>
-                            <p className="mt-1 text-2xl font-semibold">
-                                {pendingRescheduleCount}
-                            </p>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {pendingRescheduleCount > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Reschedule information</CardTitle>
-                            <CardDescription>
-                                These requests are waiting for admin approval.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {sessions
-                                .filter((session) => session.rescheduleRequest)
-                                .map((session) => (
-                                    <div
-                                        key={session.id}
-                                        className="flex flex-wrap items-start justify-between gap-3 rounded-lg border p-4"
-                                    >
-                                        <div>
-                                            <p className="flex items-center gap-2 font-medium">
-                                                <Info className="size-4 text-primary" />
-                                                {session.student} requested a
-                                                reschedule
-                                            </p>
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                {session.title}: {session.time}{' '}
-                                                to{' '}
-                                                {
-                                                    session.rescheduleRequest
-                                                        ?.requested
-                                                }
-                                            </p>
-                                            <p className="text-sm text-muted-foreground">
-                                                Reason:{' '}
-                                                {
-                                                    session.rescheduleRequest
-                                                        ?.reason
-                                                }
-                                            </p>
-                                        </div>
-                                        <Badge variant="secondary">
-                                            Waiting admin approval
-                                        </Badge>
-                                    </div>
-                                ))}
-                        </CardContent>
-                    </Card>
+            <div className="flex min-h-full max-w-full min-w-0 flex-1 flex-col gap-6 p-4">
+                {selectedCompletionSession && (
+                    <CompleteSessionDialog
+                        key={selectedCompletionSession.id}
+                        open={completionDialogOpen}
+                        onOpenChange={setCompletionDialogOpen}
+                        session={selectedCompletionSession}
+                    />
                 )}
 
-                <Card>
-                    <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-                        <div>
-                            <CardTitle>Session list</CardTitle>
-                            <CardDescription>
-                                Sessions assigned to your mentor account.
-                            </CardDescription>
-                        </div>
-                        <div className="flex h-10 min-w-64 items-center gap-2 rounded-2xl border bg-background px-3 text-sm text-muted-foreground">
-                            <Search className="size-4" />
-                            <Input
-                                value={searchQuery}
-                                onChange={(event) => {
-                                    setSearchQuery(event.target.value);
-                                    setCurrentPage(1);
-                                }}
-                                placeholder="Search sessions..."
-                                className="h-auto border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0"
-                            />
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        {sessions.length === 0 ? (
-                            <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-                                No sessions assigned yet.
-                            </div>
-                        ) : filteredSessions.length === 0 ? (
-                            <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-                                No sessions match your search.
-                            </div>
-                        ) : (
-                            <>
-                                <div className="rounded-2xl border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Session</TableHead>
-                                                <TableHead>Student</TableHead>
-                                                <TableHead>Time</TableHead>
-                                                <TableHead>Zoom</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead className="w-12 text-right" />
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {visibleSessions.map((session) => (
-                                                <TableRow key={session.id}>
-                                                    <TableCell>
-                                                        <p className="font-medium">
-                                                            {session.title}
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {session.program}
-                                                        </p>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {session.student}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {session.time}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {session.zoomAccount ? (
-                                                            <div className="flex items-center gap-2">
-                                                                <Video className="size-4 text-primary" />
-                                                                <span className="text-sm">
-                                                                    {
-                                                                        session.zoomAccount
-                                                                    }
-                                                                </span>
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-muted-foreground">
-                                                                Not assigned
-                                                            </span>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            {...getBadgeProps(
-                                                                getStatusBadgeTone(
-                                                                    session.status,
-                                                                ),
-                                                            )}
-                                                        >
-                                                            {formatBadgeLabel(
-                                                                session.status,
-                                                            )}
-                                                        </Badge>
-                                                        {session.rescheduleRequest && (
-                                                            <Badge
-                                                                variant="secondary"
-                                                                className="ml-2 gap-1"
-                                                            >
-                                                                <Repeat2 className="size-3" />
-                                                                Reschedule
-                                                            </Badge>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger
-                                                                asChild
-                                                            >
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon-sm"
-                                                                    className="rounded-full"
-                                                                >
-                                                                    <MoreVertical className="size-4" />
-                                                                    <span className="sr-only">
-                                                                        Open
-                                                                        session
-                                                                        actions
-                                                                    </span>
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent
-                                                                align="end"
-                                                                className="w-40"
-                                                            >
-                                                                <DropdownMenuItem
-                                                                    disabled={
-                                                                        !session.zoomLink
-                                                                    }
-                                                                    asChild={
-                                                                        !!session.zoomLink
-                                                                    }
-                                                                >
-                                                                    {session.zoomLink ? (
-                                                                        <a
-                                                                            href={
-                                                                                session.zoomLink
-                                                                            }
-                                                                            target="_blank"
-                                                                            rel="noreferrer"
-                                                                        >
-                                                                            <Video className="size-4" />
-                                                                            Join
-                                                                            room
-                                                                        </a>
-                                                                    ) : (
-                                                                        <span>
-                                                                            Join
-                                                                            room
-                                                                        </span>
-                                                                    )}
-                                                                </DropdownMenuItem>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                                <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto_1fr] lg:items-center">
-                                    <p className="text-sm text-muted-foreground">
-                                        Showing {firstSessionIndex + 1}-
-                                        {Math.min(
-                                            firstSessionIndex + sessionsPerPage,
-                                            filteredSessions.length,
-                                        )}{' '}
-                                        of {filteredSessions.length} sessions
-                                    </p>
-                                    <div className="flex items-center gap-2 text-sm text-muted-foreground lg:justify-center">
-                                        <span>Rows per page</span>
-                                        <Select
-                                            value={String(sessionsPerPage)}
-                                            onValueChange={(value) => {
-                                                setSessionsPerPage(
-                                                    Number(value),
-                                                );
-                                                setCurrentPage(1);
-                                            }}
-                                        >
-                                            <SelectTrigger className="h-9 w-20 rounded-xl">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="5">
-                                                    5
-                                                </SelectItem>
-                                                <SelectItem value="10">
-                                                    10
-                                                </SelectItem>
-                                                <SelectItem value="20">
-                                                    20
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <Pagination className="mx-0 w-auto justify-start lg:justify-end">
-                                        <PaginationContent>
-                                            <PaginationItem>
-                                                <PaginationPrevious
-                                                    href="#"
-                                                    className={
-                                                        safeCurrentPage === 1
-                                                            ? 'pointer-events-none opacity-50'
-                                                            : undefined
-                                                    }
-                                                    onClick={(event) => {
-                                                        event.preventDefault();
-                                                        goToPage(
-                                                            safeCurrentPage - 1,
-                                                        );
-                                                    }}
-                                                />
-                                            </PaginationItem>
-                                            {Array.from(
-                                                { length: totalPages },
-                                                (_, index) => index + 1,
-                                            ).map((page) => (
-                                                <PaginationItem key={page}>
-                                                    <PaginationButton
-                                                        type="button"
-                                                        isActive={
-                                                            safeCurrentPage ===
-                                                            page
-                                                        }
-                                                        onClick={() =>
-                                                            goToPage(page)
-                                                        }
-                                                    >
-                                                        {page}
-                                                    </PaginationButton>
-                                                </PaginationItem>
-                                            ))}
-                                            {totalPages > 5 && (
-                                                <PaginationItem>
-                                                    <PaginationEllipsis />
-                                                </PaginationItem>
+                <h1 className="font-heading text-2xl font-semibold">
+                    Schedules
+                </h1>
+
+                {pendingRescheduleCount > 0 && (
+                    <Alert className="rounded-xl border-0 bg-amber-50 text-amber-950 dark:bg-amber-950/40 dark:text-amber-100">
+                        <Info className="size-4" />
+                        <AlertTitle>
+                            {pendingRescheduleCount} reschedule{' '}
+                            {pendingRescheduleCount === 1
+                                ? 'request'
+                                : 'requests'}{' '}
+                            pending
+                        </AlertTitle>
+                        <AlertDescription className="text-amber-800 dark:text-amber-200">
+                            Admin approval is in progress. Hover the marked
+                            status to review the requested schedule.
+                        </AlertDescription>
+                    </Alert>
+                )}
+
+                <AdminTableSection
+                    emptyMessage="No sessions assigned yet."
+                    emptySearchMessage="No sessions match your filters."
+                    filteredItems={filteredSessions.length}
+                    pagination={{
+                        entity: 'sessions',
+                        firstItemIndex,
+                        onPageChange: goToPage,
+                        onRowsPerPageChange: changeRowsPerPage,
+                        rowsPerPage,
+                        safeCurrentPage,
+                        totalItems: filteredSessions.length,
+                        totalPages,
+                    }}
+                    search={{
+                        value: searchQuery,
+                        onChange: (value) => {
+                            setSearchQuery(value);
+                            resetPage();
+                        },
+                        placeholder: 'Search schedules...',
+                    }}
+                    tableMinWidth="58rem"
+                    toolbarEnd={
+                        <AdminStatusFilter
+                            value={statusFilter}
+                            options={statusOptions}
+                            onValueChange={(value) => {
+                                setStatusFilter(value);
+                                resetPage();
+                            }}
+                        />
+                    }
+                    totalItems={sessions.length}
+                >
+                    <Table className="w-full">
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Time</TableHead>
+                                <TableHead>Student</TableHead>
+                                <TableHead>Subject</TableHead>
+                                <TableHead>Program</TableHead>
+                                <TableHead>Delivery</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="w-12 text-right" />
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {visibleSessions.map((session) => {
+                                const startAt = new Date(
+                                    session.startAt,
+                                ).getTime();
+                                const endAt = new Date(session.endAt).getTime();
+                                const hasActiveStatus = completableStatuses.has(
+                                    session.status.toLowerCase(),
+                                );
+                                const canJoin =
+                                    hasActiveStatus &&
+                                    Boolean(session.zoomLink) &&
+                                    currentTime >= startAt - 5 * 60 * 1000 &&
+                                    currentTime <= endAt;
+                                const shouldShowJoin = currentTime <= endAt;
+                                const shouldShowOnlineJoin =
+                                    session.deliveryMode === 'online' &&
+                                    shouldShowJoin;
+                                const canComplete =
+                                    hasActiveStatus &&
+                                    !session.hasJournal &&
+                                    currentTime > endAt;
+
+                                return (
+                                    <TableRow key={session.id}>
+                                        <TableCell className="whitespace-nowrap">
+                                            {formatScheduleDate(
+                                                session.startAt,
                                             )}
-                                            <PaginationItem>
-                                                <PaginationNext
-                                                    href="#"
-                                                    className={
-                                                        safeCurrentPage ===
-                                                        totalPages
-                                                            ? 'pointer-events-none opacity-50'
-                                                            : undefined
-                                                    }
-                                                    onClick={(event) => {
-                                                        event.preventDefault();
-                                                        goToPage(
-                                                            safeCurrentPage + 1,
-                                                        );
-                                                    }}
+                                        </TableCell>
+                                        <TableCell className="whitespace-nowrap">
+                                            {formatScheduleTime(
+                                                session.startAt,
+                                                session.endAt,
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="font-medium">
+                                            {session.student}
+                                        </TableCell>
+                                        <TableCell>
+                                            <p className="font-medium">
+                                                {session.title}
+                                            </p>
+                                        </TableCell>
+                                        <TableCell>{session.program}</TableCell>
+                                        <TableCell>
+                                            <StatusBadge
+                                                status={session.deliveryMode}
+                                                tone="outline"
+                                            />
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <StatusBadge
+                                                    status={session.status}
                                                 />
-                                            </PaginationItem>
-                                        </PaginationContent>
-                                    </Pagination>
-                                </div>
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+                                                {session.rescheduleRequest && (
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <span className="inline-flex cursor-help">
+                                                                <StatusBadge
+                                                                    status="pending"
+                                                                    label="Reschedule pending"
+                                                                    tone="warning"
+                                                                />
+                                                            </span>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent className="max-w-xs">
+                                                            <p className="font-medium">
+                                                                Requested
+                                                                schedule
+                                                            </p>
+                                                            <p>
+                                                                {
+                                                                    session
+                                                                        .rescheduleRequest
+                                                                        .requested
+                                                                }
+                                                            </p>
+                                                            <p className="mt-2 font-medium">
+                                                                Reason
+                                                            </p>
+                                                            <p>
+                                                                {
+                                                                    session
+                                                                        .rescheduleRequest
+                                                                        .reason
+                                                                }
+                                                            </p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <ActionMenu label="Open schedule actions">
+                                                {shouldShowOnlineJoin &&
+                                                    (canJoin ? (
+                                                        <DropdownMenuItem
+                                                            asChild
+                                                        >
+                                                            <a
+                                                                href={
+                                                                    session.zoomLink ??
+                                                                    '#'
+                                                                }
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                            >
+                                                                <Video className="size-4" />
+                                                                Join session
+                                                            </a>
+                                                        </DropdownMenuItem>
+                                                    ) : (
+                                                        <DropdownMenuItem
+                                                            disabled
+                                                        >
+                                                            <Video className="size-4" />
+                                                            Join session
+                                                        </DropdownMenuItem>
+                                                    ))}
+                                                {canComplete && (
+                                                    <DropdownMenuItem
+                                                        onSelect={() => {
+                                                            setSelectedCompletionSession(
+                                                                session,
+                                                            );
+                                                            setCompletionDialogOpen(
+                                                                true,
+                                                            );
+                                                        }}
+                                                    >
+                                                        <CircleCheck className="size-4" />
+                                                        Complete
+                                                    </DropdownMenuItem>
+                                                )}
+                                                {(shouldShowJoin ||
+                                                    canComplete) && (
+                                                    <DropdownMenuSeparator />
+                                                )}
+                                                <DropdownMenuItem asChild>
+                                                    <Link
+                                                        href={`/schedules/${session.id}`}
+                                                    >
+                                                        <Eye className="size-4" />
+                                                        View detail
+                                                    </Link>
+                                                </DropdownMenuItem>
+                                            </ActionMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </AdminTableSection>
             </div>
         </>
     );

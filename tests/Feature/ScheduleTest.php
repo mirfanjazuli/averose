@@ -176,6 +176,12 @@ class ScheduleTest extends TestCase
 
         $this->assertSame('2026-06-08 20:30:00', $booking->refresh()->scheduled_at->format('Y-m-d H:i:s'));
         $this->assertSame(1, $enrollment->refresh()->sessions_used);
+        $this->assertDatabaseHas('schedule_histories', [
+            'action' => 'updated',
+            'description' => "Waktu schedule diubah oleh {$student->name} dari 07 Jun 2026, 18:00 WIB menjadi 08 Jun 2026, 20:30 WIB.",
+            'schedule_id' => $booking->id,
+            'user_id' => $student->id,
+        ]);
     }
 
     public function test_student_cannot_edit_an_assigned_session_schedule(): void

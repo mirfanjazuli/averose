@@ -10,11 +10,8 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionMenu } from '@/components/admin/action-menu';
-import { getBadgeProps } from '@/lib/badge';
-import { EmptyState } from '@/components/admin/empty-state';
 import { SummaryCard } from '@/components/admin/summary-card';
-import { TablePagination } from '@/components/admin/table-pagination';
-import { TableSearch } from '@/components/admin/table-search';
+import { AdminTableSection } from '@/components/admin/table-section';
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -26,7 +23,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -58,6 +54,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { useClientPagination } from '@/hooks/use-client-pagination';
+import { getBadgeProps } from '@/lib/badge';
 
 type PublicHoliday = {
     date: string;
@@ -271,14 +268,14 @@ export default function PublicHolidays({
         const numericYear = Number(importYear);
 
         if (!Number.isInteger(numericYear)) {
-            setGeneratedHolidays([]);
+            queueMicrotask(() => setGeneratedHolidays([]));
 
             return;
         }
 
         let canceled = false;
 
-        setIsGeneratingHolidays(true);
+        queueMicrotask(() => setIsGeneratingHolidays(true));
 
         import('date-holidays')
             .then(({ default: Holidays }) => {
@@ -359,7 +356,7 @@ export default function PublicHolidays({
     return (
         <>
             <Head title="Public Holidays" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
+            <div className="flex min-h-full min-w-0 max-w-full flex-1 flex-col gap-6 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h1 className="font-heading text-2xl font-semibold">
@@ -604,141 +601,98 @@ export default function PublicHolidays({
                     />
                 </div>
 
-                <Card>
-                    <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-                        <CardTitle>Holiday list</CardTitle>
-                        <TableSearch
-                            value={searchQuery}
-                            onChange={(value) => {
-                                setSearchQuery(value);
-                                resetPage();
-                            }}
-                            placeholder="Search holidays..."
-                        />
-                    </CardHeader>
-                    <CardContent>
-                        {holidays.length === 0 ? (
-                            <EmptyState>
-                                No public holidays added yet.
-                            </EmptyState>
-                        ) : filteredHolidays.length === 0 ? (
-                            <EmptyState>
-                                No public holidays match your search.
-                            </EmptyState>
-                        ) : (
-                            <>
-                                <div className="rounded-2xl border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Name</TableHead>
-                                                <TableHead>Date</TableHead>
-                                                <TableHead>Type</TableHead>
-                                                <TableHead>Source</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead className="w-12 text-right" />
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {visibleHolidays.map((holiday) => (
-                                                <TableRow key={holiday.id}>
-                                                    <TableCell className="font-medium">
-                                                        {holiday.name}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {formatHolidayDate(
-                                                            holiday.date,
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            {...getBadgeProps(
-                                                                'outline',
-                                                            )}
-                                                        >
-                                                            {
-                                                                typeLabel[
-                                                                    holiday.type
-                                                                ]
-                                                            }
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            {...getBadgeProps(
-                                                                'muted',
-                                                            )}
-                                                        >
-                                                            {
-                                                                sourceLabel[
-                                                                    holiday
-                                                                        .source
-                                                                ]
-                                                            }
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            {...getBadgeProps(
-                                                                holiday.status ===
-                                                                    'active'
-                                                                    ? 'success'
-                                                                    : 'muted',
-                                                            )}
-                                                        >
-                                                            {
-                                                                statusLabel[
-                                                                    holiday
-                                                                        .status
-                                                                ]
-                                                            }
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <ActionMenu label="Open holiday actions">
-                                                            <DropdownMenuItem
-                                                                onClick={() =>
-                                                                    setEditingHoliday(
-                                                                        holiday,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Pencil className="size-4" />
-                                                                Edit
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuSeparator />
-                                                            <DropdownMenuItem
-                                                                variant="destructive"
-                                                                onClick={() =>
-                                                                    setDeletingHoliday(
-                                                                        holiday,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <PowerOff className="size-4" />
-                                                                Deactivate
-                                                            </DropdownMenuItem>
-                                                        </ActionMenu>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                                <TablePagination
-                                    entity="holidays"
-                                    firstItemIndex={firstItemIndex}
-                                    onPageChange={goToPage}
-                                    onRowsPerPageChange={changeRowsPerPage}
-                                    rowsPerPage={rowsPerPage}
-                                    safeCurrentPage={safeCurrentPage}
-                                    totalItems={filteredHolidays.length}
-                                    totalPages={totalPages}
-                                />
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+                <AdminTableSection
+                    emptyMessage="No public holidays added yet."
+                    emptySearchMessage="No public holidays match your search."
+                    filteredItems={filteredHolidays.length}
+                    pagination={{
+                        entity: 'holidays',
+                        firstItemIndex,
+                        onPageChange: goToPage,
+                        onRowsPerPageChange: changeRowsPerPage,
+                        rowsPerPage,
+                        safeCurrentPage,
+                        totalItems: filteredHolidays.length,
+                        totalPages,
+                    }}
+                    search={{
+                        value: searchQuery,
+                        onChange: (value) => {
+                            setSearchQuery(value);
+                            resetPage();
+                        },
+                        placeholder: 'Search holidays...',
+                    }}
+                    totalItems={holidays.length}
+                >
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Type</TableHead>
+                                <TableHead>Source</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="w-12 text-right" />
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {visibleHolidays.map((holiday) => (
+                                <TableRow key={holiday.id}>
+                                    <TableCell className="font-medium">
+                                        {holiday.name}
+                                    </TableCell>
+                                    <TableCell>
+                                        {formatHolidayDate(holiday.date)}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge {...getBadgeProps('outline')}>
+                                            {typeLabel[holiday.type]}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge {...getBadgeProps('muted')}>
+                                            {sourceLabel[holiday.source]}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge
+                                            {...getBadgeProps(
+                                                holiday.status === 'active'
+                                                    ? 'success'
+                                                    : 'muted',
+                                            )}
+                                        >
+                                            {statusLabel[holiday.status]}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <ActionMenu label="Open holiday actions">
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    setEditingHoliday(holiday)
+                                                }
+                                            >
+                                                <Pencil className="size-4" />
+                                                Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                variant="destructive"
+                                                onClick={() =>
+                                                    setDeletingHoliday(holiday)
+                                                }
+                                            >
+                                                <PowerOff className="size-4" />
+                                                Deactivate
+                                            </DropdownMenuItem>
+                                        </ActionMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </AdminTableSection>
             </div>
         </>
     );

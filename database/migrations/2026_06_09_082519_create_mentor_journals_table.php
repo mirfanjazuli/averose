@@ -18,7 +18,6 @@ return new class extends Migration
             $table->foreignId('student_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('subject_id')->nullable()->constrained()->nullOnDelete();
             $table->string('slug')->unique();
-            $table->string('note')->default('completed');
             $table->text('achievement');
             $table->text('improvement_area');
             $table->text('next_improvement_plan');

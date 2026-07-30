@@ -1,5 +1,5 @@
 import type { ComponentProps } from 'react';
-import { Badge } from '@/components/ui/badge';
+import type { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 export type BadgeTone =
@@ -96,11 +96,7 @@ export function getStatusBadgeTone(status: string): BadgeTone {
         return 'danger';
     }
 
-    if (
-        ['draft', 'inactive', 'pending', 'postponed', 'waiting'].includes(
-            normalizedStatus,
-        )
-    ) {
+    if (['draft', 'inactive', 'postponed', 'waiting'].includes(normalizedStatus)) {
         return 'muted';
     }
 

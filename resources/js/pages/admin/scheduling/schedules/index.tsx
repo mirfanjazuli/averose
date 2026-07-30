@@ -1,59 +1,24 @@
-import { Form, Head, Link } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import {
     CalendarDays,
-    Check,
-    ChevronsUpDown,
     Clock3,
-    ExternalLink,
+    Eye,
+    Pencil,
     UserRoundCheck,
     Video,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { ActionMenu } from '@/components/admin/action-menu';
-import {
-    formatBadgeLabel,
-    getBadgeProps,
-    getStatusBadgeTone,
-} from '@/lib/badge';
-import { EmptyState } from '@/components/admin/empty-state';
+import { AdminStatusFilter } from '@/components/admin/status-filter';
 import { SummaryCard } from '@/components/admin/summary-card';
-import { TablePagination } from '@/components/admin/table-pagination';
-import { TableSearch } from '@/components/admin/table-search';
+import { AdminTableSection } from '@/components/admin/table-section';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from '@/components/ui/command';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import {
     DropdownMenuItem,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
 import {
     Table,
     TableBody,
@@ -63,13 +28,19 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { useClientPagination } from '@/hooks/use-client-pagination';
-
-type MentorOption = {
-    id: string;
-    name: string;
-};
+import {
+    formatBadgeLabel,
+    getBadgeProps,
+    getStatusBadgeTone,
+} from '@/lib/badge';
+import { AssignDialogSchedule } from '@/pages/admin/scheduling/schedules/components/assign-dialog-schedule';
+import { CreateDialogSchedule } from '@/pages/admin/scheduling/schedules/components/create-dialog-schedule';
+import type { EnrollmentOption } from '@/pages/admin/scheduling/schedules/components/create-dialog-schedule';
+import { EditDialogSchedule } from '@/pages/admin/scheduling/schedules/components/edit-dialog-schedule';
 
 type AdminSession = {
+    code: string;
+    deliveryMode: string;
     endAt: string;
     id: string;
     mentor: string;
@@ -87,109 +58,90 @@ type AdminSession = {
     zoomStartUrl: string | null;
 };
 
-function MentorSearchSelect({
-    mentors,
-    onValueChange,
-    value,
-}: {
-    mentors: MentorOption[];
-    onValueChange: (value: string) => void;
-    value: string;
-}) {
-    const [open, setOpen] = useState(false);
-    const selectedMentor = mentors.find((mentor) => mentor.id === value);
+function formatScheduleDate(value: string) {
+    return new Intl.DateTimeFormat('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    }).format(new Date(value));
+}
 
-    return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <Button
-                    type="button"
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="h-12 w-full justify-between rounded-2xl px-4 font-normal"
-                >
-                    <span
-                        className={
-                            selectedMentor
-                                ? 'truncate'
-                                : 'truncate text-muted-foreground'
-                        }
-                    >
-                        {selectedMentor?.name ?? 'Select mentor'}
-                    </span>
-                    <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent
-                align="start"
-                className="w-(--radix-popover-trigger-width) p-0"
-            >
-                <Command>
-                    <CommandInput placeholder="Search mentor..." />
-                    <CommandList>
-                        <CommandEmpty>No mentor found.</CommandEmpty>
-                        <CommandGroup>
-                            {mentors.map((mentor) => (
-                                <CommandItem
-                                    key={mentor.id}
-                                    value={`${mentor.name} ${mentor.id}`}
-                                    onSelect={() => {
-                                        onValueChange(mentor.id);
-                                        setOpen(false);
-                                    }}
-                                >
-                                    <span className="truncate">
-                                        {mentor.name}
-                                    </span>
-                                    <Check
-                                        className={
-                                            value === mentor.id
-                                                ? 'ml-auto size-4 opacity-100'
-                                                : 'ml-auto size-4 opacity-0'
-                                        }
-                                    />
-                                </CommandItem>
-                            ))}
-                        </CommandGroup>
-                    </CommandList>
-                </Command>
-            </PopoverContent>
-        </Popover>
-    );
+function formatScheduleTimeRange(startAt: string, endAt: string) {
+    const formatter = new Intl.DateTimeFormat('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+
+    return `${formatter.format(new Date(startAt))} - ${formatter.format(new Date(endAt))} WIB`;
 }
 
 export default function Schedules({
-    mentors,
+    enrollments,
     sessions,
 }: {
-    mentors: MentorOption[];
+    enrollments: EnrollmentOption[];
     sessions: AdminSession[];
 }) {
     const [assigningSession, setAssigningSession] =
         useState<AdminSession | null>(null);
+    const [creatingSchedule, setCreatingSchedule] = useState(false);
+    const [editingSession, setEditingSession] = useState<AdminSession | null>(
+        null,
+    );
+    const [currentTime, setCurrentTime] = useState(() => Date.now());
     const [searchQuery, setSearchQuery] = useState('');
-    const [mentorId, setMentorId] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
+
+    useEffect(() => {
+        const interval = window.setInterval(() => {
+            setCurrentTime(Date.now());
+        }, 30_000);
+
+        return () => window.clearInterval(interval);
+    }, []);
+
+    const statusFilters = useMemo(
+        () => [
+            { count: sessions.length, label: 'All schedules', value: 'all' },
+            ...Array.from(new Set(sessions.map((session) => session.status)))
+                .sort((firstStatus, secondStatus) =>
+                    firstStatus.localeCompare(secondStatus),
+                )
+                .map((status) => ({
+                    count: sessions.filter(
+                        (session) => session.status === status,
+                    ).length,
+                    label: formatBadgeLabel(status),
+                    value: status,
+                })),
+        ],
+        [sessions],
+    );
 
     const filteredSessions = useMemo(() => {
         const normalizedSearch = searchQuery.trim().toLowerCase();
 
-        if (!normalizedSearch) {
-            return sessions;
-        }
+        return sessions.filter((session) => {
+            const matchesStatus =
+                statusFilter === 'all' || session.status === statusFilter;
+            const matchesSearch =
+                !normalizedSearch ||
+                [
+                    session.code,
+                    session.deliveryMode,
+                    session.title,
+                    session.student,
+                    session.mentor,
+                    session.status,
+                    session.time,
+                    session.zoomAccount ?? '',
+                ].some((value) =>
+                    value.toLowerCase().includes(normalizedSearch),
+                );
 
-        return sessions.filter((session) =>
-            [
-                session.title,
-                session.student,
-                session.mentor,
-                session.program,
-                session.status,
-                session.time,
-                session.zoomAccount ?? '',
-            ].some((value) => value.toLowerCase().includes(normalizedSearch)),
-        );
-    }, [searchQuery, sessions]);
+            return matchesStatus && matchesSearch;
+        });
+    }, [searchQuery, sessions, statusFilter]);
     const {
         changeRowsPerPage,
         firstItemIndex,
@@ -209,13 +161,12 @@ export default function Schedules({
 
     const openAssignmentDialog = (session: AdminSession) => {
         setAssigningSession(session);
-        setMentorId('');
     };
 
     return (
         <>
             <Head title="Schedules" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
+            <div className="flex min-h-full max-w-full min-w-0 flex-1 flex-col gap-6 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h1 className="font-heading text-2xl font-semibold">
@@ -226,6 +177,18 @@ export default function Schedules({
                             Zoom allocation.
                         </p>
                     </div>
+                    <CreateDialogSchedule
+                        enrollments={enrollments}
+                        open={creatingSchedule}
+                        onOpenChange={setCreatingSchedule}
+                        onSuccess={() => {
+                            setCreatingSchedule(false);
+                            toast.success('Schedule added.');
+                        }}
+                        onError={() => {
+                            toast.error('Unable to add this schedule.');
+                        }}
+                    />
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-3">
@@ -246,274 +209,214 @@ export default function Schedules({
                     />
                 </div>
 
-                <Dialog
-                    open={!!assigningSession}
+                <AssignDialogSchedule
+                    key={assigningSession?.id ?? 'closed'}
+                    open={assigningSession !== null}
+                    schedule={assigningSession}
                     onOpenChange={(open) => {
                         if (!open) {
                             setAssigningSession(null);
-                            setMentorId('');
                         }
                     }}
-                >
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Assign mentor</DialogTitle>
-                            <DialogDescription>
-                                Zoom account and meeting link will be allocated
-                                automatically based on availability.
-                            </DialogDescription>
-                        </DialogHeader>
-                        {assigningSession && (
-                            <Form
-                                action={`/scheduling/schedules/${assigningSession.id}/assignment`}
-                                method="put"
-                                disableWhileProcessing
-                                onSuccess={() => {
-                                    setAssigningSession(null);
-                                    setMentorId('');
-                                    toast.success('Session assigned.');
-                                }}
-                                onError={() => {
-                                    toast.error(
-                                        'Unable to assign this session.',
-                                    );
-                                }}
-                                className="space-y-5"
-                            >
-                                {({ errors, processing }) => (
-                                    <>
-                                        <input
-                                            type="hidden"
-                                            name="mentor_id"
-                                            value={mentorId}
-                                        />
-                                        <div className="rounded-2xl border p-4 text-sm">
-                                            <p className="font-medium">
-                                                {assigningSession.title}
-                                            </p>
-                                            <p className="mt-1 text-muted-foreground">
-                                                {assigningSession.student} ·{' '}
-                                                {assigningSession.time}
-                                            </p>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <p className="text-sm font-medium">
-                                                Mentor
-                                            </p>
-                                            <MentorSearchSelect
-                                                mentors={mentors}
-                                                value={mentorId}
-                                                onValueChange={setMentorId}
-                                            />
-                                            {errors.mentor_id && (
-                                                <p className="text-xs text-destructive">
-                                                    {errors.mentor_id}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div className="flex justify-end gap-2 pt-2">
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={() => {
-                                                    setAssigningSession(null);
-                                                    setMentorId('');
-                                                }}
-                                            >
-                                                Cancel
-                                            </Button>
-                                            <Button
-                                                disabled={
-                                                    !mentorId || processing
-                                                }
-                                            >
-                                                {processing
-                                                    ? 'Assigning...'
-                                                    : 'Assign mentor'}
-                                            </Button>
-                                        </div>
-                                    </>
-                                )}
-                            </Form>
-                        )}
-                    </DialogContent>
-                </Dialog>
+                    onSuccess={() => {
+                        setAssigningSession(null);
+                        toast.success('Session assigned.');
+                    }}
+                    onError={() => {
+                        toast.error('Unable to assign this session.');
+                    }}
+                />
 
-                <Card>
-                    <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-                        <div>
-                            <CardTitle>Booked sessions</CardTitle>
-                            <CardDescription>
-                                Sessions submitted by students.
-                            </CardDescription>
-                        </div>
-                        <TableSearch
-                            value={searchQuery}
-                            onChange={(value) => {
-                                setSearchQuery(value);
+                <EditDialogSchedule
+                    key={editingSession?.id ?? 'closed'}
+                    open={editingSession !== null}
+                    schedule={editingSession}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setEditingSession(null);
+                        }
+                    }}
+                    onSuccess={() => {
+                        setEditingSession(null);
+                        toast.success('Schedule updated.');
+                    }}
+                    onError={() => {
+                        toast.error('Unable to update this schedule.');
+                    }}
+                />
+
+                <AdminTableSection
+                    emptyMessage="No sessions booked yet."
+                    emptySearchMessage="No sessions match your search."
+                    filteredItems={filteredSessions.length}
+                    pagination={{
+                        entity: 'sessions',
+                        firstItemIndex,
+                        onPageChange: goToPage,
+                        onRowsPerPageChange: changeRowsPerPage,
+                        rowsPerPage,
+                        safeCurrentPage,
+                        totalItems: filteredSessions.length,
+                        totalPages,
+                    }}
+                    search={{
+                        value: searchQuery,
+                        onChange: (value) => {
+                            setSearchQuery(value);
+                            resetPage();
+                        },
+                        placeholder: 'Search sessions...',
+                    }}
+                    toolbarEnd={
+                        <AdminStatusFilter
+                            value={statusFilter}
+                            options={statusFilters}
+                            onValueChange={(value) => {
+                                setStatusFilter(value);
                                 resetPage();
                             }}
-                            placeholder="Search sessions..."
                         />
-                    </CardHeader>
-                    <CardContent>
-                        {sessions.length === 0 ? (
-                            <EmptyState>No sessions booked yet.</EmptyState>
-                        ) : filteredSessions.length === 0 ? (
-                            <EmptyState>
-                                No sessions match your search.
-                            </EmptyState>
-                        ) : (
-                            <>
-                                <div className="rounded-2xl border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Session</TableHead>
-                                                <TableHead>Student</TableHead>
-                                                <TableHead>Mentor</TableHead>
-                                                <TableHead>Time</TableHead>
-                                                <TableHead>Zoom</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead className="w-12 text-right" />
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {visibleSessions.map((session) => (
-                                                <TableRow key={session.id}>
-                                                    <TableCell>
-                                                        <p className="font-medium">
-                                                            {session.title}
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {session.program}
-                                                        </p>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {session.student}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {session.mentor}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {session.time}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {session.zoomLink ? (
-                                                            <div className="flex items-center gap-2">
-                                                                {session.zoomAccountSlug ? (
-                                                                    <Link
-                                                                        href={`/zoom-accounts/${session.zoomAccountSlug}`}
-                                                                        className="inline-flex items-center gap-2 font-medium text-primary hover:underline"
-                                                                    >
-                                                                        <Video className="size-4" />
-                                                                        {
-                                                                            session.zoomAccount
-                                                                        }
-                                                                        <ExternalLink className="size-3.5" />
-                                                                    </Link>
-                                                                ) : (
-                                                                    <>
-                                                                        <Video className="size-4 text-primary" />
-                                                                        <span className="text-sm">
-                                                                            {
-                                                                                session.zoomAccount
-                                                                            }
-                                                                        </span>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        ) : (
-                                                            <span className="text-muted-foreground">
-                                                                Not assigned
-                                                            </span>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            {...getBadgeProps(
-                                                                getStatusBadgeTone(
-                                                                    session.status,
-                                                                ),
-                                                            )}
+                    }
+                    totalItems={sessions.length}
+                >
+                    <Table className="w-full">
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Time</TableHead>
+                                <TableHead>Student</TableHead>
+                                <TableHead>Subject</TableHead>
+                                <TableHead>Delivery</TableHead>
+                                <TableHead>Mentor</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="w-12 text-right" />
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {visibleSessions.map((session) => {
+                                const isCompleted =
+                                    session.status.toLowerCase() ===
+                                    'completed';
+                                const canJoinMeeting =
+                                    !isCompleted &&
+                                    Boolean(session.zoomLink) &&
+                                    currentTime >=
+                                        new Date(session.startAt).getTime() &&
+                                    currentTime <=
+                                        new Date(session.endAt).getTime();
+                                const hasActionsBeforeDetail =
+                                    !isCompleted || canJoinMeeting;
+
+                                return (
+                                    <TableRow key={session.id}>
+                                        <TableCell className="whitespace-nowrap">
+                                            {formatScheduleDate(
+                                                session.startAt,
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="whitespace-nowrap">
+                                            {formatScheduleTimeRange(
+                                                session.startAt,
+                                                session.endAt,
+                                            )}
+                                        </TableCell>
+                                        <TableCell>{session.student}</TableCell>
+                                        <TableCell>
+                                            <p className="font-medium">
+                                                {session.title}
+                                            </p>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline">
+                                                {formatBadgeLabel(
+                                                    session.deliveryMode,
+                                                )}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            {session.mentor ===
+                                            'Unassigned mentor'
+                                                ? '-'
+                                                : session.mentor}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge
+                                                {...getBadgeProps(
+                                                    getStatusBadgeTone(
+                                                        session.status,
+                                                    ),
+                                                )}
+                                            >
+                                                {formatBadgeLabel(
+                                                    session.status,
+                                                )}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <ActionMenu label="Open session actions">
+                                                {!isCompleted && (
+                                                    <>
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                setEditingSession(
+                                                                    session,
+                                                                )
+                                                            }
                                                         >
-                                                            {formatBadgeLabel(
-                                                                session.status,
-                                                            )}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <ActionMenu label="Open session actions">
-                                                            <DropdownMenuItem
-                                                                onClick={() =>
-                                                                    openAssignmentDialog(
-                                                                        session,
-                                                                    )
+                                                            <Pencil className="size-4" />
+                                                            Edit schedule
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem
+                                                            onClick={() =>
+                                                                openAssignmentDialog(
+                                                                    session,
+                                                                )
+                                                            }
+                                                        >
+                                                            <UserRoundCheck className="size-4" />
+                                                            {session.mentor !==
+                                                            'Unassigned mentor'
+                                                                ? 'Reassign mentor'
+                                                                : 'Assign mentor'}
+                                                        </DropdownMenuItem>
+                                                    </>
+                                                )}
+                                                {canJoinMeeting &&
+                                                    session.zoomLink && (
+                                                        <DropdownMenuItem
+                                                            asChild
+                                                        >
+                                                            <a
+                                                                href={
+                                                                    session.zoomLink
                                                                 }
+                                                                target="_blank"
+                                                                rel="noreferrer"
                                                             >
-                                                                <UserRoundCheck className="size-4" />
-                                                                {session.zoomLink
-                                                                    ? 'Reassign mentor'
-                                                                    : 'Assign mentor'}
-                                                            </DropdownMenuItem>
-                                                            {session.zoomLink && (
-                                                                <>
-                                                                    <DropdownMenuSeparator />
-                                                                    <DropdownMenuItem
-                                                                        asChild
-                                                                    >
-                                                                        <a
-                                                                            href={
-                                                                                session.zoomLink
-                                                                            }
-                                                                            target="_blank"
-                                                                            rel="noreferrer"
-                                                                        >
-                                                                            <ExternalLink className="size-4" />
-                                                                            Join
-                                                                            meeting
-                                                                        </a>
-                                                                    </DropdownMenuItem>
-                                                                </>
-                                                            )}
-                                                            {session.zoomStartUrl && (
-                                                                <DropdownMenuItem
-                                                                    asChild
-                                                                >
-                                                                    <a
-                                                                        href={
-                                                                            session.zoomStartUrl
-                                                                        }
-                                                                        target="_blank"
-                                                                        rel="noreferrer"
-                                                                    >
-                                                                        <Video className="size-4" />
-                                                                        Start
-                                                                        meeting
-                                                                    </a>
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                        </ActionMenu>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                                <TablePagination
-                                    entity="sessions"
-                                    firstItemIndex={firstItemIndex}
-                                    onPageChange={goToPage}
-                                    onRowsPerPageChange={changeRowsPerPage}
-                                    rowsPerPage={rowsPerPage}
-                                    safeCurrentPage={safeCurrentPage}
-                                    totalItems={filteredSessions.length}
-                                    totalPages={totalPages}
-                                />
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+                                                                <Video className="size-4" />
+                                                                Join meeting
+                                                            </a>
+                                                        </DropdownMenuItem>
+                                                    )}
+                                                {hasActionsBeforeDetail && (
+                                                    <DropdownMenuSeparator />
+                                                )}
+                                                <DropdownMenuItem asChild>
+                                                    <Link
+                                                        href={`/scheduling/schedules/${session.id}`}
+                                                    >
+                                                        <Eye className="size-4" />
+                                                        View detail
+                                                    </Link>
+                                                </DropdownMenuItem>
+                                            </ActionMenu>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
+                </AdminTableSection>
             </div>
         </>
     );

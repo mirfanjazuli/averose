@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\AcademicField;
+use App\Models\MentorJournal;
 use App\Models\Program;
 use App\Models\ProgramEnrollment;
 use App\Models\ProgramVariant;
@@ -77,12 +78,15 @@ class MentorDashboardTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page): Assert => $page
                 ->component('mentor/dashboard/index')
+                ->has('stats', 3)
+                ->where('stats.0.label', 'Today')
                 ->where('stats.0.value', '1')
+                ->where('stats.1.label', 'Upcoming')
                 ->where('stats.1.value', '1')
-                ->where('todaySessions.0.title', 'IELTS Speaking')
-                ->where('todaySessions.0.student', 'Alya Prameswari')
                 ->where('nextSessions.0.title', 'IELTS Speaking')
                 ->where('nextSessions.0.program', 'IELTS Intensive')
+                ->missing('completionSession')
+                ->missing('todaySessions')
             );
     }
 
@@ -121,5 +125,24 @@ class MentorDashboardTest extends TestCase
     public function test_the_old_mentor_dashboard_url_is_not_registered(): void
     {
         $this->get('/mentor/dashboard')->assertNotFound();
+    }
+
+    public function test_mentor_dashboard_limits_recent_journals_to_five(): void
+    {
+        $mentor = User::factory()->mentor()->create();
+
+        MentorJournal::factory()->count(6)->create([
+            'mentor_id' => $mentor->id,
+        ]);
+
+        $this->actingAs($mentor)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page): Assert => $page
+                ->component('mentor/dashboard/index')
+                ->has('recentJournals', 5)
+                ->missing('recentJournals.0.improvementPlan')
+                ->missing('recentJournals.0.note')
+            );
     }
 }

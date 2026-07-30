@@ -6,6 +6,7 @@ use App\Models\ProgramEnrollment;
 use App\Models\Schedule;
 use App\Models\Subject;
 use App\Models\User;
+use App\ScheduleDeliveryMode;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -28,6 +29,7 @@ class ScheduleFactory extends Factory
             'subject_id' => Subject::factory(),
             'scheduled_at' => fake()->dateTimeBetween('+1 week', '+2 months'),
             'duration' => fake()->randomElement([60, 90, 120]),
+            'delivery_mode' => ScheduleDeliveryMode::Online,
             'zoom_link' => null,
             'zoom_meeting_id' => null,
             'zoom_start_url' => null,

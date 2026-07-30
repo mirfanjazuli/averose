@@ -10,12 +10,8 @@ import {
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionMenu } from '@/components/admin/action-menu';
-import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
-import { EmptyState } from '@/components/admin/empty-state';
 import { SummaryCard } from '@/components/admin/summary-card';
-import { TablePagination } from '@/components/admin/table-pagination';
-import { TableSearch } from '@/components/admin/table-search';
-import { Badge } from '@/components/ui/badge';
+import { AdminTableSection } from '@/components/admin/table-section';
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -25,8 +21,8 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
@@ -60,6 +56,7 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useClientPagination } from '@/hooks/use-client-pagination';
+import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
 
 type Permission = {
     description: string;
@@ -314,7 +311,7 @@ export default function Roles({
     return (
         <>
             <Head title="Roles & Permissions" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
+            <div className="flex min-h-full min-w-0 max-w-full flex-1 flex-col gap-6 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h1 className="font-heading text-2xl font-semibold">
@@ -451,118 +448,88 @@ export default function Roles({
                     />
                 </div>
 
-                <Card>
-                    <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-                        <CardTitle>Internal roles</CardTitle>
-                        <TableSearch
-                            value={searchQuery}
-                            onChange={(value) => {
-                                setSearchQuery(value);
-                                resetPage();
-                            }}
-                            placeholder="Search roles..."
-                        />
-                    </CardHeader>
-                    <CardContent>
-                        {roles.length === 0 ? (
-                            <EmptyState>No roles added yet.</EmptyState>
-                        ) : filteredRoles.length === 0 ? (
-                            <EmptyState>No roles match your search.</EmptyState>
-                        ) : (
-                            <>
-                                <div className="rounded-2xl border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Role</TableHead>
-                                                <TableHead>
-                                                    Permissions
-                                                </TableHead>
-                                                <TableHead>Users</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead className="w-12 text-right" />
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {visibleRoles.map((role) => (
-                                                <TableRow key={role.id}>
-                                                    <TableCell>
-                                                        <p className="font-medium">
-                                                            {role.name}
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {role.description ??
-                                                                '-'}
-                                                        </p>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {
-                                                            role.permissions
-                                                                .length
-                                                        }
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {role.usersCount}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            {...getBadgeProps(
-                                                                'outline',
-                                                            )}
-                                                        >
-                                                            {formatBadgeLabel(
-                                                                role.status,
-                                                            )}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <ActionMenu label="Open role actions">
-                                                            <DropdownMenuItem
-                                                                onClick={() =>
-                                                                    setEditingRole(
-                                                                        role,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Pencil className="size-4" />
-                                                                Edit
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuSeparator />
-                                                            <DropdownMenuItem
-                                                                disabled={
-                                                                    role.isSystem
-                                                                }
-                                                                variant="destructive"
-                                                                onClick={() =>
-                                                                    setDeletingRole(
-                                                                        role,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <PowerOff className="size-4" />
-                                                                Deactivate
-                                                            </DropdownMenuItem>
-                                                        </ActionMenu>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                                <TablePagination
-                                    entity="roles"
-                                    firstItemIndex={firstItemIndex}
-                                    onPageChange={goToPage}
-                                    onRowsPerPageChange={changeRowsPerPage}
-                                    rowsPerPage={rowsPerPage}
-                                    safeCurrentPage={safeCurrentPage}
-                                    totalItems={filteredRoles.length}
-                                    totalPages={totalPages}
-                                />
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+                <AdminTableSection
+                    emptyMessage="No roles added yet."
+                    emptySearchMessage="No roles match your search."
+                    filteredItems={filteredRoles.length}
+                    pagination={{
+                        entity: 'roles',
+                        firstItemIndex,
+                        onPageChange: goToPage,
+                        onRowsPerPageChange: changeRowsPerPage,
+                        rowsPerPage,
+                        safeCurrentPage,
+                        totalItems: filteredRoles.length,
+                        totalPages,
+                    }}
+                    search={{
+                        value: searchQuery,
+                        onChange: (value) => {
+                            setSearchQuery(value);
+                            resetPage();
+                        },
+                        placeholder: 'Search roles...',
+                    }}
+                    totalItems={roles.length}
+                >
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Role</TableHead>
+                                <TableHead>Permissions</TableHead>
+                                <TableHead>Users</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="w-12 text-right" />
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {visibleRoles.map((role) => (
+                                <TableRow key={role.id}>
+                                    <TableCell>
+                                        <p className="font-medium">
+                                            {role.name}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {role.description ?? '-'}
+                                        </p>
+                                    </TableCell>
+                                    <TableCell>
+                                        {role.permissions.length}
+                                    </TableCell>
+                                    <TableCell>{role.usersCount}</TableCell>
+                                    <TableCell>
+                                        <Badge {...getBadgeProps('outline')}>
+                                            {formatBadgeLabel(role.status)}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <ActionMenu label="Open role actions">
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    setEditingRole(role)
+                                                }
+                                            >
+                                                <Pencil className="size-4" />
+                                                Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                disabled={role.isSystem}
+                                                variant="destructive"
+                                                onClick={() =>
+                                                    setDeletingRole(role)
+                                                }
+                                            >
+                                                <PowerOff className="size-4" />
+                                                Deactivate
+                                            </DropdownMenuItem>
+                                        </ActionMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </AdminTableSection>
             </div>
         </>
     );

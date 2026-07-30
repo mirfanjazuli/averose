@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\AcademicField;
+use App\Models\MentorLevel;
 use App\Models\Program;
 use App\Models\ProgramVariant;
 use App\Models\Schedule;
 use App\Models\Subject;
+use App\Models\TryOut;
 use App\Models\User;
 use App\UserRole;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -58,20 +60,126 @@ class UsersTest extends TestCase
     {
         $admin = User::factory()->admin()->create();
 
-        $this->actingAs($admin)
+        $response = $this->actingAs($admin)
             ->post(route('students.store'), [
                 'name' => 'Alya Prameswari',
                 'email' => 'alya@example.com',
-            ])
-            ->assertRedirect();
+            ]);
 
         $student = User::query()->where('email', 'alya@example.com')->firstOrFail();
+
+        $response
+            ->assertRedirect(route('students.show', $student))
+            ->assertSessionHas('success', 'Student added.');
 
         $this->assertSame(UserRole::Student, $student->role);
         $this->assertSame('Alya', $student->nickname);
         $this->assertSame('alya-prameswari', $student->slug);
         $this->assertSame('active', $student->status);
+        $this->assertNotNull($student->studentProfile);
         $this->assertTrue(Hash::check('averose123', $student->password));
+    }
+
+    public function test_admin_can_create_student_with_initial_program_and_try_out_access(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $field = AcademicField::factory()->create();
+        $secondField = AcademicField::factory()->create();
+        $program = Program::factory()->create([
+            'max_reschedule' => 2,
+        ]);
+        $variant = ProgramVariant::factory()->create([
+            'field_id' => $field->id,
+            'session' => 8,
+        ]);
+        $secondVariant = ProgramVariant::factory()->create([
+            'field_id' => $secondField->id,
+            'session' => 6,
+        ]);
+        $tryOut = TryOut::factory()->create([
+            'status' => 'private',
+        ]);
+        $secondTryOut = TryOut::factory()->create([
+            'status' => 'private',
+        ]);
+
+        $program->fields()->attach($field);
+        $program->fields()->attach($secondField);
+        $program->variants()->attach($variant);
+        $program->variants()->attach($secondVariant);
+
+        $response = $this->actingAs($admin)
+            ->post(route('students.store'), [
+                'add_program_access' => '1',
+                'add_try_out_access' => '1',
+                'email' => 'student.access@example.com',
+                'enrollments' => [
+                    [
+                        'field_id' => $field->id,
+                        'program_id' => $program->id,
+                        'program_variant_id' => $variant->id,
+                        'start_date' => '2026-08-01',
+                    ],
+                    [
+                        'field_id' => $secondField->id,
+                        'program_id' => $program->id,
+                        'program_variant_id' => $secondVariant->id,
+                        'start_date' => '2026-08-02',
+                    ],
+                ],
+                'name' => 'Student Access',
+                'try_out_accesses' => [
+                    [
+                        'attempt_quota' => 2,
+                        'available_from' => '2026-08-01',
+                        'available_until' => '2026-08-31',
+                        'try_out_id' => $tryOut->id,
+                    ],
+                    [
+                        'attempt_quota' => 1,
+                        'available_from' => '2026-09-01',
+                        'available_until' => '2026-09-30',
+                        'try_out_id' => $secondTryOut->id,
+                    ],
+                ],
+            ]);
+
+        $student = User::query()->where('email', 'student.access@example.com')->firstOrFail();
+
+        $response->assertRedirect(route('students.show', $student));
+
+        $this->assertDatabaseHas('program_enrollments', [
+            'field_id' => $field->id,
+            'program_id' => $program->id,
+            'program_variant_id' => $variant->id,
+            'start_date' => '2026-08-01 00:00:00',
+            'status' => 'active',
+            'user_id' => $student->id,
+        ]);
+        $this->assertDatabaseHas('program_enrollments', [
+            'field_id' => $secondField->id,
+            'program_id' => $program->id,
+            'program_variant_id' => $secondVariant->id,
+            'start_date' => '2026-08-02 00:00:00',
+            'status' => 'active',
+            'user_id' => $student->id,
+        ]);
+        $this->assertDatabaseHas('try_out_accesses', [
+            'attempt_quota' => 2,
+            'available_from' => '2026-08-01 00:00:00',
+            'available_until' => '2026-08-31 00:00:00',
+            'status' => 'active',
+            'try_out_id' => $tryOut->id,
+            'user_id' => $student->id,
+        ]);
+        $this->assertDatabaseHas('try_out_accesses', [
+            'attempt_quota' => 1,
+            'available_from' => '2026-09-01 00:00:00',
+            'available_until' => '2026-09-30 00:00:00',
+            'status' => 'active',
+            'try_out_id' => $secondTryOut->id,
+            'user_id' => $student->id,
+        ]);
     }
 
     public function test_admin_can_view_student_detail(): void
@@ -172,11 +280,17 @@ class UsersTest extends TestCase
     public function test_admin_can_create_update_and_deactivate_mentor(): void
     {
         $admin = User::factory()->admin()->create();
+        $middle = MentorLevel::query()->where('slug', 'middle')->firstOrFail();
+        $senior = MentorLevel::query()->where('slug', 'senior')->firstOrFail();
+        $biology = Subject::factory()->create(['name' => 'Biology']);
+        $chemistry = Subject::factory()->create(['name' => 'Chemistry']);
 
         $this->actingAs($admin)
             ->post(route('mentors.store'), [
                 'name' => 'Megan Norton',
                 'email' => 'megan@example.com',
+                'expertise' => [$biology->id],
+                'mentor_level_id' => $middle->id,
             ])
             ->assertRedirect();
 
@@ -184,11 +298,15 @@ class UsersTest extends TestCase
 
         $this->assertSame(UserRole::Mentor, $mentor->role);
         $this->assertSame('Megan', $mentor->nickname);
+        $this->assertSame($middle->id, $mentor->mentorProfile?->mentor_level_id);
+        $this->assertSame([(string) $biology->id], $mentor->mentorProfile?->expertise);
 
         $this->actingAs($admin)
             ->put(route('users.update', $mentor), [
                 'name' => 'Megan Rivera',
                 'email' => 'megan.rivera@example.com',
+                'expertise' => [$biology->id, $chemistry->id],
+                'mentor_level_id' => $senior->id,
             ])
             ->assertRedirect();
 
@@ -196,6 +314,8 @@ class UsersTest extends TestCase
 
         $this->assertSame('Megan', $mentor->nickname);
         $this->assertSame('megan-rivera', $mentor->slug);
+        $this->assertSame($senior->id, $mentor->mentorProfile?->mentor_level_id);
+        $this->assertSame([(string) $biology->id, (string) $chemistry->id], $mentor->mentorProfile?->expertise);
 
         $this->actingAs($admin)
             ->delete(route('users.destroy', $mentor))
@@ -205,6 +325,22 @@ class UsersTest extends TestCase
             'id' => $mentor->id,
             'status' => 'inactive',
         ]);
+    }
+
+    public function test_internal_user_create_generates_internal_profile(): void
+    {
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)
+            ->post(route('internal.store'), [
+                'email' => 'operator@example.com',
+                'name' => 'Operator AveRose',
+            ])
+            ->assertRedirect();
+
+        $internal = User::query()->where('email', 'operator@example.com')->firstOrFail();
+
+        $this->assertNotNull($internal->internalProfile);
     }
 
     public function test_admin_can_view_mentor_detail(): void
@@ -217,6 +353,14 @@ class UsersTest extends TestCase
             'name' => 'Megan Norton',
             'email' => 'megan.detail@example.com',
             'role' => UserRole::Mentor,
+        ]);
+        $level = MentorLevel::query()->where('slug', 'senior')->firstOrFail();
+        $expertise = Subject::factory()->create([
+            'name' => 'Biology',
+        ]);
+        $mentor->mentorProfile()->updateOrCreate([], [
+            'expertise' => [(string) $expertise->id],
+            'mentor_level_id' => $level->id,
         ]);
         $subject = Subject::factory()->create([
             'name' => 'Speaking Review',
@@ -237,6 +381,8 @@ class UsersTest extends TestCase
                 ->component('admin/users/mentors/show')
                 ->where('user.name', 'Megan Norton')
                 ->where('user.nickname', 'Megan')
+                ->where('expertiseSubjects.0.name', 'Biology')
+                ->where('resolvedMentorLevel.name', 'Senior')
                 ->where('teachingJournals.0.subject', 'Speaking Review')
                 ->where('teachingJournals.0.student', 'Alya Prameswari')
                 ->where('teachingJournals.0.duration', '90 minutes')

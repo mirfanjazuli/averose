@@ -13,7 +13,9 @@ use App\Support\StorageUrl;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -21,25 +23,7 @@ class ProgramController extends Controller
 {
     public function index(): Response
     {
-        $subjectOptions = Subject::query()
-            ->where('status', 'active')
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn (Subject $subject): array => [
-                'id' => (string) $subject->id,
-                'label' => $subject->name,
-            ]);
-
         return Inertia::render('admin/academics/programs/index', [
-            'fieldOptions' => AcademicField::query()
-                ->where('status', 'active')
-                ->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn (AcademicField $field): array => [
-                    'id' => (string) $field->id,
-                    'label' => $field->name,
-                    'subjects' => $subjectOptions,
-                ]),
             'programs' => Program::query()
                 ->with(['fields:id,name', 'subjects:id,name', 'variants:id,field_id,name,session,duration,price,status'])
                 ->withCount('subjects')
@@ -81,15 +65,28 @@ class ProgramController extends Controller
             'max_reschedule' => $validated['max_reschedule'],
         ]);
 
-        $program->fields()->syncWithoutDetaching($validated['fields']);
-        $program->subjects()->syncWithoutDetaching($validated['subjects'] ?? []);
-        $this->syncProgramVariants($program, $validated['variants'] ?? []);
+        if (isset($validated['fields'])) {
+            $program->fields()->syncWithoutDetaching($validated['fields']);
+            $program->subjects()->syncWithoutDetaching($validated['subjects'] ?? []);
+            $this->syncProgramVariants($program, $validated['variants'] ?? []);
+        }
 
-        return back();
+        return redirect()
+            ->route('programs.show', $program)
+            ->with('success', 'Program added.');
     }
 
     public function show(Program $program): Response
     {
+        $subjectOptions = Subject::query()
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (Subject $subject): array => [
+                'id' => (string) $subject->id,
+                'label' => $subject->name,
+            ]);
+
         $program->load([
             'fields:id,name',
             'subjects:id,name',
@@ -125,6 +122,7 @@ class ProgramController extends Controller
                 'fields' => $program->fields->map(fn (AcademicField $field): array => [
                     'id' => $field->id,
                     'name' => $field->name,
+                    'subjectIds' => $program->subjects->pluck('id')->values(),
                 ]),
                 'subjects' => $program->subjects->map(fn (Subject $subject): array => [
                     'id' => $subject->id,
@@ -144,6 +142,15 @@ class ProgramController extends Controller
                     'status' => $variant->status,
                 ]),
             ],
+            'fieldOptions' => AcademicField::query()
+                ->where('status', 'active')
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (AcademicField $field): array => [
+                    'id' => (string) $field->id,
+                    'label' => $field->name,
+                    'subjects' => $subjectOptions,
+                ]),
         ]);
     }
 
@@ -198,9 +205,124 @@ class ProgramController extends Controller
 
         $program->update($attributes);
 
-        $program->fields()->syncWithoutDetaching($validated['fields']);
+        if (isset($validated['fields'])) {
+            $program->fields()->syncWithoutDetaching($validated['fields']);
+            $program->subjects()->syncWithoutDetaching($validated['subjects'] ?? []);
+            $this->syncProgramVariants($program, $validated['variants'] ?? []);
+        }
+
+        return back();
+    }
+
+    public function storeField(Request $request, Program $program): RedirectResponse
+    {
+        $validated = $request->validate([
+            'field_id' => ['required', 'integer', 'exists:fields,id'],
+            'subjects' => ['nullable', 'array'],
+            'subjects.*' => ['integer', 'exists:subjects,id'],
+        ]);
+
+        $program->fields()->syncWithoutDetaching([(int) $validated['field_id']]);
         $program->subjects()->syncWithoutDetaching($validated['subjects'] ?? []);
-        $this->syncProgramVariants($program, $validated['variants'] ?? []);
+
+        return back();
+    }
+
+    public function updateField(Request $request, Program $program, AcademicField $field): RedirectResponse
+    {
+        abort_unless($program->fields()->whereKey($field->getKey())->exists(), 404);
+
+        $validated = $request->validate([
+            'field_id' => ['required', 'integer', 'exists:fields,id'],
+            'subjects' => ['nullable', 'array'],
+            'subjects.*' => ['integer', 'exists:subjects,id'],
+        ]);
+
+        $newFieldId = (int) $validated['field_id'];
+        $program->fields()->syncWithoutDetaching([$newFieldId]);
+
+        if ($newFieldId !== $field->id && $this->canDetachField($program, $field)) {
+            $program->fields()->detach($field->id);
+        }
+
+        $program->subjects()->syncWithoutDetaching($validated['subjects'] ?? []);
+
+        return back();
+    }
+
+    public function copyField(Request $request, Program $program, AcademicField $field): RedirectResponse
+    {
+        abort_unless($program->fields()->whereKey($field->getKey())->exists(), 404);
+
+        $validated = $request->validate([
+            'target_field_id' => [
+                'required',
+                'integer',
+                Rule::exists('fields', 'id'),
+                Rule::notIn([$field->id]),
+            ],
+        ]);
+
+        $targetFieldId = (int) $validated['target_field_id'];
+
+        DB::transaction(function () use ($field, $program, $targetFieldId): void {
+            $program->fields()->syncWithoutDetaching([$targetFieldId]);
+
+            $sourceVariants = $program->variants()
+                ->where('field_id', $field->id)
+                ->where('status', 'active')
+                ->get();
+
+            $targetVariants = $program->variants()
+                ->where('field_id', $targetFieldId)
+                ->where('status', 'active')
+                ->get();
+
+            $newVariantIds = $sourceVariants
+                ->reject(fn (ProgramVariant $sourceVariant): bool => $targetVariants->contains(
+                    fn (ProgramVariant $targetVariant): bool => $targetVariant->session === $sourceVariant->session
+                        && $targetVariant->duration === $sourceVariant->duration
+                        && (float) $targetVariant->price === (float) $sourceVariant->price
+                ))
+                ->map(function (ProgramVariant $sourceVariant) use ($targetFieldId): int {
+                    return ProgramVariant::query()->create([
+                        'field_id' => $targetFieldId,
+                        'name' => $sourceVariant->name,
+                        'session' => $sourceVariant->session,
+                        'duration' => $sourceVariant->duration,
+                        'price' => $sourceVariant->price,
+                        'status' => 'active',
+                    ])->id;
+                });
+
+            $program->variants()->syncWithoutDetaching($newVariantIds->all());
+        });
+
+        return back();
+    }
+
+    public function storeVariant(Request $request, Program $program): RedirectResponse
+    {
+        $validated = $request->validate([
+            'field_id' => ['required', 'integer', 'exists:fields,id'],
+            'session' => ['required', 'integer', 'min:1', 'max:255'],
+            'duration' => ['required', 'integer', 'in:60,90,120,180'],
+            'price' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
+        ]);
+
+        $session = (int) $validated['session'];
+        $duration = (int) $validated['duration'];
+        $variant = ProgramVariant::query()->create([
+            'field_id' => $validated['field_id'],
+            'name' => "{$session} x {$duration} Minutes",
+            'session' => $session,
+            'duration' => $duration,
+            'price' => $validated['price'],
+            'status' => 'active',
+        ]);
+
+        $program->fields()->syncWithoutDetaching([(int) $validated['field_id']]);
+        $program->variants()->syncWithoutDetaching([$variant->id]);
 
         return back();
     }
@@ -208,6 +330,15 @@ class ProgramController extends Controller
     public function destroy(Program $program): RedirectResponse
     {
         $program->update(['status' => 'inactive']);
+
+        return back();
+    }
+
+    public function destroyVariant(Program $program, ProgramVariant $variant): RedirectResponse
+    {
+        abort_unless($program->variants()->whereKey($variant->getKey())->exists(), 404);
+
+        $variant->update(['status' => 'inactive']);
 
         return back();
     }
@@ -276,6 +407,22 @@ class ProgramController extends Controller
         return collect($attributes)
             ->except('status')
             ->contains(fn (mixed $value, string $key): bool => $this->variantAttributeChanged($variant, $key, $value));
+    }
+
+    private function canDetachField(Program $program, AcademicField $field): bool
+    {
+        $hasEnrollment = ProgramEnrollment::query()
+            ->where('program_id', $program->id)
+            ->where('field_id', $field->id)
+            ->exists();
+
+        if ($hasEnrollment) {
+            return false;
+        }
+
+        return ! $program->variants()
+            ->where('field_id', $field->id)
+            ->exists();
     }
 
     private function variantAttributeChanged(ProgramVariant $variant, string $key, mixed $value): bool

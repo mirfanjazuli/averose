@@ -428,25 +428,17 @@ class DashboardController extends Controller
     {
         $image = $this->reportImageDataUri($filename);
 
-        if ($image === null) {
-            return '<div></div>';
-        }
-
         return '<div style="margin-left: -'.$offsetLeft.'mm;"><img src="'.$image.'" width="'.$width.'mm" /></div>';
     }
 
-    private function reportImageDataUri(string $filename): ?string
+    private function reportImageDataUri(string $filename): string
     {
-        $path = public_path('reports/'.$filename);
-
-        if (! is_file($path)) {
-            return null;
-        }
+        $path = $this->reportImagePath($filename);
 
         $contents = file_get_contents($path);
 
         if ($contents === false) {
-            return null;
+            throw new \RuntimeException("Unable to read report asset [{$filename}].");
         }
 
         return 'data:image/png;base64,'.base64_encode($contents);
@@ -454,13 +446,20 @@ class DashboardController extends Controller
 
     private function applyReportWatermark(Mpdf $mpdf, string $filename): void
     {
-        $path = public_path('reports/'.$filename);
-
-        if (! is_file($path)) {
-            return;
-        }
+        $path = $this->reportImagePath($filename);
 
         $mpdf->SetWatermarkImage($path, 0.18, [112, 112], 'F');
         $mpdf->showWatermarkImage = true;
+    }
+
+    private function reportImagePath(string $filename): string
+    {
+        $path = public_path('reports/'.$filename);
+
+        if (! is_file($path)) {
+            throw new \RuntimeException("Report asset [{$filename}] was not found.");
+        }
+
+        return $path;
     }
 }

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
@@ -132,6 +133,32 @@ class User extends Authenticatable implements PasskeyUser
         return $this->belongsTo(Role::class, 'role_id');
     }
 
+    public function studentProfile(): HasOne
+    {
+        return $this->hasOne(StudentProfile::class);
+    }
+
+    public function mentorProfile(): HasOne
+    {
+        return $this->hasOne(MentorProfile::class);
+    }
+
+    public function internalProfile(): HasOne
+    {
+        return $this->hasOne(InternalProfile::class);
+    }
+
+    public function resolvedMentorLevel(): ?MentorLevel
+    {
+        if (! $this->isMentor()) {
+            return null;
+        }
+
+        $this->loadMissing('mentorProfile.mentorLevel');
+
+        return $this->mentorProfile?->mentorLevel;
+    }
+
     public function recordings(): HasMany
     {
         return $this->hasMany(Recording::class);
@@ -158,6 +185,19 @@ class User extends Authenticatable implements PasskeyUser
                 $user->nickname = static::uniqueValue('nickname', static::nicknameBase($user->name), $user);
             }
         });
+
+        static::created(function (User $user): void {
+            $user->ensureRoleProfile();
+        });
+    }
+
+    public function ensureRoleProfile(): void
+    {
+        match ($this->role) {
+            UserRole::Admin => $this->internalProfile()->firstOrCreate([]),
+            UserRole::Mentor => $this->mentorProfile()->firstOrCreate([]),
+            UserRole::Student => $this->studentProfile()->firstOrCreate([]),
+        };
     }
 
     private static function nicknameBase(string $name): string

@@ -17,7 +17,6 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -26,7 +25,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldLabel } from '@/components/ui/field';
 import {
     InputGroup,
     InputGroupAddon,
@@ -37,6 +36,15 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 
 export type BookingSubjectOption = {
@@ -64,14 +72,16 @@ type FlattenedBookingSession = BookingSessionRow & {
 };
 
 type StudentBookSessionDialogProps = {
+    onOpenChange?: (open: boolean) => void;
+    open?: boolean;
     subjects: BookingSubjectOption[];
     trigger?: ReactNode;
 };
 
 const bookingSteps = [
-    { label: 'Subject' },
-    { label: 'Schedule' },
-    { label: 'Review' },
+    { label: 'Mata pelajaran' },
+    { label: 'Jadwal' },
+    { label: 'Tinjau' },
 ] as const;
 
 function uid(prefix: string): string {
@@ -102,10 +112,10 @@ function dateKey(dateValue: Date): string {
 
 function selectedDateLabel(dateValue: string): string {
     if (!dateValue) {
-        return 'Pick date';
+        return 'Pilih tanggal';
     }
 
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat('id-ID', {
         day: 'numeric',
         month: 'short',
         weekday: 'short',
@@ -119,18 +129,6 @@ function createSessionRow(): BookingSessionRow {
         id: uid('session'),
         time: '',
     };
-}
-
-function dateTimeLabel(dateValue: string, timeValue: string): string {
-    if (!dateValue && !timeValue) {
-        return 'Pick date & time';
-    }
-
-    if (!dateValue) {
-        return timeValue;
-    }
-
-    return `${selectedDateLabel(dateValue)}${timeValue ? ` · ${timeValue}` : ''}`;
 }
 
 function DateTimePicker({
@@ -149,23 +147,30 @@ function DateTimePicker({
     time: string;
 }) {
     return (
-        <Popover>
-            <PopoverTrigger asChild>
-                <Button
-                    type="button"
-                    variant="outline"
-                    className={cn(
-                        'h-11 w-full justify-start rounded-xl bg-background text-left font-normal',
-                        !date && !time && 'text-muted-foreground',
-                    )}
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
+            <Popover>
+                <PopoverTrigger asChild>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                            'h-11 w-full min-w-0 justify-start gap-2 rounded-xl bg-background text-left font-normal',
+                            !date && 'text-muted-foreground',
+                        )}
+                    >
+                        <CalendarIcon className="size-4 shrink-0" />
+                        <span className="min-w-0 truncate">
+                            {selectedDateLabel(date)}
+                        </span>
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                    align="start"
+                    collisionPadding={16}
+                    sideOffset={8}
+                    className="max-h-[min(var(--radix-popover-content-available-height),calc(100vh-2rem))] w-auto overflow-y-auto p-0"
                 >
-                    <CalendarIcon className="size-4" />
-                    {dateTimeLabel(date, time)}
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-auto p-0">
-                <Card size="sm" className="w-fit gap-0 rounded-xl py-0">
-                    <CardContent className="p-3">
+                    <div className="p-3">
                         <Calendar
                             mode="single"
                             selected={
@@ -179,42 +184,41 @@ function DateTimePicker({
                             }
                             className="p-0"
                         />
-                    </CardContent>
-                    <CardFooter className="border-t bg-card p-3">
-                        <FieldGroup className="w-full">
-                            <Field>
-                                <FieldLabel htmlFor={id}>Start time</FieldLabel>
-                                <InputGroup>
-                                    <InputGroupInput
-                                        id={id}
-                                        type="time"
-                                        step="300"
-                                        value={time}
-                                        disabled={!date}
-                                        onChange={(event) =>
-                                            onTimeChange(event.target.value)
-                                        }
-                                        className="appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
-                                    />
-                                    <InputGroupAddon>
-                                        <Clock2Icon className="text-muted-foreground" />
-                                    </InputGroupAddon>
-                                </InputGroup>
-                            </Field>
-                        </FieldGroup>
-                    </CardFooter>
-                </Card>
-            </PopoverContent>
-        </Popover>
+                    </div>
+                </PopoverContent>
+            </Popover>
+
+            <Field>
+                <FieldLabel htmlFor={id} className="sr-only">
+                    Jam mulai
+                </FieldLabel>
+                <InputGroup className="h-11 rounded-xl">
+                    <InputGroupInput
+                        id={id}
+                        type="time"
+                        step="300"
+                        value={time}
+                        disabled={!date}
+                        onChange={(event) => onTimeChange(event.target.value)}
+                        className="appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+                    />
+                    <InputGroupAddon>
+                        <Clock2Icon className="text-muted-foreground" />
+                    </InputGroupAddon>
+                </InputGroup>
+            </Field>
+        </div>
     );
 }
 
 export function StudentBookSessionDialog({
+    onOpenChange,
+    open,
     subjects,
     trigger,
 }: StudentBookSessionDialogProps) {
     const submitAllowedRef = useRef(false);
-    const [bookingOpen, setBookingOpen] = useState(false);
+    const [internalBookingOpen, setInternalBookingOpen] = useState(false);
     const [currentStep, setCurrentStep] = useState(0);
     const [selectedSubjectValue, setSelectedSubjectValue] = useState('');
     const [sessions, setSessions] = useState<BookingSessionRow[]>(() => [
@@ -231,7 +235,7 @@ export function StudentBookSessionDialog({
         () =>
             subjects.reduce<Record<string, BookingSubjectOption[]>>(
                 (groups, subject) => {
-                    const program = subject.program ?? 'No program';
+                    const program = subject.program ?? 'Tanpa program';
 
                     groups[program] = [...(groups[program] ?? []), subject];
 
@@ -279,9 +283,8 @@ export function StudentBookSessionDialog({
         currentStep === 0
             ? Boolean(selectedSubject)
             : hasCompleteSchedule && hasEnoughSessions;
-    const totalDuration = selectedSubject
-        ? selectedSubject.duration * sessions.length
-        : 0;
+    const bookingOpen = open ?? internalBookingOpen;
+    const setBookingOpen = onOpenChange ?? setInternalBookingOpen;
 
     const resetBooking = () => {
         submitAllowedRef.current = false;
@@ -363,21 +366,30 @@ export function StudentBookSessionDialog({
                 }
             }}
         >
-            <DialogTrigger asChild>
-                {trigger ?? (
-                    <Button className="gap-2" disabled={!hasBookableSubjects}>
-                        Book session
-                        <ArrowUpRight className="size-4" />
-                    </Button>
-                )}
-            </DialogTrigger>
-            <DialogContent className="scrollbar-stable max-h-[92vh] overflow-y-auto sm:max-w-5xl">
-                <DialogHeader>
-                    <DialogTitle>Book sessions</DialogTitle>
+            {trigger !== null ? (
+                <DialogTrigger asChild>
+                    {trigger ?? (
+                        <Button
+                            className="gap-2"
+                            disabled={!hasBookableSubjects}
+                        >
+                            Jadwalkan sesi
+                            <ArrowUpRight className="size-4" />
+                        </Button>
+                    )}
+                </DialogTrigger>
+            ) : null}
+            <DialogContent className="flex h-[92vh] max-h-[92vh] flex-col overflow-hidden p-0 sm:max-w-4xl">
+                <DialogHeader className="shrink-0">
+                    <DialogTitle className="px-6 pt-6">
+                        Jadwalkan sesi belajar
+                    </DialogTitle>
                     <DialogDescription>
-                        {hasBookableSubjects
-                            ? 'Select one subject, arrange schedules, then review before confirming.'
-                            : 'You need an active program before booking a session.'}
+                        <span className="block px-6">
+                            {hasBookableSubjects
+                                ? 'Pilih mata pelajaran, tentukan jadwal, lalu tinjau sebelum dikonfirmasi.'
+                                : 'Kamu perlu memiliki program aktif sebelum menjadwalkan sesi.'}
+                        </span>
                     </DialogDescription>
                 </DialogHeader>
 
@@ -401,7 +413,7 @@ export function StudentBookSessionDialog({
                         method="post"
                         disableWhileProcessing
                         onSuccess={() => {
-                            toast.success('Session booked.');
+                            toast.success('Sesi berhasil dijadwalkan.');
                             setBookingOpen(false);
                             resetBooking();
                         }}
@@ -427,358 +439,182 @@ export function StudentBookSessionDialog({
                                 goNext();
                             }
                         }}
-                        className="space-y-5"
+                        className="flex min-h-0 flex-1 flex-col overflow-hidden"
                     >
                         {({ errors, processing }) => (
                             <>
-                                <div className="overflow-hidden rounded-xl border">
-                                    <div className="p-4">
-                                        <div className="grid grid-cols-3 gap-5">
-                                            {bookingSteps.map((step, index) => {
-                                                const isActive =
-                                                    currentStep === index;
-                                                const isCompleted =
-                                                    currentStep > index;
+                                <div className="min-h-0 flex-1 px-6 pb-2">
+                                    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border bg-background">
+                                        <div className="border-b bg-muted/20 p-4">
+                                            <div className="grid grid-cols-3 gap-3">
+                                                {bookingSteps.map(
+                                                    (step, index) => {
+                                                        const isActive =
+                                                            currentStep ===
+                                                            index;
+                                                        const isCompleted =
+                                                            currentStep > index;
 
-                                                return (
-                                                    <button
-                                                        key={step.label}
-                                                        type="button"
-                                                        className="min-w-0 text-left"
-                                                        disabled={
-                                                            index >
-                                                                currentStep &&
-                                                            !canGoNext
-                                                        }
-                                                        onClick={() => {
-                                                            if (
-                                                                index <=
-                                                                currentStep
-                                                            ) {
-                                                                setCurrentStep(
-                                                                    index,
-                                                                );
-                                                            }
-                                                        }}
-                                                    >
-                                                        <span
-                                                            className={cn(
-                                                                'block h-1 rounded-full bg-muted',
-                                                                (isActive ||
-                                                                    isCompleted) &&
-                                                                    'bg-foreground',
-                                                            )}
-                                                        />
-                                                        <span className="mt-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                                                            {isCompleted && (
-                                                                <Check className="size-3.5 text-primary" />
-                                                            )}
-                                                            <span
-                                                                className={cn(
-                                                                    isActive &&
-                                                                        'text-foreground',
-                                                                )}
+                                                        return (
+                                                            <button
+                                                                key={step.label}
+                                                                type="button"
+                                                                className="min-w-0 text-left"
+                                                                disabled={
+                                                                    index >
+                                                                        currentStep &&
+                                                                    !canGoNext
+                                                                }
+                                                                onClick={() => {
+                                                                    if (
+                                                                        index <=
+                                                                        currentStep
+                                                                    ) {
+                                                                        setCurrentStep(
+                                                                            index,
+                                                                        );
+                                                                    }
+                                                                }}
                                                             >
-                                                                {step.label}
-                                                            </span>
-                                                        </span>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-
-                                    <div className="border-t p-4">
-                                        {currentStep === 0 && (
-                                            <div className="space-y-5">
-                                                <div>
-                                                    <p className="text-sm font-medium">
-                                                        Select subject
-                                                    </p>
-                                                </div>
-
-                                                <div className="scrollbar-stable max-h-[56vh] space-y-5 overflow-y-auto pr-1">
-                                                    {Object.entries(
-                                                        subjectsByProgram,
-                                                    ).map(
-                                                        ([
-                                                            program,
-                                                            programSubjects,
-                                                        ]) => (
-                                                            <div
-                                                                key={program}
-                                                                className="space-y-3"
-                                                            >
-                                                                <p className="text-xs font-medium text-muted-foreground uppercase">
-                                                                    {program}
-                                                                </p>
-                                                                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-                                                                    {programSubjects.map(
-                                                                        (
-                                                                            subject,
-                                                                        ) => {
-                                                                            const checked =
-                                                                                selectedSubjectValue ===
-                                                                                subject.value;
-                                                                            const disabled =
-                                                                                !subject.enrollmentId ||
-                                                                                subject.sessionsRemaining ===
-                                                                                    0;
-
-                                                                            return (
-                                                                                <button
-                                                                                    key={
-                                                                                        subject.value
-                                                                                    }
-                                                                                    type="button"
-                                                                                    disabled={
-                                                                                        disabled
-                                                                                    }
-                                                                                    onClick={() =>
-                                                                                        selectSubject(
-                                                                                            subject,
-                                                                                        )
-                                                                                    }
-                                                                                    className={cn(
-                                                                                        'flex aspect-square w-full flex-col items-center justify-center gap-3 rounded-xl border bg-background p-4 text-center transition-colors',
-                                                                                        checked
-                                                                                            ? 'border-foreground bg-muted/35 shadow-sm'
-                                                                                            : 'border-border hover:border-foreground/40',
-                                                                                        disabled &&
-                                                                                            'cursor-not-allowed opacity-50',
-                                                                                    )}
-                                                                                >
-                                                                                    <span
-                                                                                        className={cn(
-                                                                                            'flex size-8 items-center justify-center rounded-lg bg-muted',
-                                                                                            checked &&
-                                                                                                'bg-primary/10 text-primary',
-                                                                                        )}
-                                                                                    >
-                                                                                        <DynamicIcon
-                                                                                            name={
-                                                                                                subject.icon ??
-                                                                                                'book-open'
-                                                                                            }
-                                                                                            fallback={() => (
-                                                                                                <BookOpen className="size-4" />
-                                                                                            )}
-                                                                                            className="size-4"
-                                                                                        />
-                                                                                    </span>
-                                                                                    <p className="line-clamp-2 text-sm leading-snug font-medium">
-                                                                                        {
-                                                                                            subject.label
-                                                                                        }
-                                                                                    </p>
-                                                                                </button>
-                                                                            );
-                                                                        },
+                                                                <span
+                                                                    className={cn(
+                                                                        'block h-1 rounded-full bg-muted',
+                                                                        (isActive ||
+                                                                            isCompleted) &&
+                                                                            'bg-[#0f8f7a]',
                                                                     )}
-                                                                </div>
-                                                            </div>
-                                                        ),
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {currentStep === 1 &&
-                                            selectedSubject && (
-                                                <div className="space-y-4">
-                                                    <div className="flex items-start justify-between gap-3">
-                                                        <div>
-                                                            <p className="text-sm font-medium">
-                                                                Add date & time
-                                                            </p>
-                                                        </div>
-                                                        {selectedSubject.sessionsRemaining !==
-                                                            null && (
-                                                            <Badge variant="outline">
-                                                                {
-                                                                    selectedSubject.sessionsRemaining
-                                                                }{' '}
-                                                                remaining
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-
-                                                    <div className="grid gap-2">
-                                                        {sessions.map(
-                                                            (
-                                                                session,
-                                                                sessionIndex,
-                                                            ) => {
-                                                                const endTime =
-                                                                    session.time
-                                                                        ? addMinutes(
-                                                                              session.time,
-                                                                              selectedSubject.duration,
-                                                                          )
-                                                                        : '';
-                                                                const dateError =
-                                                                    errors[
-                                                                        `sessions.${sessionIndex}.date`
-                                                                    ];
-                                                                const timeError =
-                                                                    errors[
-                                                                        `sessions.${sessionIndex}.time`
-                                                                    ];
-
-                                                                return (
-                                                                    <div
-                                                                        key={
-                                                                            session.id
-                                                                        }
-                                                                        className="grid gap-3 rounded-xl bg-muted/35 p-3 md:grid-cols-[minmax(0,1fr)_auto]"
+                                                                />
+                                                                <span className="mt-3 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                                                                    <span
+                                                                        className={cn(
+                                                                            'flex size-6 items-center justify-center rounded-full bg-muted text-[11px]',
+                                                                            isActive &&
+                                                                                'bg-[#0f8f7a] text-white',
+                                                                            isCompleted &&
+                                                                                'bg-[#e4f5f0] text-[#0f8f7a]',
+                                                                        )}
                                                                     >
-                                                                        <div className="space-y-2">
-                                                                            <div className="flex items-center justify-between gap-2">
-                                                                                <p className="text-xs font-medium text-muted-foreground">
-                                                                                    Session{' '}
-                                                                                    {sessionIndex +
-                                                                                        1}
-                                                                                </p>
-                                                                                {endTime && (
-                                                                                    <span className="text-xs text-muted-foreground">
-                                                                                        Ends
-                                                                                        at{' '}
-                                                                                        {
-                                                                                            endTime
-                                                                                        }
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                            <DateTimePicker
-                                                                                id={`session-time-${session.id}`}
-                                                                                date={
-                                                                                    session.date
-                                                                                }
-                                                                                time={
-                                                                                    session.time
-                                                                                }
-                                                                                disabledDate={
-                                                                                    today
-                                                                                }
-                                                                                onDateChange={(
-                                                                                    date,
-                                                                                ) =>
-                                                                                    updateSession(
-                                                                                        session.id,
-                                                                                        {
-                                                                                            date,
-                                                                                        },
-                                                                                    )
-                                                                                }
-                                                                                onTimeChange={(
-                                                                                    time,
-                                                                                ) =>
-                                                                                    updateSession(
-                                                                                        session.id,
-                                                                                        {
-                                                                                            time,
-                                                                                        },
-                                                                                    )
-                                                                                }
-                                                                            />
-                                                                            {(dateError ||
-                                                                                timeError) && (
-                                                                                <p className="text-xs text-destructive">
-                                                                                    {dateError ??
-                                                                                        timeError}
-                                                                                </p>
-                                                                            )}
-                                                                        </div>
-                                                                        <div className="flex items-end justify-end">
-                                                                            <Button
-                                                                                type="button"
-                                                                                variant="ghost"
-                                                                                size="icon"
-                                                                                className="rounded-full"
-                                                                                disabled={
-                                                                                    sessions.length ===
-                                                                                    1
-                                                                                }
-                                                                                onClick={() =>
-                                                                                    removeSession(
-                                                                                        session.id,
-                                                                                    )
-                                                                                }
-                                                                            >
-                                                                                <Trash2 className="size-4" />
-                                                                                <span className="sr-only">
-                                                                                    Remove
-                                                                                    session
-                                                                                </span>
-                                                                            </Button>
-                                                                        </div>
-                                                                    </div>
-                                                                );
-                                                            },
-                                                        )}
-                                                    </div>
+                                                                        {isCompleted ? (
+                                                                            <Check className="size-3.5" />
+                                                                        ) : (
+                                                                            index +
+                                                                            1
+                                                                        )}
+                                                                    </span>
+                                                                    <span
+                                                                        className={cn(
+                                                                            isActive &&
+                                                                                'text-[#102a3a]',
+                                                                        )}
+                                                                    >
+                                                                        {
+                                                                            step.label
+                                                                        }
+                                                                    </span>
+                                                                </span>
+                                                            </button>
+                                                        );
+                                                    },
+                                                )}
+                                            </div>
+                                        </div>
 
-                                                    {canAddSchedule && (
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            size="sm"
-                                                            className="gap-2"
-                                                            onClick={addSession}
-                                                        >
-                                                            <Plus className="size-4" />
-                                                            Add schedule
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            )}
-
-                                        {currentStep === 2 &&
-                                            selectedSubject && (
+                                        <div className="min-h-0 flex-1 p-4 sm:p-5">
+                                            {currentStep === 0 && (
                                                 <div className="space-y-4">
-                                                    <div>
+                                                    <div className="flex items-center justify-between gap-3">
                                                         <p className="text-sm font-medium">
-                                                            Review booking
+                                                            Pilih 1 mata
+                                                            pelajaran
                                                         </p>
-                                                        <p className="text-sm text-muted-foreground">
-                                                            {sessions.length}{' '}
-                                                            session
-                                                            {sessions.length > 1
-                                                                ? 's'
-                                                                : ''}{' '}
-                                                            · {totalDuration}{' '}
-                                                            min total
-                                                        </p>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {subjects.length}{' '}
+                                                            opsi
+                                                        </span>
                                                     </div>
 
-                                                    <div className="scrollbar-stable max-h-[42vh] divide-y overflow-y-auto rounded-xl border">
-                                                        {flattenedSessions.map(
-                                                            (
-                                                                session,
-                                                                index,
-                                                            ) => (
+                                                    <div className="space-y-5">
+                                                        {Object.entries(
+                                                            subjectsByProgram,
+                                                        ).map(
+                                                            ([
+                                                                program,
+                                                                programSubjects,
+                                                            ]) => (
                                                                 <div
                                                                     key={
-                                                                        session.id
+                                                                        program
                                                                     }
-                                                                    className="flex items-center justify-between gap-3 p-3"
+                                                                    className="space-y-3"
                                                                 >
-                                                                    <div className="min-w-0">
-                                                                        <p className="text-xs font-medium text-muted-foreground">
-                                                                            Session{' '}
-                                                                            {index +
-                                                                                1}
-                                                                        </p>
-                                                                        <p className="truncate text-sm">
-                                                                            {session.date
-                                                                                ? selectedDateLabel(
-                                                                                      session.date,
-                                                                                  )
-                                                                                : 'No date'}{' '}
-                                                                            ·{' '}
-                                                                            {session.time ||
-                                                                                'No time'}
-                                                                        </p>
+                                                                    <p className="text-xs font-medium text-muted-foreground uppercase">
+                                                                        {
+                                                                            program
+                                                                        }
+                                                                    </p>
+                                                                    <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                                                                        {programSubjects.map(
+                                                                            (
+                                                                                subject,
+                                                                            ) => {
+                                                                                const checked =
+                                                                                    selectedSubjectValue ===
+                                                                                    subject.value;
+                                                                                const disabled =
+                                                                                    !subject.enrollmentId ||
+                                                                                    subject.sessionsRemaining ===
+                                                                                        0;
+
+                                                                                return (
+                                                                                    <button
+                                                                                        key={
+                                                                                            subject.value
+                                                                                        }
+                                                                                        type="button"
+                                                                                        disabled={
+                                                                                            disabled
+                                                                                        }
+                                                                                        onClick={() =>
+                                                                                            selectSubject(
+                                                                                                subject,
+                                                                                            )
+                                                                                        }
+                                                                                        className={cn(
+                                                                                            'flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-xl border bg-background p-3 text-center transition-colors',
+                                                                                            checked
+                                                                                                ? 'border-[#0f8f7a] bg-[#edf7f4] shadow-sm'
+                                                                                                : 'border-border hover:border-[#0f8f7a]/40',
+                                                                                            disabled &&
+                                                                                                'cursor-not-allowed opacity-50',
+                                                                                        )}
+                                                                                    >
+                                                                                        <span
+                                                                                            className={cn(
+                                                                                                'flex size-8 items-center justify-center rounded-lg bg-muted',
+                                                                                                checked &&
+                                                                                                    'bg-white text-[#0f8f7a]',
+                                                                                            )}
+                                                                                        >
+                                                                                            <DynamicIcon
+                                                                                                name={
+                                                                                                    subject.icon ??
+                                                                                                    'book-open'
+                                                                                                }
+                                                                                                fallback={() => (
+                                                                                                    <BookOpen className="size-4" />
+                                                                                                )}
+                                                                                                className="size-4"
+                                                                                            />
+                                                                                        </span>
+                                                                                        <p className="line-clamp-2 text-xs leading-snug font-semibold">
+                                                                                            {
+                                                                                                subject.label
+                                                                                            }
+                                                                                        </p>
+                                                                                    </button>
+                                                                                );
+                                                                            },
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             ),
@@ -786,20 +622,253 @@ export function StudentBookSessionDialog({
                                                     </div>
                                                 </div>
                                             )}
+
+                                            {currentStep === 1 &&
+                                                selectedSubject && (
+                                                    <ScrollArea className="h-full min-h-0 pr-3">
+                                                        <div className="space-y-4">
+                                                            <div className="flex items-start justify-between gap-3">
+                                                                <div>
+                                                                    <p className="text-sm font-medium">
+                                                                        Pilih
+                                                                        tanggal
+                                                                        dan jam
+                                                                    </p>
+                                                                </div>
+                                                                {selectedSubject.sessionsRemaining !==
+                                                                    null && (
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className="rounded-full"
+                                                                    >
+                                                                        {
+                                                                            selectedSubject.sessionsRemaining
+                                                                        }{' '}
+                                                                        sesi
+                                                                        tersisa
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+
+                                                            <div className="grid gap-2">
+                                                                {sessions.map(
+                                                                    (
+                                                                        session,
+                                                                        sessionIndex,
+                                                                    ) => {
+                                                                        const endTime =
+                                                                            session.time
+                                                                                ? addMinutes(
+                                                                                      session.time,
+                                                                                      selectedSubject.duration,
+                                                                                  )
+                                                                                : '';
+                                                                        const dateError =
+                                                                            errors[
+                                                                                `sessions.${sessionIndex}.date`
+                                                                            ];
+                                                                        const timeError =
+                                                                            errors[
+                                                                                `sessions.${sessionIndex}.time`
+                                                                            ];
+
+                                                                        return (
+                                                                            <div
+                                                                                key={
+                                                                                    session.id
+                                                                                }
+                                                                                className="grid gap-3 rounded-xl bg-muted/35 p-3 md:grid-cols-[minmax(0,1fr)_auto]"
+                                                                            >
+                                                                                <div className="space-y-2">
+                                                                                    <div className="flex items-center justify-between gap-2">
+                                                                                        <p className="text-xs font-medium text-muted-foreground">
+                                                                                            Sesi{' '}
+                                                                                            {sessionIndex +
+                                                                                                1}
+                                                                                        </p>
+                                                                                        {endTime && (
+                                                                                            <span className="text-xs text-muted-foreground">
+                                                                                                Selesai{' '}
+                                                                                                {
+                                                                                                    endTime
+                                                                                                }
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <DateTimePicker
+                                                                                        id={`session-time-${session.id}`}
+                                                                                        date={
+                                                                                            session.date
+                                                                                        }
+                                                                                        time={
+                                                                                            session.time
+                                                                                        }
+                                                                                        disabledDate={
+                                                                                            today
+                                                                                        }
+                                                                                        onDateChange={(
+                                                                                            date,
+                                                                                        ) =>
+                                                                                            updateSession(
+                                                                                                session.id,
+                                                                                                {
+                                                                                                    date,
+                                                                                                },
+                                                                                            )
+                                                                                        }
+                                                                                        onTimeChange={(
+                                                                                            time,
+                                                                                        ) =>
+                                                                                            updateSession(
+                                                                                                session.id,
+                                                                                                {
+                                                                                                    time,
+                                                                                                },
+                                                                                            )
+                                                                                        }
+                                                                                    />
+                                                                                    {(dateError ||
+                                                                                        timeError) && (
+                                                                                        <p className="text-xs text-destructive">
+                                                                                            {dateError ??
+                                                                                                timeError}
+                                                                                        </p>
+                                                                                    )}
+                                                                                </div>
+                                                                                <div className="flex items-end justify-end">
+                                                                                    <Button
+                                                                                        type="button"
+                                                                                        variant="ghost"
+                                                                                        size="icon"
+                                                                                        className="rounded-full"
+                                                                                        disabled={
+                                                                                            sessions.length ===
+                                                                                            1
+                                                                                        }
+                                                                                        onClick={() =>
+                                                                                            removeSession(
+                                                                                                session.id,
+                                                                                            )
+                                                                                        }
+                                                                                    >
+                                                                                        <Trash2 className="size-4" />
+                                                                                        <span className="sr-only">
+                                                                                            Hapus
+                                                                                            sesi
+                                                                                        </span>
+                                                                                    </Button>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    },
+                                                                )}
+                                                            </div>
+
+                                                            {canAddSchedule && (
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="w-full gap-2 rounded-xl sm:w-auto"
+                                                                    onClick={
+                                                                        addSession
+                                                                    }
+                                                                >
+                                                                    <Plus className="size-4" />
+                                                                    Tambah
+                                                                    jadwal
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </ScrollArea>
+                                                )}
+
+                                            {currentStep === 2 &&
+                                                selectedSubject && (
+                                                    <div className="flex h-full min-h-0 flex-col gap-4">
+                                                        <div className="shrink-0">
+                                                            <p className="text-sm font-medium">
+                                                                {
+                                                                    selectedSubject.label
+                                                                }
+                                                            </p>
+                                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                                {
+                                                                    sessions.length
+                                                                }{' '}
+                                                                sesi siap
+                                                                dijadwalkan
+                                                            </p>
+                                                        </div>
+
+                                                        <ScrollArea className="min-h-0 flex-1">
+                                                            <Table>
+                                                                <TableHeader>
+                                                                    <TableRow>
+                                                                        <TableHead className="h-11">
+                                                                            Sesi
+                                                                        </TableHead>
+                                                                        <TableHead className="h-11">
+                                                                            Tanggal
+                                                                        </TableHead>
+                                                                        <TableHead className="h-11">
+                                                                            Jam
+                                                                        </TableHead>
+                                                                    </TableRow>
+                                                                </TableHeader>
+                                                                <TableBody>
+                                                                    {flattenedSessions.map(
+                                                                        (
+                                                                            session,
+                                                                            index,
+                                                                        ) => (
+                                                                            <TableRow
+                                                                                key={
+                                                                                    session.id
+                                                                                }
+                                                                            >
+                                                                                <TableCell className="py-3 font-medium">
+                                                                                    {index +
+                                                                                        1}
+                                                                                </TableCell>
+                                                                                <TableCell className="py-3">
+                                                                                    {session.date
+                                                                                        ? selectedDateLabel(
+                                                                                              session.date,
+                                                                                          )
+                                                                                        : 'Belum ada tanggal'}
+                                                                                </TableCell>
+                                                                                <TableCell className="py-3">
+                                                                                    {session.time
+                                                                                        ? `${session.time} - ${addMinutes(
+                                                                                              session.time,
+                                                                                              selectedSubject.duration,
+                                                                                          )} WIB`
+                                                                                        : 'Belum ada jam'}
+                                                                                </TableCell>
+                                                                            </TableRow>
+                                                                        ),
+                                                                    )}
+                                                                </TableBody>
+                                                            </Table>
+                                                        </ScrollArea>
+                                                    </div>
+                                                )}
+                                        </div>
                                     </div>
+
+                                    {(errors.sessions ||
+                                        errors.subject_id ||
+                                        errors.program_enrollment_id) && (
+                                        <p className="px-6 pb-5 text-sm text-destructive">
+                                            {errors.sessions ??
+                                                errors.subject_id ??
+                                                errors.program_enrollment_id}
+                                        </p>
+                                    )}
                                 </div>
 
-                                {(errors.sessions ||
-                                    errors.subject_id ||
-                                    errors.program_enrollment_id) && (
-                                    <p className="text-sm text-destructive">
-                                        {errors.sessions ??
-                                            errors.subject_id ??
-                                            errors.program_enrollment_id}
-                                    </p>
-                                )}
-
-                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 bg-background/95 px-6 pt-3 pb-4 backdrop-blur">
                                     <Button
                                         type="button"
                                         variant="outline"
@@ -810,7 +879,7 @@ export function StudentBookSessionDialog({
                                             )
                                         }
                                     >
-                                        Back
+                                        Kembali
                                     </Button>
                                     <div className="flex gap-2">
                                         <Button
@@ -820,7 +889,7 @@ export function StudentBookSessionDialog({
                                                 setBookingOpen(false)
                                             }
                                         >
-                                            Cancel
+                                            Batal
                                         </Button>
                                         {currentStep <
                                         bookingSteps.length - 1 ? (
@@ -829,7 +898,7 @@ export function StudentBookSessionDialog({
                                                 disabled={!canGoNext}
                                                 onClick={goNext}
                                             >
-                                                Continue
+                                                Lanjut
                                             </Button>
                                         ) : (
                                             <Button
@@ -842,8 +911,8 @@ export function StudentBookSessionDialog({
                                                 }}
                                             >
                                                 {processing
-                                                    ? 'Booking...'
-                                                    : `Confirm ${sessions.length} session${sessions.length > 1 ? 's' : ''}`}
+                                                    ? 'Menjadwalkan...'
+                                                    : `Konfirmasi ${sessions.length} sesi`}
                                             </Button>
                                         )}
                                     </div>

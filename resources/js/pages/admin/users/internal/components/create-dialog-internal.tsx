@@ -11,53 +11,41 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { FormUser } from '@/pages/admin/users/components/form-user';
+import { FormInternal } from '@/pages/admin/users/internal/components/form-internal';
+import type { InternalRoleOption } from '@/pages/admin/users/internal/components/form-internal';
 
-type CreateDialogUserProps = {
-    action: string;
-    description: string;
-    idPrefix: string;
+type CreateDialogInternalProps = {
     onError: () => void;
     onOpenChange: (open: boolean) => void;
     onSuccess: () => void;
     open: boolean;
-    roleOptions?: {
-        id: string;
-        label: string;
-    }[];
-    submitLabel: string;
-    title: string;
-    triggerLabel: string;
+    roleOptions: InternalRoleOption[];
 };
 
-export function CreateDialogUser({
-    action,
-    description,
-    idPrefix,
+export function CreateDialogInternal({
     onError,
     onOpenChange,
     onSuccess,
     open,
     roleOptions,
-    submitLabel,
-    title,
-    triggerLabel,
-}: CreateDialogUserProps) {
+}: CreateDialogInternalProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogTrigger asChild>
                 <Button className="gap-2">
                     <Plus className="size-4" />
-                    {triggerLabel}
+                    Add internal
                 </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>{title}</DialogTitle>
-                    <DialogDescription>{description}</DialogDescription>
+                    <DialogTitle>Add internal user</DialogTitle>
+                    <DialogDescription>
+                        Create an internal user account.
+                    </DialogDescription>
                 </DialogHeader>
                 <Form
-                    action={action}
+                    action="/users/internal"
                     method="post"
                     resetOnSuccess
                     disableWhileProcessing
@@ -67,9 +55,9 @@ export function CreateDialogUser({
                 >
                     {({ processing, errors }) => (
                         <>
-                            <FormUser
+                            <FormInternal
                                 errors={errors}
-                                idPrefix={idPrefix}
+                                idPrefix="internal"
                                 roleOptions={roleOptions}
                             />
                             <DialogFooter className="pt-2">
@@ -83,7 +71,7 @@ export function CreateDialogUser({
                                     </Button>
                                 </DialogClose>
                                 <Button type="submit" disabled={processing}>
-                                    {submitLabel}
+                                    Save internal user
                                 </Button>
                             </DialogFooter>
                         </>

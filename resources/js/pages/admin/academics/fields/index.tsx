@@ -1,13 +1,10 @@
-import { Form, Head } from '@inertiajs/react';
+import { Form, Head, Link } from '@inertiajs/react';
 import { Eye, Pencil, PowerOff, Shapes, UsersRound } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionMenu } from '@/components/admin/action-menu';
-import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
-import { EmptyState } from '@/components/admin/empty-state';
 import { SummaryCard } from '@/components/admin/summary-card';
-import { TablePagination } from '@/components/admin/table-pagination';
-import { TableSearch } from '@/components/admin/table-search';
+import { AdminTableSection } from '@/components/admin/table-section';
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -19,14 +16,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import {
     DropdownMenuItem,
     DropdownMenuSeparator,
@@ -40,6 +29,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { useClientPagination } from '@/hooks/use-client-pagination';
+import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
 import { CreateDialogField } from '@/pages/admin/academics/fields/components/create-dialog-field';
 import { UpdateDialogField } from '@/pages/admin/academics/fields/components/update-dialog-field';
 
@@ -56,7 +46,6 @@ type Field = {
 export default function Fields({ fields }: { fields: Field[] }) {
     const [addFieldDialogOpen, setAddFieldDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [viewingField, setViewingField] = useState<Field | null>(null);
     const [editingField, setEditingField] = useState<Field | null>(null);
     const [deletingField, setDeletingField] = useState<Field | null>(null);
     const activeFieldsCount = fields.filter(
@@ -89,7 +78,7 @@ export default function Fields({ fields }: { fields: Field[] }) {
     return (
         <>
             <Head title="Fields" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
+            <div className="flex min-h-full max-w-full min-w-0 flex-1 flex-col gap-6 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h1 className="font-heading text-2xl font-semibold">
@@ -125,70 +114,6 @@ export default function Fields({ fields }: { fields: Field[] }) {
                         value={activeFieldsCount}
                     />
                 </div>
-
-                <Dialog
-                    open={!!viewingField}
-                    onOpenChange={(open) => {
-                        if (!open) {
-                            setViewingField(null);
-                        }
-                    }}
-                >
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>{viewingField?.name}</DialogTitle>
-                            <DialogDescription>
-                                Field detail and current academic mapping.
-                            </DialogDescription>
-                        </DialogHeader>
-                        {viewingField && (
-                            <div className="grid gap-4 text-sm">
-                                <div>
-                                    <p className="text-muted-foreground">
-                                        Description
-                                    </p>
-                                    <p className="mt-1">
-                                        {viewingField.description ||
-                                            'No description.'}
-                                    </p>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="rounded-2xl border p-4">
-                                        <p className="text-muted-foreground">
-                                            Programs
-                                        </p>
-                                        <p className="mt-1 text-lg font-semibold">
-                                            {viewingField.programsCount}
-                                        </p>
-                                    </div>
-                                    <div className="rounded-2xl border p-4">
-                                        <p className="text-muted-foreground">
-                                            Subjects
-                                        </p>
-                                        <p className="mt-1 text-lg font-semibold">
-                                            {viewingField.subjectsCount}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div>
-                                    <p className="text-muted-foreground">
-                                        Status
-                                    </p>
-                                    <Badge
-                                        {...getBadgeProps(
-                                            viewingField.status === 'active'
-                                                ? 'success'
-                                                : 'muted',
-                                            'mt-2',
-                                        )}
-                                    >
-                                        {formatBadgeLabel(viewingField.status)}
-                                    </Badge>
-                                </div>
-                            </div>
-                        )}
-                    </DialogContent>
-                </Dialog>
 
                 <UpdateDialogField
                     open={!!editingField}
@@ -274,121 +199,94 @@ export default function Fields({ fields }: { fields: Field[] }) {
                     </AlertDialogContent>
                 </AlertDialog>
 
-                <Card>
-                    <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-                        <CardTitle>Field list</CardTitle>
-                        <TableSearch
-                            value={searchQuery}
-                            onChange={(value) => {
-                                setSearchQuery(value);
-                                resetPage();
-                            }}
-                            placeholder="Search fields..."
-                        />
-                    </CardHeader>
-                    <CardContent>
-                        {fields.length === 0 ? (
-                            <EmptyState>No fields added yet.</EmptyState>
-                        ) : filteredFields.length === 0 ? (
-                            <EmptyState>
-                                No fields match your search.
-                            </EmptyState>
-                        ) : (
-                            <>
-                                <div className="rounded-2xl border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Name</TableHead>
-                                                <TableHead>Programs</TableHead>
-                                                <TableHead>Subjects</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead className="w-12 text-right" />
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {visibleFields.map((field) => (
-                                                <TableRow key={field.id}>
-                                                    <TableCell className="font-medium">
-                                                        {field.name}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {field.programsCount}{' '}
-                                                        programs
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {field.subjectsCount}{' '}
-                                                        subjects
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            {...getBadgeProps(
-                                                                field.status ===
-                                                                    'active'
-                                                                    ? 'success'
-                                                                    : 'muted',
-                                                            )}
-                                                        >
-                                                            {formatBadgeLabel(
-                                                                field.status,
-                                                            )}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <ActionMenu label="Open field actions">
-                                                            <DropdownMenuItem
-                                                                onClick={() =>
-                                                                    setViewingField(
-                                                                        field,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Eye className="size-4" />
-                                                                View
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                onClick={() =>
-                                                                    setEditingField(
-                                                                        field,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Pencil className="size-4" />
-                                                                Edit
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuSeparator />
-                                                            <DropdownMenuItem
-                                                                variant="destructive"
-                                                                onClick={() =>
-                                                                    setDeletingField(
-                                                                        field,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <PowerOff className="size-4" />
-                                                                Deactivate
-                                                            </DropdownMenuItem>
-                                                        </ActionMenu>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                                <TablePagination
-                                    entity="fields"
-                                    firstItemIndex={firstItemIndex}
-                                    onPageChange={goToPage}
-                                    onRowsPerPageChange={changeRowsPerPage}
-                                    rowsPerPage={rowsPerPage}
-                                    safeCurrentPage={safeCurrentPage}
-                                    totalItems={filteredFields.length}
-                                    totalPages={totalPages}
-                                />
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+                <AdminTableSection
+                    emptyMessage="No fields added yet."
+                    emptySearchMessage="No fields match your search."
+                    filteredItems={filteredFields.length}
+                    pagination={{
+                        entity: 'fields',
+                        firstItemIndex,
+                        onPageChange: goToPage,
+                        onRowsPerPageChange: changeRowsPerPage,
+                        rowsPerPage,
+                        safeCurrentPage,
+                        totalItems: filteredFields.length,
+                        totalPages,
+                    }}
+                    search={{
+                        value: searchQuery,
+                        onChange: (value) => {
+                            setSearchQuery(value);
+                            resetPage();
+                        },
+                        placeholder: 'Search fields...',
+                    }}
+                    totalItems={fields.length}
+                >
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Programs</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="w-12 text-right" />
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {visibleFields.map((field) => (
+                                <TableRow key={field.id}>
+                                    <TableCell className="font-medium">
+                                        {field.name}
+                                    </TableCell>
+                                    <TableCell>
+                                        {field.programsCount} programs
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge
+                                            {...getBadgeProps(
+                                                field.status === 'active'
+                                                    ? 'success'
+                                                    : 'muted',
+                                            )}
+                                        >
+                                            {formatBadgeLabel(field.status)}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <ActionMenu label="Open field actions">
+                                            <DropdownMenuItem asChild>
+                                                <Link
+                                                    href={`/academics/fields/${field.slug}`}
+                                                >
+                                                    <Eye className="size-4" />
+                                                    View
+                                                </Link>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    setEditingField(field)
+                                                }
+                                            >
+                                                <Pencil className="size-4" />
+                                                Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                variant="destructive"
+                                                onClick={() =>
+                                                    setDeletingField(field)
+                                                }
+                                            >
+                                                <PowerOff className="size-4" />
+                                                Deactivate
+                                            </DropdownMenuItem>
+                                        </ActionMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </AdminTableSection>
             </div>
         </>
     );

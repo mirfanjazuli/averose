@@ -3,10 +3,9 @@ import { Eye, Pencil, PowerOff, ShieldCheck, UserCheck } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionMenu } from '@/components/admin/action-menu';
-import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
-import { EmptyState } from '@/components/admin/empty-state';
+import { AdminStatusFilter } from '@/components/admin/status-filter';
 import { SummaryCard } from '@/components/admin/summary-card';
-import { TableSearch } from '@/components/admin/table-search';
+import { AdminTableSection } from '@/components/admin/table-section';
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -18,7 +17,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     DropdownMenuItem,
     DropdownMenuSeparator,
@@ -31,11 +29,16 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { CreateDialogUser } from '@/pages/admin/users/components/create-dialog-user';
-import type { ManagedUser } from '@/pages/admin/users/components/form-user';
-import { UpdateDialogUser } from '@/pages/admin/users/components/update-dialog-user';
+import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
+import { CreateDialogMentor } from '@/pages/admin/users/mentors/components/create-dialog-mentor';
+import type {
+    MentorFormUser,
+    MentorLevelOption,
+    SubjectOption,
+} from '@/pages/admin/users/mentors/components/form-mentor';
+import { UpdateDialogMentor } from '@/pages/admin/users/mentors/components/update-dialog-mentor';
 
-type User = ManagedUser & {
+type User = MentorFormUser & {
     createdAt: string | null;
     id: number;
     slug: string;
@@ -43,33 +46,49 @@ type User = ManagedUser & {
     nickname: string;
 };
 
-export default function Mentors({ users }: { users: User[] }) {
+export default function Mentors({
+    mentorLevelOptions,
+    subjectOptions,
+    users,
+}: {
+    mentorLevelOptions: MentorLevelOption[];
+    subjectOptions: SubjectOption[];
+    users: User[];
+}) {
     const [addDialogOpen, setAddDialogOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [deletingUser, setDeletingUser] = useState<User | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
     const activeMentorsCount = users.filter(
         (user) => user.status === 'active',
     ).length;
-
     const filteredUsers = useMemo(() => {
         const normalizedSearch = searchQuery.trim().toLowerCase();
+        const filteredByStatus =
+            statusFilter === 'all'
+                ? users
+                : users.filter((user) => user.status === statusFilter);
 
         if (!normalizedSearch) {
-            return users;
+            return filteredByStatus;
         }
 
-        return users.filter((user) =>
-            [user.name, user.nickname, user.email, user.status].some((value) =>
-                value.toLowerCase().includes(normalizedSearch),
-            ),
+        return filteredByStatus.filter((user) =>
+            [
+                user.name,
+                user.nickname,
+                user.email,
+                user.mentorLevel?.name ?? '',
+                user.status,
+            ].some((value) => value.toLowerCase().includes(normalizedSearch)),
         );
-    }, [users, searchQuery]);
+    }, [users, searchQuery, statusFilter]);
 
     return (
         <>
             <Head title="Mentors" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
+            <div className="flex min-h-full max-w-full min-w-0 flex-1 flex-col gap-6 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h1 className="font-heading text-2xl font-semibold">
@@ -79,15 +98,11 @@ export default function Mentors({ users }: { users: User[] }) {
                             Manage mentor accounts and access.
                         </p>
                     </div>
-                    <CreateDialogUser
+                    <CreateDialogMentor
                         open={addDialogOpen}
                         onOpenChange={setAddDialogOpen}
-                        action="/users/mentors"
-                        idPrefix="mentor"
-                        triggerLabel="Add mentor"
-                        title="Add mentor"
-                        description="Create a mentor account with default access."
-                        submitLabel="Save mentor"
+                        mentorLevelOptions={mentorLevelOptions}
+                        subjectOptions={subjectOptions}
                         onSuccess={() => {
                             setAddDialogOpen(false);
                             toast.success('Mentor added.');
@@ -98,13 +113,12 @@ export default function Mentors({ users }: { users: User[] }) {
                     />
                 </div>
 
-                <UpdateDialogUser
+                <UpdateDialogMentor
                     open={!!editingUser}
                     onOpenChange={(open) => !open && setEditingUser(null)}
                     user={editingUser}
-                    idPrefix="edit-mentor"
-                    title="Edit mentor"
-                    description="Update mentor account details."
+                    mentorLevelOptions={mentorLevelOptions}
+                    subjectOptions={subjectOptions}
                     onSuccess={() => {
                         setEditingUser(null);
                         toast.success('Mentor updated.');
@@ -176,108 +190,107 @@ export default function Mentors({ users }: { users: User[] }) {
                     />
                 </div>
 
-                <Card>
-                    <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-                        <CardTitle>Mentor list</CardTitle>
-                        <TableSearch
-                            value={searchQuery}
-                            onChange={setSearchQuery}
-                            placeholder="Search mentors..."
+                <AdminTableSection
+                    emptyMessage="No mentors added yet."
+                    emptySearchMessage="No mentors match your search."
+                    filteredItems={filteredUsers.length}
+                    search={{
+                        value: searchQuery,
+                        onChange: setSearchQuery,
+                        placeholder: 'Search mentors...',
+                    }}
+                    toolbarEnd={
+                        <AdminStatusFilter
+                            value={statusFilter}
+                            widthClassName="w-40"
+                            options={[
+                                { label: 'All statuses', value: 'all' },
+                                { label: 'Active', value: 'active' },
+                                { label: 'Inactive', value: 'inactive' },
+                            ]}
+                            onValueChange={setStatusFilter}
                         />
-                    </CardHeader>
-                    <CardContent>
-                        {users.length === 0 ? (
-                            <EmptyState>No mentors added yet.</EmptyState>
-                        ) : filteredUsers.length === 0 ? (
-                            <EmptyState>
-                                No mentors match your search.
-                            </EmptyState>
-                        ) : (
-                            <div className="rounded-2xl border">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Name</TableHead>
-                                            <TableHead>Nickname</TableHead>
-                                            <TableHead>Email</TableHead>
-                                            <TableHead>Created</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead className="w-12 text-right" />
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {filteredUsers.map((user) => (
-                                            <TableRow key={user.id}>
-                                                <TableCell className="font-medium">
-                                                    {user.name}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {user.nickname}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {user.email}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {user.createdAt}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        {...getBadgeProps(
-                                                            user.status ===
-                                                                'active'
-                                                                ? 'success'
-                                                                : 'muted',
-                                                        )}
-                                                    >
-                                                        {formatBadgeLabel(
-                                                            user.status,
-                                                        )}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <ActionMenu label="Open mentor actions">
-                                                        <DropdownMenuItem
-                                                            asChild
-                                                        >
-                                                            <Link
-                                                                href={`/users/mentors/${user.slug}`}
-                                                            >
-                                                                <Eye className="size-4" />
-                                                                View
-                                                            </Link>
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem
-                                                            onClick={() =>
-                                                                setEditingUser(
-                                                                    user,
-                                                                )
-                                                            }
-                                                        >
-                                                            <Pencil className="size-4" />
-                                                            Edit
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem
-                                                            variant="destructive"
-                                                            onClick={() =>
-                                                                setDeletingUser(
-                                                                    user,
-                                                                )
-                                                            }
-                                                        >
-                                                            <PowerOff className="size-4" />
-                                                            Deactivate
-                                                        </DropdownMenuItem>
-                                                    </ActionMenu>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                    }
+                    totalItems={users.length}
+                >
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Nickname</TableHead>
+                                <TableHead>Level</TableHead>
+                                <TableHead>Email</TableHead>
+                                <TableHead>Joined</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="w-12 text-right" />
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredUsers.map((user) => (
+                                <TableRow key={user.id}>
+                                    <TableCell className="font-medium">
+                                        {user.name}
+                                    </TableCell>
+                                    <TableCell>{user.nickname}</TableCell>
+                                    <TableCell>
+                                        {user.mentorLevel ? (
+                                            <div>
+                                                <p className="font-medium">
+                                                    {user.mentorLevel.name}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            '-'
+                                        )}
+                                    </TableCell>
+                                    <TableCell>{user.email}</TableCell>
+                                    <TableCell>{user.createdAt}</TableCell>
+                                    <TableCell>
+                                        <Badge
+                                            {...getBadgeProps(
+                                                user.status === 'active'
+                                                    ? 'success'
+                                                    : 'muted',
+                                            )}
+                                        >
+                                            {formatBadgeLabel(user.status)}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <ActionMenu label="Open mentor actions">
+                                            <DropdownMenuItem asChild>
+                                                <Link
+                                                    href={`/users/mentors/${user.slug}`}
+                                                >
+                                                    <Eye className="size-4" />
+                                                    View
+                                                </Link>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    setEditingUser(user)
+                                                }
+                                            >
+                                                <Pencil className="size-4" />
+                                                Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                variant="destructive"
+                                                onClick={() =>
+                                                    setDeletingUser(user)
+                                                }
+                                            >
+                                                <PowerOff className="size-4" />
+                                                Deactivate
+                                            </DropdownMenuItem>
+                                        </ActionMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </AdminTableSection>
             </div>
         </>
     );

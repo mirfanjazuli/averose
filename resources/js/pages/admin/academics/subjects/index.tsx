@@ -1,13 +1,11 @@
 import { Form, Head } from '@inertiajs/react';
-import { Clock3, Eye, LibraryBig, Pencil, PowerOff } from 'lucide-react';
+import { CheckCircle2, LibraryBig, Pencil, PowerOff } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionMenu } from '@/components/admin/action-menu';
-import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
-import { EmptyState } from '@/components/admin/empty-state';
+import { StatusBadge } from '@/components/admin/status-badge';
 import { SummaryCard } from '@/components/admin/summary-card';
-import { TablePagination } from '@/components/admin/table-pagination';
-import { TableSearch } from '@/components/admin/table-search';
+import { AdminTableSection } from '@/components/admin/table-section';
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -19,14 +17,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import {
     DropdownMenuItem,
     DropdownMenuSeparator,
@@ -40,6 +30,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { useClientPagination } from '@/hooks/use-client-pagination';
+import { getBadgeProps } from '@/lib/badge';
 import { CreateDialogSubject } from '@/pages/admin/academics/subjects/components/create-dialog-subject';
 import { UpdateDialogSubject } from '@/pages/admin/academics/subjects/components/update-dialog-subject';
 
@@ -56,7 +47,6 @@ type Subject = {
 export default function Subjects({ subjects }: { subjects: Subject[] }) {
     const [addSubjectDialogOpen, setAddSubjectDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    const [viewingSubject, setViewingSubject] = useState<Subject | null>(null);
     const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
     const [deletingSubject, setDeletingSubject] = useState<Subject | null>(
         null,
@@ -91,7 +81,7 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
     return (
         <>
             <Head title="Subjects" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
+            <div className="flex min-h-full min-w-0 max-w-full flex-1 flex-col gap-6 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h1 className="font-heading text-2xl font-semibold">
@@ -121,77 +111,11 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                         value={subjects.length}
                     />
                     <SummaryCard
-                        icon={Clock3}
-                        label="Active sessions"
+                        icon={CheckCircle2}
+                        label="Active subjects"
                         value={activeSubjectsCount}
                     />
                 </div>
-
-                <Dialog
-                    open={!!viewingSubject}
-                    onOpenChange={(open) => {
-                        if (!open) {
-                            setViewingSubject(null);
-                        }
-                    }}
-                >
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>{viewingSubject?.name}</DialogTitle>
-                            <DialogDescription>
-                                Subject detail and current program usage.
-                            </DialogDescription>
-                        </DialogHeader>
-                        {viewingSubject && (
-                            <div className="grid gap-4 text-sm">
-                                <div>
-                                    <p className="text-muted-foreground">
-                                        Description
-                                    </p>
-                                    <p className="mt-1">
-                                        {viewingSubject.description ||
-                                            'No description.'}
-                                    </p>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="rounded-2xl border p-4">
-                                        <p className="text-muted-foreground">
-                                            Programs
-                                        </p>
-                                        <p className="mt-1 text-lg font-semibold">
-                                            {viewingSubject.programsCount}
-                                        </p>
-                                    </div>
-                                    <div className="rounded-2xl border p-4">
-                                        <p className="text-muted-foreground">
-                                            Icon
-                                        </p>
-                                        <p className="mt-1 text-lg font-semibold">
-                                            {viewingSubject.icon || '-'}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div>
-                                    <p className="text-muted-foreground">
-                                        Status
-                                    </p>
-                                    <Badge
-                                        {...getBadgeProps(
-                                            viewingSubject.status === 'active'
-                                                ? 'success'
-                                                : 'muted',
-                                            'mt-2',
-                                        )}
-                                    >
-                                        {formatBadgeLabel(
-                                            viewingSubject.status,
-                                        )}
-                                    </Badge>
-                                </div>
-                            </div>
-                        )}
-                    </DialogContent>
-                </Dialog>
 
                 <UpdateDialogSubject
                     open={!!editingSubject}
@@ -276,128 +200,80 @@ export default function Subjects({ subjects }: { subjects: Subject[] }) {
                     </AlertDialogContent>
                 </AlertDialog>
 
-                <Card>
-                    <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-                        <CardTitle>Subject list</CardTitle>
-                        <TableSearch
-                            value={searchQuery}
-                            onChange={(value) => {
-                                setSearchQuery(value);
-                                resetPage();
-                            }}
-                            placeholder="Search subjects..."
-                        />
-                    </CardHeader>
-                    <CardContent>
-                        {subjects.length === 0 ? (
-                            <EmptyState>No subjects added yet.</EmptyState>
-                        ) : filteredSubjects.length === 0 ? (
-                            <EmptyState>
-                                No subjects match your search.
-                            </EmptyState>
-                        ) : (
-                            <>
-                                <div className="rounded-2xl border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Name</TableHead>
-                                                <TableHead>Programs</TableHead>
-                                                <TableHead>Sessions</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead className="w-12 text-right" />
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {visibleSubjects.map((subject) => (
-                                                <TableRow key={subject.id}>
-                                                    <TableCell className="font-medium">
-                                                        {subject.name}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            {...getBadgeProps(
-                                                                'outline',
-                                                            )}
-                                                        >
-                                                            {
-                                                                subject.programsCount
-                                                            }{' '}
-                                                            programs
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-muted-foreground">
-                                                        Not scheduled
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            {...getBadgeProps(
-                                                                subject.status ===
-                                                                    'active'
-                                                                    ? 'success'
-                                                                    : 'muted',
-                                                            )}
-                                                        >
-                                                            {formatBadgeLabel(
-                                                                subject.status,
-                                                            )}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <ActionMenu label="Open subject actions">
-                                                            <DropdownMenuItem
-                                                                onClick={() =>
-                                                                    setViewingSubject(
-                                                                        subject,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Eye className="size-4" />
-                                                                View
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                onClick={() =>
-                                                                    setEditingSubject(
-                                                                        subject,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Pencil className="size-4" />
-                                                                Edit
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuSeparator />
-                                                            <DropdownMenuItem
-                                                                variant="destructive"
-                                                                onClick={() =>
-                                                                    setDeletingSubject(
-                                                                        subject,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <PowerOff className="size-4" />
-                                                                Deactivate
-                                                            </DropdownMenuItem>
-                                                        </ActionMenu>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                                <TablePagination
-                                    entity="subjects"
-                                    firstItemIndex={firstItemIndex}
-                                    onPageChange={goToPage}
-                                    onRowsPerPageChange={changeRowsPerPage}
-                                    rowsPerPage={rowsPerPage}
-                                    safeCurrentPage={safeCurrentPage}
-                                    totalItems={filteredSubjects.length}
-                                    totalPages={totalPages}
-                                />
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+                <AdminTableSection
+                    emptyMessage="No subjects added yet."
+                    emptySearchMessage="No subjects match your search."
+                    filteredItems={filteredSubjects.length}
+                    pagination={{
+                        entity: 'subjects',
+                        firstItemIndex,
+                        onPageChange: goToPage,
+                        onRowsPerPageChange: changeRowsPerPage,
+                        rowsPerPage,
+                        safeCurrentPage,
+                        totalItems: filteredSubjects.length,
+                        totalPages,
+                    }}
+                    search={{
+                        value: searchQuery,
+                        onChange: (value) => {
+                            setSearchQuery(value);
+                            resetPage();
+                        },
+                        placeholder: 'Search subjects...',
+                    }}
+                    totalItems={subjects.length}
+                >
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Programs</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="w-12 text-right" />
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {visibleSubjects.map((subject) => (
+                                <TableRow key={subject.id}>
+                                    <TableCell className="font-medium">
+                                        {subject.name}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge {...getBadgeProps('outline')}>
+                                            {subject.programsCount} programs
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <StatusBadge status={subject.status} />
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <ActionMenu label="Open subject actions">
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    setEditingSubject(subject)
+                                                }
+                                            >
+                                                <Pencil className="size-4" />
+                                                Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                variant="destructive"
+                                                onClick={() =>
+                                                    setDeletingSubject(subject)
+                                                }
+                                            >
+                                                <PowerOff className="size-4" />
+                                                Deactivate
+                                            </DropdownMenuItem>
+                                        </ActionMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </AdminTableSection>
             </div>
         </>
     );

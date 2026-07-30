@@ -5,6 +5,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
 import { MentorSidebar } from '@/components/mentor/mentor-sidebar';
 import { StudentSidebar } from '@/components/student/student-sidebar';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import type { AppLayoutProps } from '@/types';
 
 export default function AppSidebarLayout({
@@ -22,9 +23,14 @@ export default function AppSidebarLayout({
     return (
         <AppShell variant="sidebar">
             <Sidebar />
-            <AppContent variant="sidebar" className="overflow-x-hidden">
+            <AppContent
+                variant="sidebar"
+                className="min-h-0 min-w-0 overflow-hidden"
+            >
                 <AppSidebarHeader breadcrumbs={breadcrumbs} />
-                {children}
+                <ScrollArea className="min-h-0 min-w-0 w-full max-w-full flex-1">
+                    <div className="min-w-0 max-w-full">{children}</div>
+                </ScrollArea>
             </AppContent>
         </AppShell>
     );

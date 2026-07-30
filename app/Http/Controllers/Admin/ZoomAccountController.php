@@ -83,6 +83,13 @@ class ZoomAccountController extends Controller
         return back();
     }
 
+    public function activate(ZoomAccount $zoomAccount): RedirectResponse
+    {
+        $zoomAccount->update(['status' => 'active']);
+
+        return back();
+    }
+
     /**
      * @return array{id: int, name: string, slug: string, accountId: string, clientId: string, status: string, createdAt: string|null, updatedAt: string|null, clientSecret?: string, tokenSecret?: string}
      */

@@ -322,4 +322,19 @@ class ZoomAccountsTest extends TestCase
             'status' => 'inactive',
         ]);
     }
+
+    public function test_admin_users_can_activate_zoom_accounts(): void
+    {
+        $user = User::factory()->admin()->create();
+        $account = ZoomAccount::factory()->inactive()->create();
+
+        $response = $this->actingAs($user)->put(route('zoom-accounts.activate', $account));
+
+        $response->assertRedirect();
+
+        $this->assertDatabaseHas('zoom_accounts', [
+            'id' => $account->id,
+            'status' => 'active',
+        ]);
+    }
 }

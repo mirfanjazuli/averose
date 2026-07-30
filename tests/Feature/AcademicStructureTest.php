@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class AcademicStructureTest extends TestCase
@@ -96,6 +97,29 @@ class AcademicStructureTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_view_academic_field_detail_page(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $field = AcademicField::factory()->create([
+            'name' => 'Science',
+        ]);
+        $program = Program::factory()->create();
+        $subject = Subject::factory()->create();
+
+        $program->fields()->attach($field);
+        $field->subjects()->attach($subject);
+
+        $this->actingAs($admin)
+            ->get(route('fields.show', $field))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page): Assert => $page
+                ->component('admin/academics/fields/show')
+                ->where('field.name', 'Science')
+                ->where('field.programsCount', 1)
+                ->where('field.subjectsCount', 1)
+            );
+    }
+
     public function test_admin_can_store_subject(): void
     {
         $admin = User::factory()->admin()->create();
@@ -172,6 +196,31 @@ class AcademicStructureTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_store_program_info_then_redirect_to_detail(): void
+    {
+        config()->set('filesystems.default', 'local');
+        Storage::fake('local');
+
+        $admin = User::factory()->admin()->create();
+
+        $this->actingAs($admin)
+            ->post('/academics/programs', [
+                'name' => 'Medical Preparation',
+                'description' => 'Prepare for medical school.',
+                'max_reschedule' => 3,
+                'thumbnail' => UploadedFile::fake()->image('program.jpg', 800, 450),
+            ])
+            ->assertRedirect('/academics/programs/medical-preparation');
+
+        $program = Program::query()->where('slug', 'medical-preparation')->firstOrFail();
+
+        $this->assertNotNull($program->thumbnail);
+        Storage::disk('local')->assertExists($program->thumbnail);
+        $this->assertDatabaseMissing('field_program', [
+            'program_id' => $program->id,
+        ]);
+    }
+
     public function test_admin_can_view_program_detail_page(): void
     {
         $admin = User::factory()->admin()->create();
@@ -202,6 +251,8 @@ class AcademicStructureTest extends TestCase
                 ->component('admin/academics/programs/show')
                 ->where('breadcrumbs.2.title', 'Frontend Engineering')
                 ->where('program.name', 'Frontend Engineering')
+                ->where('program.fields.0.subjectIds.0', $subject->id)
+                ->where('fieldOptions.0.subjects.0.id', (string) $subject->id)
                 ->where('program.variants.0.duration', 90)
             );
     }
@@ -236,6 +287,89 @@ class AcademicStructureTest extends TestCase
             'session' => 8,
             'duration' => 120,
             'price' => 2400000,
+        ]);
+    }
+
+    public function test_admin_can_add_field_subjects_and_variant_from_program_detail(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $field = AcademicField::factory()->create();
+        $subject = Subject::factory()->create();
+        $program = Program::factory()->create([
+            'name' => 'Frontend Engineering',
+        ]);
+
+        $this->actingAs($admin)
+            ->post("/academics/programs/{$program->slug}/fields", [
+                'field_id' => $field->id,
+                'subjects' => [$subject->id],
+            ])
+            ->assertRedirect();
+
+        $this->actingAs($admin)
+            ->post("/academics/programs/{$program->slug}/variants", [
+                'field_id' => $field->id,
+                'session' => 6,
+                'duration' => 90,
+                'price' => 1500000,
+            ])
+            ->assertRedirect();
+
+        $variant = ProgramVariant::query()->where('name', '6 x 90 Minutes')->firstOrFail();
+
+        $this->assertDatabaseHas('field_program', [
+            'field_id' => $field->id,
+            'program_id' => $program->id,
+        ]);
+        $this->assertDatabaseHas('program_subject', [
+            'program_id' => $program->id,
+            'subject_id' => $subject->id,
+        ]);
+        $this->assertDatabaseHas('program_variant_program', [
+            'program_id' => $program->id,
+            'program_variant_id' => $variant->id,
+        ]);
+    }
+
+    public function test_admin_can_copy_field_variants_from_program_detail(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $sourceField = AcademicField::factory()->create();
+        $targetField = AcademicField::factory()->create();
+        $program = Program::factory()->create();
+        $sourceVariant = ProgramVariant::factory()
+            ->for($sourceField, 'field')
+            ->create([
+                'name' => '6 x 90 Minutes',
+                'session' => 6,
+                'duration' => 90,
+                'price' => 1500000,
+                'status' => 'active',
+            ]);
+
+        $program->fields()->attach($sourceField);
+        $program->variants()->attach($sourceVariant);
+
+        $this->actingAs($admin)
+            ->post("/academics/programs/{$program->slug}/fields/{$sourceField->id}/copy", [
+                'target_field_id' => $targetField->id,
+            ])
+            ->assertRedirect();
+
+        $copiedVariant = ProgramVariant::query()
+            ->where('field_id', $targetField->id)
+            ->where('session', 6)
+            ->where('duration', 90)
+            ->where('price', 1500000)
+            ->firstOrFail();
+
+        $this->assertDatabaseHas('field_program', [
+            'field_id' => $targetField->id,
+            'program_id' => $program->id,
+        ]);
+        $this->assertDatabaseHas('program_variant_program', [
+            'program_id' => $program->id,
+            'program_variant_id' => $copiedVariant->id,
         ]);
     }
 
@@ -411,6 +545,52 @@ class AcademicStructureTest extends TestCase
             'subject_id' => $newSubject->id,
         ]);
         $this->assertDatabaseCount('program_variants', 2);
+    }
+
+    public function test_updating_program_info_without_academic_payload_preserves_existing_relationships(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $field = AcademicField::factory()->create();
+        $subject = Subject::factory()->create();
+        $program = Program::factory()->create([
+            'name' => 'Stable Program',
+        ]);
+        $variant = ProgramVariant::factory()->for($field, 'field')->create([
+            'name' => '6 x 90 Minutes',
+            'session' => 6,
+            'duration' => 90,
+            'price' => 1500000,
+        ]);
+
+        $program->fields()->attach($field);
+        $program->subjects()->attach($subject);
+        $program->variants()->attach($variant);
+
+        $this->actingAs($admin)
+            ->put("/academics/programs/{$program->slug}", [
+                'name' => 'Stable Program Updated',
+                'description' => 'Only program info changed.',
+                'max_reschedule' => 4,
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('programs', [
+            'id' => $program->id,
+            'name' => 'Stable Program Updated',
+            'max_reschedule' => 4,
+        ]);
+        $this->assertDatabaseHas('field_program', [
+            'field_id' => $field->id,
+            'program_id' => $program->id,
+        ]);
+        $this->assertDatabaseHas('program_subject', [
+            'program_id' => $program->id,
+            'subject_id' => $subject->id,
+        ]);
+        $this->assertDatabaseHas('program_variant_program', [
+            'program_id' => $program->id,
+            'program_variant_id' => $variant->id,
+        ]);
     }
 
     public function test_admin_can_deactivate_academic_field_subject_and_program(): void

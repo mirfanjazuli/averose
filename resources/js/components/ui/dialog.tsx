@@ -1,16 +1,72 @@
 "use client"
 
-import * as React from "react"
-import { Dialog as DialogPrimitive } from "radix-ui"
-
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
+import { Dialog as DialogPrimitive } from "radix-ui"
+import * as React from "react"
+
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+
+const DialogOpenContext = React.createContext(false)
+
+type DialogContentSnapshotProps = {
+  children: React.ReactNode
+  open: boolean
+}
+
+type DialogContentSnapshotState = {
+  children: React.ReactNode
+}
+
+class DialogContentSnapshot extends React.Component<
+  DialogContentSnapshotProps,
+  DialogContentSnapshotState
+> {
+  state: DialogContentSnapshotState = {
+    children: this.props.children,
+  }
+
+  static getDerivedStateFromProps(
+    props: DialogContentSnapshotProps
+  ): DialogContentSnapshotState | null {
+    return props.open ? { children: props.children } : null
+  }
+
+  render() {
+    return this.props.open ? this.props.children : this.state.children
+  }
+}
 
 function Dialog({
+  open,
+  defaultOpen,
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+  const [internalOpen, setInternalOpen] = React.useState(defaultOpen ?? false)
+  const resolvedOpen = open ?? internalOpen
+
+  const handleOpenChange = React.useCallback(
+    (nextOpen: boolean) => {
+      if (open === undefined) {
+        setInternalOpen(nextOpen)
+      }
+
+      onOpenChange?.(nextOpen)
+    },
+    [onOpenChange, open]
+  )
+
+  return (
+    <DialogOpenContext.Provider value={resolvedOpen}>
+      <DialogPrimitive.Root
+        data-slot="dialog"
+        open={resolvedOpen}
+        onOpenChange={handleOpenChange}
+        {...props}
+      />
+    </DialogOpenContext.Provider>
+  )
 }
 
 function DialogTrigger({
@@ -39,7 +95,7 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/80 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        "fixed inset-0 isolate z-50 bg-black/80 duration-200 ease-out supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 data-closed:ease-in",
         className
       )}
       {...props}
@@ -55,18 +111,22 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  const open = React.useContext(DialogOpenContext)
+
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-4xl bg-popover p-6 text-sm text-popover-foreground ring-1 ring-foreground/5 duration-100 outline-none sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-4xl bg-popover p-6 text-sm text-popover-foreground ring-1 ring-foreground/5 duration-200 ease-out outline-none sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-open:slide-in-from-bottom-2 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-closed:slide-out-to-bottom-2 data-closed:ease-in",
           className
         )}
         {...props}
       >
-        {children}
+        <DialogContentSnapshot open={open}>
+          {children}
+        </DialogContentSnapshot>
         {showCloseButton && (
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
             <Button
@@ -74,8 +134,7 @@ function DialogContent({
               className="absolute top-4 right-4"
               size="icon-sm"
             >
-              <XIcon
-              />
+              <XIcon />
               <span className="sr-only">Close</span>
             </Button>
           </DialogPrimitive.Close>

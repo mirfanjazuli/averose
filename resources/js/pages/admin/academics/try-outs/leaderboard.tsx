@@ -1,13 +1,10 @@
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, ClipboardList, Medal, Trophy, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { getBadgeProps } from '@/lib/badge';
-import { EmptyState } from '@/components/admin/empty-state';
 import { SummaryCard } from '@/components/admin/summary-card';
-import { TableSearch } from '@/components/admin/table-search';
+import { AdminTableSection } from '@/components/admin/table-section';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Table,
     TableBody,
@@ -16,6 +13,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { getBadgeProps } from '@/lib/badge';
 
 type LeaderboardRow = {
     correctCount: number;
@@ -78,7 +76,7 @@ export default function AdminTryOutLeaderboard({ tryOut }: { tryOut: TryOut }) {
     return (
         <>
             <Head title={`${tryOut.title} Leaderboard`} />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
+            <div className="flex h-full min-w-0 max-w-full flex-1 flex-col gap-6 overflow-hidden p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h1 className="font-heading text-2xl font-semibold">
@@ -119,82 +117,69 @@ export default function AdminTryOutLeaderboard({ tryOut }: { tryOut: TryOut }) {
                     />
                 </div>
 
-                <Card>
-                    <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-                        <CardTitle>Ranking</CardTitle>
-                        <TableSearch
-                            value={searchQuery}
-                            onChange={setSearchQuery}
-                            placeholder="Search student..."
-                        />
-                    </CardHeader>
-                    <CardContent>
-                        {tryOut.leaderboard.length === 0 ? (
-                            <EmptyState>No attempts yet.</EmptyState>
-                        ) : filteredRows.length === 0 ? (
-                            <EmptyState>
-                                No students match your search.
-                            </EmptyState>
-                        ) : (
-                            <div className="rounded-2xl border">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Rank</TableHead>
-                                            <TableHead>Student</TableHead>
-                                            <TableHead>Score</TableHead>
-                                            <TableHead>Normalized</TableHead>
-                                            <TableHead>Correct</TableHead>
-                                            <TableHead>Submitted</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {filteredRows.map((row) => (
-                                            <TableRow key={row.id}>
-                                                <TableCell>
-                                                    <Badge
-                                                        {...getBadgeProps(
-                                                            'outline',
-                                                            rankClassName(
-                                                                row.rank,
-                                                            ),
-                                                        )}
-                                                    >
-                                                        {row.rank <= 3 && (
-                                                            <Medal className="size-3.5" />
-                                                        )}
-                                                        #{row.rank}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="font-medium">
-                                                        {row.student.name}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {row.student.email}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="font-semibold">
-                                                    {row.score}/{row.maxScore}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {row.percentageScore}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {row.correctCount}/
-                                                    {row.questionCount}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {row.submittedAt ?? '-'}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                <AdminTableSection
+                    emptyMessage="No attempts yet."
+                    emptySearchMessage="No students match your search."
+                    filteredItems={filteredRows.length}
+                    search={{
+                        value: searchQuery,
+                        onChange: setSearchQuery,
+                        placeholder: 'Search student...',
+                    }}
+                    totalItems={tryOut.leaderboard.length}
+                >
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Rank</TableHead>
+                                <TableHead>Student</TableHead>
+                                <TableHead>Score</TableHead>
+                                <TableHead>Normalized</TableHead>
+                                <TableHead>Correct</TableHead>
+                                <TableHead>Submitted</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredRows.map((row) => (
+                                <TableRow key={row.id}>
+                                    <TableCell>
+                                        <Badge
+                                            {...getBadgeProps(
+                                                'outline',
+                                                rankClassName(row.rank),
+                                            )}
+                                        >
+                                            {row.rank <= 3 && (
+                                                <Medal className="size-3.5" />
+                                            )}
+                                            #{row.rank}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="font-medium">
+                                            {row.student.name}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {row.student.email}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="font-semibold">
+                                        {row.score}/{row.maxScore}
+                                    </TableCell>
+                                    <TableCell>
+                                        {row.percentageScore}
+                                    </TableCell>
+                                    <TableCell>
+                                        {row.correctCount}/{row.questionCount}
+                                    </TableCell>
+                                    <TableCell>
+                                        {row.submittedAt ?? '-'}
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </AdminTableSection>
             </div>
         </>
     );

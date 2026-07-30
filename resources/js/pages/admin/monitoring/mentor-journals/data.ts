@@ -1,32 +1,25 @@
-export type JournalNote =
-    | 'completed'
-    | 'postponed'
-    | 'student late'
-    | 'mentor late'
-    | 'mentor waiting';
-
 export type MentorJournal = {
     achievement: string;
-    date: string;
-    duration: string;
+    attachments: {
+        mimeType: string;
+        name: string;
+        size: number;
+        url: string;
+        uuid: string;
+    }[];
+    completedAt: string;
     id: number;
     improvementArea: string;
     mentor: string;
+    mentorId: string;
     nextImprovementPlan: string;
-    note: JournalNote;
-    sessionName: string;
+    program: string;
+    scheduleCode: string;
+    scheduleId: string | null;
+    sessionEndAt: string | null;
+    sessionStartAt: string;
     slug: string;
     student: string;
+    studentId: string;
     subject: string;
-};
-
-export const noteVariants: Record<
-    JournalNote,
-    'default' | 'secondary' | 'outline' | 'destructive'
-> = {
-    completed: 'default',
-    postponed: 'secondary',
-    'student late': 'outline',
-    'mentor late': 'outline',
-    'mentor waiting': 'secondary',
 };

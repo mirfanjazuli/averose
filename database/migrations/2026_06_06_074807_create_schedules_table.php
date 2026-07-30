@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('schedules', function (Blueprint $table) {
             $table->id();
+            $table->string('code')->nullable()->unique();
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();
             $table->foreignId('mentor_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('zoom_account_id')->nullable()->constrained()->nullOnDelete();
@@ -25,6 +26,7 @@ return new class extends Migration
             $table->text('zoom_start_url')->nullable();
             $table->string('zoom_passcode')->nullable();
             $table->timestamp('assigned_at')->nullable();
+            $table->string('delivery_mode')->default('online')->index();
             $table->string('status')->default('pending')->index();
             $table->timestamps();
         });

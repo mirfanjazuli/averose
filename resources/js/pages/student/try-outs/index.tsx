@@ -1,5 +1,11 @@
 import { Form, Head, router, usePage } from '@inertiajs/react';
-import { BookOpenCheck, CalendarCheck2, Clock3, Ticket } from 'lucide-react';
+import {
+    ArrowUpRight,
+    BookOpenCheck,
+    CalendarCheck2,
+    Clock3,
+    Ticket,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import InputError from '@/components/input-error';
@@ -102,7 +108,18 @@ const initialRedeemToken = () => {
     );
 };
 
-export default function StudentTryOuts({ tryOuts }: { tryOuts: TryOut[] }) {
+type TryOutSummary = {
+    bestScore: number | null;
+    completed: number;
+};
+
+export default function StudentTryOuts({
+    summary,
+    tryOuts,
+}: {
+    summary: TryOutSummary;
+    tryOuts: TryOut[];
+}) {
     const page = usePage<{
         flash?: {
             success?: string;
@@ -194,21 +211,55 @@ export default function StudentTryOuts({ tryOuts }: { tryOuts: TryOut[] }) {
             <Head title="Try Out" />
             <StudentTryOutLayout
                 header={
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                            <h1 className="font-heading text-2xl font-semibold">
-                                Try Out
+                            <h1 className="font-heading text-2xl leading-tight font-semibold tracking-tight text-[#102a3a] md:text-4xl">
+                                Try out
                             </h1>
+                            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#526b7b]">
+                                Kerjakan latihan evaluasi, lanjutkan progress,
+                                atau gunakan token untuk membuka akses khusus.
+                            </p>
                         </div>
                         <Button
                             type="button"
-                            variant="outline"
-                            className="gap-2"
+                            className="w-full shrink-0 gap-2 rounded-2xl bg-[#d9a441] text-[#102a3a] shadow-lg shadow-[#d9a441]/20 hover:bg-[#c89532] sm:w-auto"
                             onClick={() => setRedeemDialogOpen(true)}
                         >
                             <Ticket className="size-4" />
-                            Redeem token
+                            Gunakan token
                         </Button>
+                    </div>
+                }
+                sidebar={
+                    <div className="space-y-4">
+                        <div>
+                            <p className="text-xs font-semibold tracking-wide text-[#526b7b] uppercase">
+                                Try out tersedia
+                            </p>
+                            <p className="mt-1 font-heading text-3xl font-semibold tracking-tight text-[#102a3a]">
+                                {tryOuts.length}
+                            </p>
+                        </div>
+
+                        <div className="space-y-2 border-t border-[#edf3f1] pt-3">
+                            <div className="flex items-center justify-between gap-3 text-sm">
+                                <span className="text-[#526b7b]">
+                                    Selesai
+                                </span>
+                                <span className="font-semibold text-[#102a3a]">
+                                    {summary.completed}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-3 text-sm">
+                                <span className="text-[#526b7b]">
+                                    Skor terbaik
+                                </span>
+                                <span className="font-semibold text-[#102a3a]">
+                                    {summary.bestScore ?? '-'}
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 }
             >
@@ -216,54 +267,52 @@ export default function StudentTryOuts({ tryOuts }: { tryOuts: TryOut[] }) {
                     {tryOuts.map((item) => (
                         <div
                             key={item.id}
-                            className="flex flex-col justify-between gap-5 rounded-xl border bg-card p-4 text-card-foreground"
+                            className="group flex min-h-64 flex-col rounded-md bg-white p-4 shadow-sm shadow-[#102a3a]/[0.03] ring-1 ring-[#dcece7] transition-colors hover:ring-[#bfe4db]"
                         >
-                            <div className="flex gap-4">
-                                <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                                    <BookOpenCheck className="size-5" />
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-[#edf7f4] text-[#0f8f7a]">
+                                    <BookOpenCheck className="size-5 transition-transform group-hover:scale-105" />
                                 </div>
-                                <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <h2 className="font-semibold">
-                                            {item.title}
-                                        </h2>
-                                        <Badge
-                                            variant="outline"
-                                            className={
-                                                item.status === 'Private'
-                                                    ? 'border-amber-200 bg-amber-50 text-amber-700'
-                                                    : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                            }
-                                        >
-                                            {item.status}
-                                        </Badge>
+                                <Badge
+                                    variant="outline"
+                                    className={
+                                        item.status === 'Private'
+                                            ? 'rounded-full border-amber-200 bg-amber-50 px-3 text-amber-700'
+                                            : 'rounded-full border-emerald-200 bg-emerald-50 px-3 text-emerald-700'
+                                    }
+                                >
+                                    {item.status}
+                                </Badge>
+                            </div>
+
+                            <div className="mt-5 min-w-0">
+                                <h2 className="line-clamp-2 font-heading text-lg leading-snug font-semibold text-[#102a3a]">
+                                    {item.title}
+                                </h2>
+                                <div className="mt-4 grid grid-cols-2 gap-3 text-sm text-[#526b7b]">
+                                    <div className="flex items-center gap-2">
+                                        <Clock3 className="size-4 text-[#0f8f7a]" />
+                                        <span>{item.duration}</span>
                                     </div>
-                                    <div className="mt-3 flex flex-wrap gap-4 text-sm text-muted-foreground">
-                                        <span className="flex items-center gap-1.5">
-                                            <Clock3 className="size-4" />
-                                            {item.duration}
-                                        </span>
-                                        <span className="flex items-center gap-1.5">
-                                            <CalendarCheck2 className="size-4" />
-                                            {item.questions} soal
-                                        </span>
+                                    <div className="flex items-center gap-2">
+                                        <CalendarCheck2 className="size-4 text-[#0f8f7a]" />
+                                        <span>{item.questions} soal</span>
                                     </div>
-                                    {item.status === 'Private' && (
-                                        <p className="mt-3 text-sm text-muted-foreground">
-                                            {item.remainingAttempts} attempt
-                                            tersisa
-                                            {item.accessStartsAt &&
-                                            item.accessEndsAt
-                                                ? `, berlaku ${item.accessStartsAt} - ${item.accessEndsAt}`
-                                                : ''}
-                                        </p>
-                                    )}
                                 </div>
+                                {item.status === 'Private' && (
+                                    <p className="mt-4 text-sm leading-6 text-[#526b7b]">
+                                        {item.remainingAttempts} attempt tersisa
+                                        {item.accessStartsAt &&
+                                        item.accessEndsAt
+                                            ? ` · ${item.accessStartsAt} - ${item.accessEndsAt}`
+                                            : ''}
+                                    </p>
+                                )}
                             </div>
 
                             <Button
                                 type="button"
-                                className="w-full"
+                                className="mt-auto w-full gap-2 rounded-xl bg-[#0f8f7a] hover:bg-[#0b7668]"
                                 disabled={autoSubmittingTryOutId === item.id}
                                 onClick={() => openTryOutDialog(item)}
                             >
@@ -272,13 +321,23 @@ export default function StudentTryOuts({ tryOuts }: { tryOuts: TryOut[] }) {
                                     : progressStates[item.id] === 'in_progress'
                                       ? 'Lanjutkan try out'
                                       : 'Mulai try out'}
+                                <ArrowUpRight className="size-4" />
                             </Button>
                         </div>
                     ))}
 
                     {tryOuts.length === 0 && (
-                        <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground lg:col-span-2">
-                            Belum ada try out tersedia.
+                        <div className="rounded-md bg-[#f8fbfa] px-6 py-12 text-center lg:col-span-2">
+                            <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-white text-[#0f8f7a] ring-1 ring-[#dcece7]">
+                                <BookOpenCheck className="size-6" />
+                            </div>
+                            <h2 className="mt-5 font-heading text-xl font-semibold text-[#102a3a]">
+                                Belum ada try out tersedia
+                            </h2>
+                            <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#526b7b]">
+                                Try out yang dapat kamu akses akan tampil di
+                                sini.
+                            </p>
                         </div>
                     )}
                 </div>
@@ -322,7 +381,7 @@ export default function StudentTryOuts({ tryOuts }: { tryOuts: TryOut[] }) {
             <Dialog open={redeemDialogOpen} onOpenChange={setRedeemDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Redeem try out token</DialogTitle>
+                        <DialogTitle>Gunakan token try out</DialogTitle>
                         <DialogDescription>
                             Masukkan token group untuk membuka akses try out
                             private.
@@ -375,13 +434,13 @@ export default function StudentTryOuts({ tryOuts }: { tryOuts: TryOut[] }) {
                                             setRedeemDialogOpen(false)
                                         }
                                     >
-                                        Cancel
+                                        Batal
                                     </Button>
                                     <Button
                                         type="submit"
                                         disabled={processing || !redeemToken}
                                     >
-                                        Redeem
+                                        Gunakan
                                     </Button>
                                 </div>
                             </>

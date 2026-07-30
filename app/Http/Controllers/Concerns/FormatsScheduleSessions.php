@@ -12,10 +12,33 @@ trait FormatsScheduleSessions
     {
         $startAt = $schedule->scheduled_at;
         $endAt = $schedule->scheduled_at->copy()->addMinutes($schedule->duration);
+        $feedback = $includeStudent ? null : $schedule->feedback;
 
         $data = [
+            'attachments' => $schedule->relationLoaded('mentorJournal')
+                && $schedule->mentorJournal?->relationLoaded('attachments')
+                ? $schedule->mentorJournal->attachments->map(fn ($attachment): array => [
+                    'mimeType' => $attachment->mime_type,
+                    'name' => $attachment->original_name,
+                    'size' => $attachment->size,
+                    'url' => route('mentor-journal-attachments.show', $attachment, absolute: false),
+                    'uuid' => $attachment->uuid,
+                ])->values()->all()
+                : [],
+            'code' => $schedule->code,
+            'deliveryMode' => $schedule->delivery_mode->value,
             'id' => (string) $schedule->id,
+            'canGiveFeedback' => ! $includeStudent
+                && $feedback === null
+                && ($schedule->status === 'completed' || $endAt->isPast()),
             'endAt' => $endAt->toJSON(),
+            'feedback' => $feedback ? [
+                'audioQualityRating' => $feedback->audio_quality_rating,
+                'comment' => $feedback->comment,
+                'interactivityRating' => $feedback->interactivity_rating,
+                'materialClarityRating' => $feedback->material_clarity_rating,
+                'visualQualityRating' => $feedback->visual_quality_rating,
+            ] : null,
             'mentor' => $schedule->mentor?->name ?? 'Unassigned mentor',
             'program' => $schedule->enrollment?->program?->name ?? '-',
             'startAt' => $startAt->toJSON(),

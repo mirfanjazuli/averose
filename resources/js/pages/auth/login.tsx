@@ -79,7 +79,7 @@ export default function Login({
         <>
             <Head title={isLogin ? 'Log in' : 'Register'} />
 
-            <div className="space-y-8 transition-all duration-300 ease-out">
+            <div className="space-y-6 transition-all duration-300 ease-out">
                 <div
                     key={`heading-${authMode}`}
                     className="animate-in space-y-2 text-center duration-300 fade-in-0 slide-in-from-bottom-1"
@@ -150,13 +150,6 @@ export default function Login({
                         <SignupForm passwordRules={passwordRules} />
                     )}
                 </div>
-
-                <div className="pt-16 text-center text-xs leading-relaxed text-muted-foreground">
-                    Join the millions of smart investors who trust us to manage
-                    their finances. Log in to access your personalized
-                    dashboard, track your portfolio performance, and make
-                    informed investment decisions.
-                </div>
             </div>
         </>
     );
@@ -176,11 +169,11 @@ function LoginForm({ canResetPassword }: { canResetPassword: boolean }) {
             action={loginStore().url}
             method="post"
             resetOnSuccess={['password']}
-            className="space-y-6"
+            className="space-y-5"
         >
             {({ processing, errors }) => (
                 <>
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                         <div className="space-y-2">
                             <Label htmlFor="email" className="sr-only">
                                 Email address
@@ -302,7 +295,7 @@ function SignupForm({ passwordRules }: { passwordRules?: string }) {
                                     autoComplete="name"
                                     name="name"
                                     placeholder="Full Name"
-                                    className="pl-11"
+                                    className="h-12 rounded-xl pl-11"
                                     aria-invalid={!!errors.name}
                                 />
                             </div>
@@ -323,7 +316,7 @@ function SignupForm({ passwordRules }: { passwordRules?: string }) {
                                     autoComplete="email"
                                     name="email"
                                     placeholder="Email Address"
-                                    className="pr-12 pl-11"
+                                    className="h-12 rounded-xl pr-12 pl-11"
                                     aria-invalid={!!errors.email}
                                     onChange={(event) =>
                                         setEmail(event.target.value)
@@ -354,7 +347,7 @@ function SignupForm({ passwordRules }: { passwordRules?: string }) {
                                     name="password"
                                     placeholder="Password"
                                     passwordrules={passwordRules}
-                                    className="pl-11"
+                                    className="h-12 rounded-xl pl-11"
                                     aria-invalid={!!errors.password}
                                 />
                             </div>
@@ -378,7 +371,7 @@ function SignupForm({ passwordRules }: { passwordRules?: string }) {
                                     name="password_confirmation"
                                     placeholder="Confirm Password"
                                     passwordrules={passwordRules}
-                                    className="pl-11"
+                                    className="h-12 rounded-xl pl-11"
                                     aria-invalid={
                                         !!errors.password_confirmation
                                     }

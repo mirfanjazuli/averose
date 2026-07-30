@@ -87,19 +87,22 @@ export const testimonials = [
         initials: 'AM',
         name: 'Azzami Mutahhari',
         school: 'MAN 1 Darussalam',
-        quote: 'Setiap pertemuan interaktif dan boleh bertanya di luar jadwal. AveRose membantu aku memahami materi yang sebelumnya terasa sulit.',
+        result: 'Nilai meningkat dan lebih percaya diri mengikuti ujian',
+        quote: 'Awalnya saya bingung harus memulai persiapan dari mana. Setelah belajar bersama mentor AveRose, materi jadi lebih terarah dan saya lebih siap menghadapi ujian.',
     },
     {
         initials: 'KL',
         name: 'Kimberly Levina',
-        school: 'Lolos Fakultas Kedokteran',
-        quote: 'Belajarnya fokus, terarah, dan mentornya suportif. Aku jadi lebih percaya diri menghadapi proses seleksi masuk FK.',
+        school: 'Fakultas Kedokteran',
+        result: 'Diterima di FK',
+        quote: 'Belajarnya fokus dan mentornya membantu saya menyusun strategi sampai hari seleksi. Saya jadi tahu prioritas materi yang harus dikejar.',
     },
     {
         initials: 'RJ',
         name: 'Rania Janeeta',
         school: 'FKG Universitas Indonesia',
-        quote: 'Bukan hanya pembahasan materi, aku juga dibantu menyusun strategi dan ritme belajar sampai hari ujian.',
+        result: 'Lebih mudah memahami materi kedokteran',
+        quote: 'Materi kedokteran yang awalnya terasa berat jadi lebih mudah dipahami karena dibahas bertahap dan selalu dikaitkan dengan contoh.',
     },
 ];
 

@@ -2,13 +2,8 @@ import { Form, Head } from '@inertiajs/react';
 import { ExternalLink, Plus, PowerOff, Video } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import {
-    formatBadgeLabel,
-    getBadgeProps,
-    getStatusBadgeTone,
-} from '@/lib/badge';
 import { SummaryCard } from '@/components/admin/summary-card';
-import { TableSearch } from '@/components/admin/table-search';
+import { AdminTableSection } from '@/components/admin/table-section';
 import InputError from '@/components/input-error';
 import {
     AlertDialog,
@@ -21,13 +16,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -53,6 +41,11 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import {
+    formatBadgeLabel,
+    getBadgeProps,
+    getStatusBadgeTone,
+} from '@/lib/badge';
 
 type Recording = {
     id: string;
@@ -118,7 +111,7 @@ export default function AdminRecordings({
     return (
         <>
             <Head title="Recordings" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
+            <div className="flex min-h-full min-w-0 max-w-full flex-1 flex-col gap-6 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h1 className="font-heading text-2xl font-semibold">
@@ -313,141 +306,108 @@ export default function AdminRecordings({
                     </AlertDialogContent>
                 </AlertDialog>
 
-                <Card>
-                    <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-                        <div>
-                            <CardTitle>Recording list</CardTitle>
-                            <CardDescription>
-                                Videos linked to student session schedules.
-                            </CardDescription>
-                        </div>
-                        <TableSearch
-                            value={searchQuery}
-                            onChange={setSearchQuery}
-                            placeholder="Search recordings..."
-                        />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="rounded-2xl border">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Recording</TableHead>
-                                        <TableHead>Student</TableHead>
-                                        <TableHead>Mentor</TableHead>
-                                        <TableHead>Subject</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Source</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead className="w-24 text-right" />
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredRecordings.length > 0 ? (
-                                        filteredRecordings.map((recording) => (
-                                            <TableRow key={recording.id}>
-                                                <TableCell>
-                                                    <div className="font-medium">
-                                                        {recording.title}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {
-                                                            recording.zoomMeetingId
-                                                        }
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {recording.student}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {recording.mentor}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {recording.subject}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {recording.recordedDate}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        {...getBadgeProps(
-                                                            'muted',
-                                                        )}
-                                                    >
-                                                        {formatBadgeLabel(
-                                                            recording.source,
-                                                        )}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        {...getBadgeProps(
-                                                            getStatusBadgeTone(
-                                                                recording.status,
-                                                            ),
-                                                        )}
-                                                    >
-                                                        {formatBadgeLabel(
-                                                            recording.status,
-                                                        )}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <div className="flex justify-end gap-1">
-                                                        <Button
-                                                            asChild
-                                                            size="icon-sm"
-                                                            variant="ghost"
-                                                        >
-                                                            <a
-                                                                href={
-                                                                    recording.youtubeUrl
-                                                                }
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                            >
-                                                                <ExternalLink className="size-4" />
-                                                            </a>
-                                                        </Button>
-                                                        {recording.status ===
-                                                            'Active' && (
-                                                            <Button
-                                                                type="button"
-                                                                size="icon-sm"
-                                                                variant="ghost"
-                                                                className="rounded-full text-muted-foreground hover:text-destructive"
-                                                                onClick={() =>
-                                                                    setDeactivatingRecording(
-                                                                        recording,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <PowerOff className="size-4" />
-                                                                <span className="sr-only">
-                                                                    Deactivate
-                                                                    recording
-                                                                </span>
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    ) : (
-                                        <TableRow>
-                                            <TableCell
-                                                colSpan={8}
-                                                className="h-24 text-center text-sm text-muted-foreground"
+                <AdminTableSection
+                    emptyMessage="No recordings found."
+                    emptySearchMessage="No recordings match your search."
+                    filteredItems={filteredRecordings.length}
+                    search={{
+                        value: searchQuery,
+                        onChange: setSearchQuery,
+                        placeholder: 'Search recordings...',
+                    }}
+                    tableMinWidth="72rem"
+                    totalItems={recordings.length}
+                >
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Recording</TableHead>
+                                <TableHead>Student</TableHead>
+                                <TableHead>Mentor</TableHead>
+                                <TableHead>Subject</TableHead>
+                                <TableHead>Date</TableHead>
+                                <TableHead>Source</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="w-24 text-right" />
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filteredRecordings.map((recording) => (
+                                <TableRow key={recording.id}>
+                                    <TableCell>
+                                        <div className="font-medium">
+                                            {recording.title}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {recording.zoomMeetingId}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>{recording.student}</TableCell>
+                                    <TableCell>{recording.mentor}</TableCell>
+                                    <TableCell>{recording.subject}</TableCell>
+                                    <TableCell>
+                                        {recording.recordedDate}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge {...getBadgeProps('muted')}>
+                                            {formatBadgeLabel(
+                                                recording.source,
+                                            )}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge
+                                            {...getBadgeProps(
+                                                getStatusBadgeTone(
+                                                    recording.status,
+                                                ),
+                                            )}
+                                        >
+                                            {formatBadgeLabel(
+                                                recording.status,
+                                            )}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex justify-end gap-1">
+                                            <Button
+                                                asChild
+                                                size="icon-sm"
+                                                variant="ghost"
                                             >
-                                                No recordings found.
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
+                                                <a
+                                                    href={recording.youtubeUrl}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                >
+                                                    <ExternalLink className="size-4" />
+                                                </a>
+                                            </Button>
+                                            {recording.status === 'Active' && (
+                                                <Button
+                                                    type="button"
+                                                    size="icon-sm"
+                                                    variant="ghost"
+                                                    className="rounded-full text-muted-foreground hover:text-destructive"
+                                                    onClick={() =>
+                                                        setDeactivatingRecording(
+                                                            recording,
+                                                        )
+                                                    }
+                                                >
+                                                    <PowerOff className="size-4" />
+                                                    <span className="sr-only">
+                                                        Deactivate recording
+                                                    </span>
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </AdminTableSection>
             </div>
         </>
     );

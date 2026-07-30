@@ -15,7 +15,7 @@ class JournalController extends Controller
         return Inertia::render('mentor/journals/index', [
             'journals' => MentorJournal::query()
                 ->with([
-                    'schedule:id,scheduled_at,duration,program_enrollment_id',
+                    'schedule:id,code,scheduled_at,duration,program_enrollment_id',
                     'schedule.enrollment.program:id,name',
                     'student:id,name',
                     'subject:id,name',
@@ -33,13 +33,24 @@ class JournalController extends Controller
         abort_unless($journal->mentor_id === $request->user()->id, 404);
 
         $journal->load([
-            'schedule:id,scheduled_at,duration,program_enrollment_id',
+            'attachments:id,uuid,mentor_journal_id,original_name,mime_type,size',
+            'schedule:id,code,scheduled_at,duration,program_enrollment_id',
             'schedule.enrollment.program:id,name',
             'student:id,name',
             'subject:id,name',
         ]);
 
         return Inertia::render('mentor/journals/show', [
+            'breadcrumbs' => [
+                [
+                    'title' => 'Journals',
+                    'href' => '/journals',
+                ],
+                [
+                    'title' => $journal->schedule?->code ?? "Journal #{$journal->id}",
+                    'href' => "/journals/{$journal->routeIdentifier()}",
+                ],
+            ],
             'journal' => $this->journalData($journal),
         ]);
     }
@@ -53,18 +64,27 @@ class JournalController extends Controller
 
         return [
             'achievement' => $journal->achievement,
-            'date' => $scheduledAt?->format('l, d F Y') ?? $journal->created_at->format('l, d F Y'),
-            'duration' => $journal->schedule ? "{$journal->schedule->duration} min" : '-',
+            'attachments' => $journal->relationLoaded('attachments')
+                ? $journal->attachments->map(fn ($attachment): array => [
+                    'mimeType' => $attachment->mime_type,
+                    'name' => $attachment->original_name,
+                    'size' => $attachment->size,
+                    'url' => route('mentor-journal-attachments.show', $attachment, absolute: false),
+                    'uuid' => $attachment->uuid,
+                ])->values()->all()
+                : [],
+            'completedAt' => $journal->created_at->toJSON(),
             'id' => (string) $journal->id,
             'improvementArea' => $journal->improvement_area,
             'nextImprovementPlan' => $journal->next_improvement_plan,
-            'note' => $journal->note,
             'program' => $journal->schedule?->enrollment?->program?->name ?? '-',
-            'sessionName' => $journal->subject?->name ?? 'Session',
-            'slug' => $journal->slug,
+            'scheduleCode' => $journal->schedule?->code ?? "Journal #{$journal->id}",
+            'scheduleId' => $journal->schedule_id ? (string) $journal->schedule_id : null,
+            'sessionEndAt' => $endedAt?->toJSON(),
+            'sessionStartAt' => ($scheduledAt ?? $journal->created_at)->toJSON(),
+            'slug' => $journal->routeIdentifier(),
             'student' => $journal->student?->name ?? '-',
             'subject' => $journal->subject?->name ?? '-',
-            'time' => $scheduledAt && $endedAt ? $scheduledAt->format('H:i').' - '.$endedAt->format('H:i') : '-',
         ];
     }
 }

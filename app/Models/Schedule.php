@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\ScheduleDeliveryMode;
+use App\UserRole;
 use Database\Factories\ScheduleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['user_id', 'mentor_id', 'zoom_account_id', 'program_enrollment_id', 'subject_id', 'scheduled_at', 'duration', 'zoom_link', 'zoom_meeting_id', 'zoom_start_url', 'zoom_passcode', 'assigned_at', 'status'])]
+#[Fillable(['user_id', 'mentor_id', 'zoom_account_id', 'program_enrollment_id', 'subject_id', 'scheduled_at', 'duration', 'delivery_mode', 'zoom_link', 'zoom_meeting_id', 'zoom_start_url', 'zoom_passcode', 'assigned_at', 'status'])]
 class Schedule extends Model
 {
     /** @use HasFactory<ScheduleFactory> */
@@ -48,9 +50,19 @@ class Schedule extends Model
         return $this->hasOne(MentorJournal::class);
     }
 
+    public function feedback(): HasOne
+    {
+        return $this->hasOne(ScheduleFeedback::class);
+    }
+
     public function recordings(): HasMany
     {
         return $this->hasMany(Recording::class);
+    }
+
+    public function histories(): HasMany
+    {
+        return $this->hasMany(ScheduleHistory::class);
     }
 
     public function rescheduleRequests(): HasMany
@@ -64,6 +76,22 @@ class Schedule extends Model
     }
 
     /**
+     * @param  array<string, mixed>  $changes
+     */
+    public function recordHistory(string $action, string $description, ?User $user = null, array $changes = [], ?string $ipAddress = null): ScheduleHistory
+    {
+        return $this->histories()->create([
+            'action' => $action,
+            'changes' => $changes === [] ? null : $changes,
+            'description' => $description,
+            'ip_address' => $ipAddress,
+            'user_id' => $user?->id,
+            'user_name' => $user?->name,
+            'user_role' => $user?->role instanceof UserRole ? $user->role->value : ($user?->role ? (string) $user->role : null),
+        ]);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -71,9 +99,27 @@ class Schedule extends Model
     protected function casts(): array
     {
         return [
-            'scheduled_at' => 'datetime',
-            'duration' => 'integer',
             'assigned_at' => 'datetime',
+            'delivery_mode' => ScheduleDeliveryMode::class,
+            'duration' => 'integer',
+            'scheduled_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::created(function (Schedule $schedule): void {
+            if ($schedule->code) {
+                return;
+            }
+
+            $schedule->forceFill([
+                'code' => sprintf(
+                    'SCH-%s-%06d',
+                    $schedule->created_at->format('Y'),
+                    $schedule->getKey(),
+                ),
+            ])->saveQuietly();
+        });
     }
 }

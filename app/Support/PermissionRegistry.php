@@ -14,6 +14,9 @@ class PermissionRegistry
                 ['key' => 'dashboard.view', 'label' => 'View dashboard', 'description' => 'Open the admin dashboard.'],
                 ['key' => 'dashboard.export_pdf', 'label' => 'Export dashboard PDF', 'description' => 'Download dashboard reports as PDF.'],
             ],
+            'System' => [
+                ['key' => 'logs.view', 'label' => 'View activity logs', 'description' => 'Open activity audit trail.'],
+            ],
             'Scheduling' => [
                 ['key' => 'schedules.view', 'label' => 'View schedules', 'description' => 'Open schedule management pages.'],
                 ['key' => 'schedules.assign', 'label' => 'Assign mentor', 'description' => 'Assign mentors to schedules.'],
@@ -33,6 +36,10 @@ class PermissionRegistry
                 ['key' => 'mentors.create', 'label' => 'Create mentors', 'description' => 'Create mentor accounts.'],
                 ['key' => 'mentors.update', 'label' => 'Update mentors', 'description' => 'Edit mentor accounts.'],
                 ['key' => 'mentors.delete', 'label' => 'Deactivate mentors', 'description' => 'Deactivate mentor accounts.'],
+                ['key' => 'mentor_levels.view', 'label' => 'View mentor levels', 'description' => 'Open mentor level master data.'],
+                ['key' => 'mentor_levels.create', 'label' => 'Create mentor levels', 'description' => 'Create mentor levels.'],
+                ['key' => 'mentor_levels.update', 'label' => 'Update mentor levels', 'description' => 'Edit mentor levels and hourly rates.'],
+                ['key' => 'mentor_levels.delete', 'label' => 'Deactivate mentor levels', 'description' => 'Deactivate mentor levels.'],
             ],
             'Internal Users' => [
                 ['key' => 'internal.view', 'label' => 'View internal users', 'description' => 'Open internal user list.'],

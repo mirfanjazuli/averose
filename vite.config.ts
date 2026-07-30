@@ -20,7 +20,6 @@ export default defineConfig({
         tailwindcss(),
         wayfinder({
             formVariants: true,
-            command: `${process.env.WAYFINDER_PHP ?? 'php'} artisan wayfinder:generate`,
         }),
     ],
 });

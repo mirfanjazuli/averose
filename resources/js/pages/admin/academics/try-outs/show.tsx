@@ -1,16 +1,13 @@
 import { Form, Head, Link, usePage } from '@inertiajs/react';
-import { ArrowUpRight, Copy, Plus, Users } from 'lucide-react';
+import { Copy, Plus, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import {
-    formatBadgeLabel,
-    getBadgeProps,
-    getStatusBadgeTone,
-} from '@/lib/badge';
+import { EmptyState } from '@/components/admin/empty-state';
+import { StatusBadge } from '@/components/admin/status-badge';
+import { TableScrollArea } from '@/components/admin/table-scroll-area';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -113,6 +110,16 @@ type LeaderboardPreview = {
     submittedAt: string | null;
 };
 
+function formatDuration(duration: string) {
+    return duration === '-' ? '-' : `${duration} minutes`;
+}
+
+function formatScoringMode(scoringMode: TryOutDetail['scoringMode']) {
+    return scoringMode === 'negative_marking'
+        ? 'Negative marking'
+        : 'Raw score';
+}
+
 export default function AdminTryOutDetail({
     tryOut,
 }: {
@@ -136,24 +143,14 @@ export default function AdminTryOutDetail({
     return (
         <>
             <Head title={tryOut.title} />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
+            <div className="flex h-full min-w-0 max-w-full flex-1 flex-col gap-6 overflow-hidden p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <div className="flex flex-wrap items-center gap-3">
                             <h1 className="font-heading text-2xl font-semibold">
                                 {tryOut.title}
                             </h1>
-                            <Badge
-                                {...getBadgeProps(
-                                    getStatusBadgeTone(tryOut.status),
-                                )}
-                            >
-                                {formatBadgeLabel(tryOut.status)}
-                            </Badge>
                         </div>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Try out detail, subjects, questions, and answers.
-                        </p>
                     </div>
                     {tryOut.status === 'Private' && (
                         <Dialog
@@ -342,356 +339,268 @@ export default function AdminTryOutDetail({
                     )}
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <Card>
-                        <CardContent className="relative flex min-h-36 flex-col justify-between px-6">
-                            <div className="flex items-start justify-between gap-4">
-                                <p className="min-w-0 truncate text-sm text-muted-foreground">
-                                    Duration
+                <section className="space-y-1.5">
+                    <div className="grid min-h-10 gap-2 md:grid-cols-[14rem_1fr] md:items-center">
+                        <p className="text-sm text-muted-foreground">
+                            Duration
+                        </p>
+                        <p className="text-sm">
+                            {formatDuration(tryOut.duration)}
+                        </p>
+                    </div>
+                    <div className="grid min-h-10 gap-2 md:grid-cols-[14rem_1fr] md:items-center">
+                        <p className="text-sm text-muted-foreground">
+                            Questions
+                        </p>
+                        <Link
+                            href={`/academics/try-outs/${tryOut.slug}/questions`}
+                            className="text-sm font-medium text-primary hover:underline"
+                        >
+                            {tryOut.questionsCount} questions
+                        </Link>
+                    </div>
+                    <div className="grid min-h-10 gap-2 md:grid-cols-[14rem_1fr] md:items-center">
+                        <p className="text-sm text-muted-foreground">
+                            Scoring
+                        </p>
+                        <div className="space-y-1">
+                            <p className="text-sm">
+                                {formatScoringMode(tryOut.scoringMode)}
+                            </p>
+                            {tryOut.scoringMode === 'negative_marking' && (
+                                <p className="text-xs text-muted-foreground">
+                                    Correct {tryOut.correctPoints ?? '-'} /
+                                    Wrong {tryOut.wrongPoints ?? '-'} / No
+                                    answer {tryOut.unansweredPoints ?? '-'}
                                 </p>
-                            </div>
-
-                            <div>
-                                <div className="flex items-end gap-2">
-                                    <p className="text-5xl font-semibold tracking-normal">
-                                        {tryOut.duration}
-                                    </p>
-                                    <p className="mb-1.5 flex max-w-full items-center gap-1 text-xs text-muted-foreground">
-                                        <span className="truncate">
-                                            minutes
-                                        </span>
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Link
-                        href={`/academics/try-outs/${tryOut.slug}/questions`}
-                        className="block rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                    >
-                        <Card className="transition-colors hover:border-primary/40 hover:bg-muted/35">
-                            <CardContent className="relative flex min-h-36 flex-col justify-between px-6">
-                                <div className="flex items-start justify-between gap-4">
-                                    <p className="min-w-0 truncate text-sm text-muted-foreground">
-                                        Questions
-                                    </p>
-                                    <Button
-                                        asChild
-                                        variant="secondary"
-                                        size="icon"
-                                        className="-mt-1 size-8 shrink-0 rounded-full"
-                                    >
-                                        <span>
-                                            <ArrowUpRight className="size-3.5" />
-                                        </span>
-                                    </Button>
-                                </div>
-
-                                <div>
-                                    <div className="flex items-end gap-2">
-                                        <p className="text-5xl font-semibold tracking-normal">
-                                            {tryOut.questionsCount}
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </Link>
-                    <Card>
-                        <CardContent className="relative flex min-h-36 flex-col justify-between px-6">
-                            <div className="flex items-start justify-between gap-4">
-                                <p className="min-w-0 truncate text-sm text-muted-foreground">
-                                    Subjects
-                                </p>
-                            </div>
-
-                            <div>
-                                <div className="flex items-end gap-2">
-                                    <p className="text-5xl font-semibold tracking-normal">
-                                        {tryOut.subjects.length}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Link
-                        href={`/academics/try-outs/${tryOut.slug}/leaderboard`}
-                        className="block rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                    >
-                        <Card className="transition-colors hover:border-primary/40 hover:bg-muted/35">
-                            <CardContent className="relative flex min-h-36 flex-col justify-between px-6">
-                                <div className="flex items-start justify-between gap-4">
-                                    <p className="min-w-0 truncate text-sm text-muted-foreground">
-                                        Leaderboard
-                                    </p>
-                                    <Button
-                                        asChild
-                                        variant="secondary"
-                                        size="icon"
-                                        className="-mt-1 size-8 shrink-0 rounded-full"
-                                    >
-                                        <span>
-                                            <ArrowUpRight className="size-3.5" />
-                                        </span>
-                                    </Button>
-                                </div>
-
-                                <div>
-                                    <div className="flex items-end gap-2">
-                                        <p className="text-5xl font-semibold tracking-normal">
-                                            {
-                                                tryOut.leaderboard
-                                                    .participantsCount
-                                            }
-                                        </p>
-                                        <p className="mb-1.5 flex max-w-full items-center gap-1 text-xs text-muted-foreground">
-                                            <span className="truncate">
-                                                {tryOut.leaderboard
-                                                    .participantsCount === 1
-                                                    ? 'participant'
-                                                    : 'participants'}
-                                            </span>
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </Link>
-                </div>
+                            )}
+                        </div>
+                    </div>
+                    <div className="grid min-h-10 gap-2 md:grid-cols-[14rem_1fr] md:items-center">
+                        <p className="text-sm text-muted-foreground">
+                            Participants
+                        </p>
+                        <Link
+                            href={`/academics/try-outs/${tryOut.slug}/leaderboard`}
+                            className="text-sm font-medium text-primary hover:underline"
+                        >
+                            {tryOut.leaderboard.participantsCount}{' '}
+                            {tryOut.leaderboard.participantsCount === 1
+                                ? 'participant'
+                                : 'participants'}
+                        </Link>
+                    </div>
+                    <div className="grid min-h-10 gap-2 md:grid-cols-[14rem_1fr] md:items-center">
+                        <p className="text-sm text-muted-foreground">
+                            Subjects
+                        </p>
+                        <div className="flex min-h-10 flex-wrap items-center gap-1.5">
+                            {tryOut.subjects.length === 0 ? (
+                                <span className="text-sm text-muted-foreground">
+                                    -
+                                </span>
+                            ) : (
+                                tryOut.subjects.map((subject) => (
+                                    <Badge key={subject} variant="outline">
+                                        {subject}
+                                    </Badge>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                    <div className="grid min-h-10 gap-2 md:grid-cols-[14rem_1fr] md:items-center">
+                        <p className="text-sm text-muted-foreground">
+                            Status
+                        </p>
+                        <div>
+                            <StatusBadge status={tryOut.status} />
+                        </div>
+                    </div>
+                </section>
 
                 {tryOut.status === 'Private' && (
-                    <Card>
-                        <CardHeader>
-                            <div>
-                                <CardTitle>Groups</CardTitle>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            {tryOut.groups.length === 0 ? (
-                                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                                    No groups yet.
-                                </div>
-                            ) : (
-                                <div className="rounded-lg border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Group</TableHead>
-                                                <TableHead>Token</TableHead>
-                                                <TableHead>
-                                                    Availability
-                                                </TableHead>
-                                                <TableHead>Attempts</TableHead>
-                                                <TableHead>
-                                                    Participants
-                                                </TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead className="w-20 text-right" />
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {tryOut.groups.map((group) => (
-                                                <TableRow key={group.id}>
-                                                    <TableCell className="font-medium">
-                                                        {group.name}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <button
-                                                            type="button"
-                                                            className="inline-flex items-center gap-2 font-mono text-sm font-semibold text-primary"
-                                                            onClick={() => {
-                                                                void navigator.clipboard?.writeText(
-                                                                    group.token,
-                                                                );
-                                                                toast.success(
-                                                                    'Token copied.',
+                    <section className="space-y-4">
+                        <h2 className="font-heading text-lg font-semibold">
+                            Groups
+                        </h2>
+                        {tryOut.groups.length === 0 ? (
+                            <EmptyState>No groups yet.</EmptyState>
+                        ) : (
+                            <TableScrollArea>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Group</TableHead>
+                                            <TableHead>Token</TableHead>
+                                            <TableHead>Availability</TableHead>
+                                            <TableHead>Attempts</TableHead>
+                                            <TableHead>Participants</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="w-20 text-right" />
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {tryOut.groups.map((group) => (
+                                            <TableRow key={group.id}>
+                                                <TableCell className="font-medium">
+                                                    {group.name}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <button
+                                                        type="button"
+                                                        className="inline-flex items-center gap-2 font-mono text-sm font-semibold text-primary"
+                                                        onClick={() => {
+                                                            void navigator.clipboard?.writeText(
+                                                                group.token,
+                                                            );
+                                                            toast.success(
+                                                                'Token copied.',
+                                                            );
+                                                        }}
+                                                    >
+                                                        {group.token}
+                                                        <Copy className="size-3.5" />
+                                                    </button>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {group.availableFrom} -{' '}
+                                                    {group.availableUntil}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {group.attemptQuota}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        <Users className="size-4 text-muted-foreground" />
+                                                        {group.redeemedCount}/
+                                                        {group.maxParticipants ??
+                                                            '∞'}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <StatusBadge
+                                                        status={group.status}
+                                                        tone={
+                                                            group.statusValue ===
+                                                            'active'
+                                                                ? 'success'
+                                                                : 'outline'
+                                                        }
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    {group.statusValue ===
+                                                        'active' && (
+                                                        <Form
+                                                            action={`/academics/try-outs/${tryOut.slug}/groups/${group.id}/deactivate`}
+                                                            method="put"
+                                                            onError={() => {
+                                                                toast.error(
+                                                                    'Unable to deactivate group.',
                                                                 );
                                                             }}
                                                         >
-                                                            {group.token}
-                                                            <Copy className="size-3.5" />
-                                                        </button>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {group.availableFrom} -{' '}
-                                                        {group.availableUntil}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {group.attemptQuota}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <span className="inline-flex items-center gap-1.5">
-                                                            <Users className="size-4 text-muted-foreground" />
-                                                            {
-                                                                group.redeemedCount
-                                                            }
-                                                            /
-                                                            {group.maxParticipants ??
-                                                                '∞'}
-                                                        </span>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            {...getBadgeProps(
-                                                                group.statusValue ===
-                                                                    'active'
-                                                                    ? 'success'
-                                                                    : 'outline',
+                                                            {({
+                                                                processing,
+                                                            }) => (
+                                                                <Button
+                                                                    type="submit"
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    disabled={
+                                                                        processing
+                                                                    }
+                                                                    className="text-destructive hover:text-destructive"
+                                                                >
+                                                                    Deactivate
+                                                                </Button>
                                                             )}
-                                                        >
-                                                            {formatBadgeLabel(
-                                                                group.status,
-                                                            )}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        {group.statusValue ===
-                                                            'active' && (
-                                                            <Form
-                                                                action={`/academics/try-outs/${tryOut.slug}/groups/${group.id}/deactivate`}
-                                                                method="put"
-                                                                onError={() => {
-                                                                    toast.error(
-                                                                        'Unable to deactivate group.',
-                                                                    );
-                                                                }}
-                                                            >
-                                                                {({
-                                                                    processing,
-                                                                }) => (
-                                                                    <Button
-                                                                        type="submit"
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        disabled={
-                                                                            processing
-                                                                        }
-                                                                    >
-                                                                        Deactivate
-                                                                    </Button>
-                                                                )}
-                                                            </Form>
-                                                        )}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                                                        </Form>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableScrollArea>
+                        )}
+                    </section>
                 )}
 
-                {tryOut.status === 'Public' && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Recent Attempts</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {tryOut.recentAttempts.length === 0 ? (
-                                <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-                                    No attempts yet.
-                                </div>
-                            ) : (
-                                <div className="rounded-lg border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Student</TableHead>
-                                                <TableHead>Score</TableHead>
-                                                <TableHead>Correct</TableHead>
-                                                <TableHead>
-                                                    Submitted at
-                                                </TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {tryOut.recentAttempts.map(
-                                                (attempt) => (
-                                                    <TableRow key={attempt.id}>
-                                                        <TableCell>
-                                                            <div className="font-medium">
-                                                                {
-                                                                    attempt
-                                                                        .student
-                                                                        .name
-                                                                }
-                                                            </div>
-                                                            <div className="text-sm text-muted-foreground">
-                                                                {
-                                                                    attempt
-                                                                        .student
-                                                                        .email
-                                                                }
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell className="font-medium">
-                                                            {attempt.score} /{' '}
-                                                            {attempt.maxScore}
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {
-                                                                attempt.correctCount
-                                                            }
-                                                            /
-                                                            {
-                                                                attempt.questionCount
-                                                            }
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            {attempt.submittedAt ??
-                                                                '-'}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ),
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                {tryOut.recentAttempts.length > 0 && (
+                    <section className="space-y-4">
+                        <h2 className="font-heading text-lg font-semibold">
+                            Recent Attempts
+                        </h2>
+                        <TableScrollArea>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Student</TableHead>
+                                        <TableHead>Score</TableHead>
+                                        <TableHead>Correct</TableHead>
+                                        <TableHead>Submitted at</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {tryOut.recentAttempts.map((attempt) => (
+                                        <TableRow key={attempt.id}>
+                                            <TableCell className="font-medium">
+                                                {attempt.student.name}
+                                            </TableCell>
+                                            <TableCell className="font-medium">
+                                                {attempt.score} /{' '}
+                                                {attempt.maxScore}
+                                            </TableCell>
+                                            <TableCell>
+                                                {attempt.correctCount}/
+                                                {attempt.questionCount}
+                                            </TableCell>
+                                            <TableCell>
+                                                {attempt.submittedAt ?? '-'}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableScrollArea>
+                    </section>
                 )}
 
                 {tryOut.status === 'Draft' && (
-                    <Card>
-                        <CardHeader>
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <CardTitle>Publish Checklist</CardTitle>
-                                <Badge variant="outline">
-                                    {tryOut.readiness.readyCount}/
-                                    {tryOut.readiness.totalCount} Ready
-                                </Badge>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid gap-3 sm:grid-cols-2">
-                                {tryOut.readiness.items.map((item) => (
-                                    <div
-                                        key={item.key}
-                                        className="flex items-center justify-between gap-3 rounded-lg border p-4"
+                    <section className="space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <h2 className="font-heading text-lg font-semibold">
+                                Publish Checklist
+                            </h2>
+                            <Badge variant="outline">
+                                {tryOut.readiness.readyCount}/
+                                {tryOut.readiness.totalCount} Ready
+                            </Badge>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            {tryOut.readiness.items.map((item) => (
+                                <div
+                                    key={item.key}
+                                    className="flex items-center justify-between gap-3 rounded-lg border p-4"
+                                >
+                                    <span className="text-sm font-medium">
+                                        {item.label}
+                                    </span>
+                                    <Badge
+                                        variant="outline"
+                                        className={
+                                            item.ready
+                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                                : 'border-amber-200 bg-amber-50 text-amber-700'
+                                        }
                                     >
-                                        <span className="text-sm font-medium">
-                                            {item.label}
-                                        </span>
-                                        <Badge
-                                            variant="outline"
-                                            className={
-                                                item.ready
-                                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                                    : 'border-amber-200 bg-amber-50 text-amber-700'
-                                            }
-                                        >
-                                            {item.ready
-                                                ? 'Ready'
-                                                : 'Needs Work'}
-                                        </Badge>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
+                                        {item.ready ? 'Ready' : 'Needs Work'}
+                                    </Badge>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
                 )}
             </div>
         </>

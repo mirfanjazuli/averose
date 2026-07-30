@@ -28,7 +28,9 @@ class AssignScheduleRequest extends FormRequest
             'mentor_id' => [
                 'required',
                 'integer',
-                Rule::exists('users', 'id')->where('role', UserRole::Mentor->value),
+                Rule::exists('users', 'id')
+                    ->where('role', UserRole::Mentor->value)
+                    ->where('status', 'active'),
             ],
         ];
     }

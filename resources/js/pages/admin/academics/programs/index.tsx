@@ -1,13 +1,18 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import { Eye, Layers3, Pencil, Plus, PowerOff, UsersRound } from 'lucide-react';
+import {
+    CheckCircle2,
+    Eye,
+    Layers3,
+    Pencil,
+    Plus,
+    PowerOff,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionMenu } from '@/components/admin/action-menu';
-import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
-import { EmptyState } from '@/components/admin/empty-state';
+import { StatusBadge } from '@/components/admin/status-badge';
 import { SummaryCard } from '@/components/admin/summary-card';
-import { TablePagination } from '@/components/admin/table-pagination';
-import { TableSearch } from '@/components/admin/table-search';
+import { AdminTableSection } from '@/components/admin/table-section';
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -19,7 +24,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     Dialog,
     DialogContent,
@@ -41,10 +45,8 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { useClientPagination } from '@/hooks/use-client-pagination';
-import type {
-    AcademicProgramFieldOption,
-    AcademicProgramFormProgram,
-} from '@/pages/admin/academics/programs/components/academic-program-form';
+import { getBadgeProps } from '@/lib/badge';
+import type { AcademicProgramFormProgram } from '@/pages/admin/academics/programs/components/academic-program-form';
 import { AcademicProgramForm } from '@/pages/admin/academics/programs/components/academic-program-form';
 
 type Program = AcademicProgramFormProgram & {
@@ -58,19 +60,16 @@ type Program = AcademicProgramFormProgram & {
     status: string;
 };
 
-export default function Programs({
-    fieldOptions,
-    programs,
-}: {
-    fieldOptions: AcademicProgramFieldOption[];
-    programs: Program[];
-}) {
+export default function Programs({ programs }: { programs: Program[] }) {
     const [addProgramDialogOpen, setAddProgramDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [editingProgram, setEditingProgram] = useState<Program | null>(null);
     const [deletingProgram, setDeletingProgram] = useState<Program | null>(
         null,
     );
+    const activeProgramsCount = programs.filter(
+        (program) => program.status === 'active',
+    ).length;
 
     const filteredPrograms = useMemo(() => {
         const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -80,13 +79,9 @@ export default function Programs({
         }
 
         return programs.filter((program) =>
-            [
-                program.name,
-                program.field,
-                program.subjects,
-                program.students,
-                program.status,
-            ].some((value) => value.toLowerCase().includes(normalizedSearch)),
+            [program.name, program.field, program.status].some((value) =>
+                value.toLowerCase().includes(normalizedSearch),
+            ),
         );
     }, [programs, searchQuery]);
     const {
@@ -103,7 +98,7 @@ export default function Programs({
     return (
         <>
             <Head title="Programs" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
+            <div className="flex min-h-full max-w-full min-w-0 flex-1 flex-col gap-6 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h1 className="font-heading text-2xl font-semibold">
@@ -123,17 +118,16 @@ export default function Programs({
                                 Add program
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="scrollbar-stable max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-4xl">
+                        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-lg">
                             <DialogHeader>
                                 <DialogTitle>Add program</DialogTitle>
                                 <DialogDescription>
-                                    Create a program and map its fields,
-                                    subjects, and variants.
+                                    Create the program first, then complete its
+                                    academic setup from the detail page.
                                 </DialogDescription>
                             </DialogHeader>
                             <AcademicProgramForm
                                 action="/academics/programs"
-                                fieldOptions={fieldOptions}
                                 idPrefix="program"
                                 method="post"
                                 resetOnSuccess
@@ -159,9 +153,9 @@ export default function Programs({
                         value={programs.length}
                     />
                     <SummaryCard
-                        icon={UsersRound}
-                        label="Enrolled students"
-                        value={106}
+                        icon={CheckCircle2}
+                        label="Active programs"
+                        value={activeProgramsCount}
                     />
                 </div>
 
@@ -173,18 +167,17 @@ export default function Programs({
                         }
                     }}
                 >
-                    <DialogContent className="scrollbar-stable max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-4xl">
+                    <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-lg">
                         <DialogHeader>
                             <DialogTitle>Edit program</DialogTitle>
                             <DialogDescription>
-                                Update this program and its academic mapping.
+                                Update program information only.
                             </DialogDescription>
                         </DialogHeader>
                         {editingProgram && (
                             <AcademicProgramForm
                                 key={editingProgram.id}
                                 action={`/academics/programs/${editingProgram.slug}`}
-                                fieldOptions={fieldOptions}
                                 idPrefix="edit-program"
                                 method="put"
                                 program={editingProgram}
@@ -258,147 +251,102 @@ export default function Programs({
                     </AlertDialogContent>
                 </AlertDialog>
 
-                <Card>
-                    <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-                        <CardTitle>Program list</CardTitle>
-                        <TableSearch
-                            value={searchQuery}
-                            onChange={(value) => {
-                                setSearchQuery(value);
-                                resetPage();
-                            }}
-                            placeholder="Search programs..."
-                        />
-                    </CardHeader>
-                    <CardContent>
-                        {programs.length === 0 ? (
-                            <EmptyState>No programs added yet.</EmptyState>
-                        ) : filteredPrograms.length === 0 ? (
-                            <EmptyState>
-                                No programs match your search.
-                            </EmptyState>
-                        ) : (
-                            <>
-                                <div className="rounded-2xl border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead className="w-20">
-                                                    Image
-                                                </TableHead>
-                                                <TableHead>Name</TableHead>
-                                                <TableHead>Field</TableHead>
-                                                <TableHead>Subjects</TableHead>
-                                                <TableHead>Students</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead className="w-12 text-right" />
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {visiblePrograms.map((program) => (
-                                                <TableRow key={program.id}>
-                                                    <TableCell>
-                                                        {program.thumbnailUrl ? (
-                                                            <img
-                                                                src={
-                                                                    program.thumbnailUrl
-                                                                }
-                                                                alt=""
-                                                                className="aspect-video h-12 w-16 rounded-xl object-cover"
-                                                            />
-                                                        ) : (
-                                                            <div className="flex aspect-video h-12 w-16 items-center justify-center rounded-xl bg-muted text-xs text-muted-foreground">
-                                                                -
-                                                            </div>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="font-medium">
-                                                        {program.name}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            {...getBadgeProps(
-                                                                'outline',
-                                                            )}
-                                                        >
-                                                            {program.field}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {program.subjects}
-                                                    </TableCell>
-                                                    <TableCell className="text-muted-foreground">
-                                                        {program.students}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            {...getBadgeProps(
-                                                                program.status ===
-                                                                    'active'
-                                                                    ? 'success'
-                                                                    : 'muted',
-                                                            )}
-                                                        >
-                                                            {formatBadgeLabel(
-                                                                program.status,
-                                                            )}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <ActionMenu label="Open program actions">
-                                                            <DropdownMenuItem
-                                                                asChild
-                                                            >
-                                                                <Link
-                                                                    href={`/academics/programs/${program.slug}`}
-                                                                >
-                                                                    <Eye className="size-4" />
-                                                                    View
-                                                                </Link>
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                onClick={() =>
-                                                                    setEditingProgram(
-                                                                        program,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Pencil className="size-4" />
-                                                                Edit
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuSeparator />
-                                                            <DropdownMenuItem
-                                                                variant="destructive"
-                                                                onClick={() =>
-                                                                    setDeletingProgram(
-                                                                        program,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <PowerOff className="size-4" />
-                                                                Deactivate
-                                                            </DropdownMenuItem>
-                                                        </ActionMenu>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                                <TablePagination
-                                    entity="programs"
-                                    firstItemIndex={firstItemIndex}
-                                    onPageChange={goToPage}
-                                    onRowsPerPageChange={changeRowsPerPage}
-                                    rowsPerPage={rowsPerPage}
-                                    safeCurrentPage={safeCurrentPage}
-                                    totalItems={filteredPrograms.length}
-                                    totalPages={totalPages}
-                                />
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+                <AdminTableSection
+                    emptyMessage="No programs added yet."
+                    emptySearchMessage="No programs match your search."
+                    filteredItems={filteredPrograms.length}
+                    pagination={{
+                        entity: 'programs',
+                        firstItemIndex,
+                        onPageChange: goToPage,
+                        onRowsPerPageChange: changeRowsPerPage,
+                        rowsPerPage,
+                        safeCurrentPage,
+                        totalItems: filteredPrograms.length,
+                        totalPages,
+                    }}
+                    search={{
+                        value: searchQuery,
+                        onChange: (value) => {
+                            setSearchQuery(value);
+                            resetPage();
+                        },
+                        placeholder: 'Search programs...',
+                    }}
+                    totalItems={programs.length}
+                >
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-20">Image</TableHead>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Field</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="w-12 text-right" />
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {visiblePrograms.map((program) => (
+                                <TableRow key={program.id}>
+                                    <TableCell>
+                                        {program.thumbnailUrl ? (
+                                            <img
+                                                src={program.thumbnailUrl}
+                                                alt=""
+                                                className="aspect-video h-12 w-16 rounded-xl object-cover"
+                                            />
+                                        ) : (
+                                            <div className="flex aspect-video h-12 w-16 items-center justify-center rounded-xl bg-muted text-xs text-muted-foreground">
+                                                -
+                                            </div>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="font-medium">
+                                        {program.name}
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge {...getBadgeProps('outline')}>
+                                            {program.field}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                        <StatusBadge status={program.status} />
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <ActionMenu label="Open program actions">
+                                            <DropdownMenuItem asChild>
+                                                <Link
+                                                    href={`/academics/programs/${program.slug}`}
+                                                >
+                                                    <Eye className="size-4" />
+                                                    View
+                                                </Link>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    setEditingProgram(program)
+                                                }
+                                            >
+                                                <Pencil className="size-4" />
+                                                Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem
+                                                variant="destructive"
+                                                onClick={() =>
+                                                    setDeletingProgram(program)
+                                                }
+                                            >
+                                                <PowerOff className="size-4" />
+                                                Deactivate
+                                            </DropdownMenuItem>
+                                        </ActionMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </AdminTableSection>
             </div>
         </>
     );

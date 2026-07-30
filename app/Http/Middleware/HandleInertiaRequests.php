@@ -3,6 +3,8 @@
 namespace App\Http\Middleware;
 
 use App\Models\RescheduleRequest;
+use App\Models\Schedule;
+use App\Support\NotificationFeed;
 use App\Support\PermissionRegistry;
 use App\UserRole;
 use Illuminate\Http\Request;
@@ -48,6 +50,7 @@ class HandleInertiaRequests extends Middleware
                     ? [
                         'id' => $request->user()->id,
                         'name' => $request->user()->name,
+                        'nickname' => $request->user()->nickname,
                         'email' => $request->user()->email,
                         'permissions' => $this->permissions($request),
                         'role' => $request->user()->role->value,
@@ -63,11 +66,23 @@ class HandleInertiaRequests extends Middleware
             ],
 
             'navigation' => [
+                'pendingSchedules' => $request->user()?->role === UserRole::Admin
+                    && $request->user()?->hasPermission('schedules.view')
+                    ? Schedule::query()->where('status', 'pending')->count()
+                    : 0,
                 'pendingRescheduleRequests' => $request->user()?->role === UserRole::Admin
                     && $request->user()?->hasPermission('schedules.view')
                     ? RescheduleRequest::query()->where('status', 'pending')->count()
                     : 0,
             ],
+
+            'notificationFeed' => fn (): array => in_array(
+                $request->user()?->role,
+                [UserRole::Mentor, UserRole::Student],
+                true,
+            )
+                ? NotificationFeed::for($request->user())
+                : ['items' => [], 'unreadCount' => 0],
 
             'sidebarOpen' => ! $request->hasCookie('sidebar_state')
                 || $request->cookie('sidebar_state') === 'true',

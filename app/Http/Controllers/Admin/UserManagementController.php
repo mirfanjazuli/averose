@@ -4,16 +4,20 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProgramEnrollmentRequest;
+use App\Models\MentorLevel;
 use App\Models\Program;
 use App\Models\ProgramEnrollment;
 use App\Models\Role;
+use App\Models\Subject;
 use App\Models\TryOut;
 use App\Models\TryOutAccess;
 use App\Models\User;
 use App\UserRole;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -33,7 +37,10 @@ class UserManagementController extends Controller
 
     public function mentors(): Response
     {
-        return $this->index(UserRole::Mentor, 'admin/users/mentors/index');
+        return $this->index(UserRole::Mentor, 'admin/users/mentors/index', [
+            'mentorLevelOptions' => $this->mentorLevelOptions(),
+            'subjectOptions' => $this->subjectOptions(),
+        ]);
     }
 
     public function showStudent(User $user): Response
@@ -89,8 +96,11 @@ class UserManagementController extends Controller
     public function showMentor(User $user): Response
     {
         abort_unless($user->isMentor(), 404);
+        $user->loadMissing('mentorProfile.mentorLevel');
 
         return $this->show($user, 'admin/users/mentors/show', 'Mentors', route('mentors'), [
+            'expertiseSubjects' => $this->mentorExpertiseSubjects($user),
+            'resolvedMentorLevel' => $this->serializeMentorLevel($this->resolvedMentorLevel($user)),
             'teachingJournals' => $this->teachingJournals($user),
         ]);
     }
@@ -152,17 +162,29 @@ class UserManagementController extends Controller
     public function update(Request $request, User $user): RedirectResponse
     {
         abort_unless($request->user()?->hasPermission($this->userPermissionKey($user, 'update')), 403);
+        $user->loadMissing('mentorProfile');
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user)],
+            'mentor_level_id' => [
+                $user->isMentor() ? 'required' : 'nullable',
+                Rule::exists('mentor_levels', 'id')->where(fn ($query) => $query
+                    ->where('status', 'active')
+                    ->when($user->mentorProfile?->mentor_level_id, fn ($query) => $query->orWhere('id', $user->mentorProfile?->mentor_level_id))),
+            ],
+            'expertise' => ['nullable', 'array'],
+            'expertise.*' => ['nullable', Rule::exists('subjects', 'id')->where('status', 'active')],
             'role_id' => ['nullable', Rule::exists('roles', 'id')->where('status', 'active')],
         ]);
 
         $user->update([
-            ...$validated,
+            'email' => $validated['email'],
+            'name' => $validated['name'],
             'role_id' => $user->isAdmin() ? (($validated['role_id'] ?? null) ?: null) : null,
         ]);
+
+        $this->syncRoleProfile($user, $validated);
 
         return back();
     }
@@ -181,7 +203,7 @@ class UserManagementController extends Controller
     {
         return Inertia::render($component, [
             'users' => User::query()
-                ->with('internalRole:id,name')
+                ->with(['internalRole:id,name', 'mentorProfile.mentorLevel:id,name,hourly_rate,status'])
                 ->where('role', $role)
                 ->latest()
                 ->get(['id', 'name', 'nickname', 'slug', 'email', 'role', 'role_id', 'status', 'created_at'])
@@ -191,7 +213,10 @@ class UserManagementController extends Controller
                     'nickname' => $user->nickname,
                     'slug' => $user->slug,
                     'email' => $user->email,
+                    'expertise' => $this->serializeMentorExpertise($user),
                     'internalRole' => $user->internalRole?->name,
+                    'mentorLevel' => $this->serializeMentorLevel($this->resolvedMentorLevel($user)),
+                    'mentorLevelId' => $user->mentorProfile?->mentor_level_id,
                     'roleId' => $user->role_id,
                     'status' => $user->status,
                     'createdAt' => $user->created_at?->format('M d, Y'),
@@ -203,18 +228,63 @@ class UserManagementController extends Controller
     private function store(Request $request, UserRole $role): RedirectResponse
     {
         $validated = $request->validate([
+            'add_program_access' => ['nullable', 'boolean'],
+            'add_try_out_access' => ['nullable', 'boolean'],
+            'attempt_quota' => ['nullable', 'integer', 'min:1', 'max:1000'],
+            'available_from' => ['nullable', 'date'],
+            'available_until' => ['nullable', 'date', 'after_or_equal:available_from'],
+            'enrollments' => ['nullable', 'array'],
+            'enrollments.*' => ['array'],
+            'enrollments.*.field_id' => ['nullable', 'integer', 'exists:fields,id'],
+            'enrollments.*.max_reschedule' => ['nullable', 'integer', 'min:0', 'max:255'],
+            'enrollments.*.program_id' => ['nullable', 'integer', 'exists:programs,id'],
+            'enrollments.*.program_variant_id' => ['nullable', 'integer', 'exists:program_variants,id'],
+            'enrollments.*.start_date' => ['nullable', 'date'],
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
+            'field_id' => ['nullable', 'integer', 'exists:fields,id'],
+            'max_reschedule' => ['nullable', 'integer', 'min:0', 'max:255'],
+            'mentor_level_id' => [
+                $role === UserRole::Mentor ? 'required' : 'nullable',
+                Rule::exists('mentor_levels', 'id')->where('status', 'active'),
+            ],
+            'expertise' => ['nullable', 'array'],
+            'expertise.*' => ['nullable', Rule::exists('subjects', 'id')->where('status', 'active')],
+            'program_id' => ['nullable', 'integer', 'exists:programs,id'],
+            'program_variant_id' => ['nullable', 'integer', 'exists:program_variants,id'],
             'role_id' => ['nullable', Rule::exists('roles', 'id')->where('status', 'active')],
+            'start_date' => ['nullable', 'date'],
+            'status' => ['nullable', Rule::in(['active', 'inactive'])],
+            'try_out_accesses' => ['nullable', 'array'],
+            'try_out_accesses.*' => ['array'],
+            'try_out_accesses.*.attempt_quota' => ['nullable', 'integer', 'min:1', 'max:1000'],
+            'try_out_accesses.*.available_from' => ['nullable', 'date'],
+            'try_out_accesses.*.available_until' => ['nullable', 'date'],
+            'try_out_accesses.*.try_out_id' => ['nullable', Rule::exists('try_outs', 'id')->where('status', 'private')],
+            'try_out_id' => ['nullable', Rule::exists('try_outs', 'id')->where('status', 'private')],
         ]);
 
-        User::query()->create([
-            ...$validated,
-            'password' => 'averose123',
-            'role' => $role,
-            'role_id' => $role === UserRole::Admin ? (($validated['role_id'] ?? null) ?: null) : null,
-            'status' => 'active',
-        ]);
+        $this->validateStudentAccessData($role, $validated);
+
+        $user = DB::transaction(function () use ($role, $validated): User {
+            $user = User::query()->create([
+                'email' => $validated['email'],
+                'name' => $validated['name'],
+                'password' => 'averose123',
+                'role' => $role,
+                'role_id' => $role === UserRole::Admin ? (($validated['role_id'] ?? null) ?: null) : null,
+                'status' => 'active',
+            ]);
+
+            $this->syncRoleProfile($user, $validated);
+            $this->syncInitialStudentAccess($user, $validated);
+
+            return $user;
+        });
+
+        if ($role === UserRole::Student) {
+            return to_route('students.show', $user)->with('success', 'Student added.');
+        }
 
         return back();
     }
@@ -290,6 +360,9 @@ class UserManagementController extends Controller
             'nickname' => $user->nickname,
             'slug' => $user->slug,
             'email' => $user->email,
+            'expertise' => $this->serializeMentorExpertise($user),
+            'mentorLevel' => $this->serializeMentorLevel($user->resolvedMentorLevel()),
+            'mentorLevelId' => $user->mentorProfile?->mentor_level_id,
             'roleId' => $user->role_id,
             'status' => $user->status,
             'createdAt' => $user->created_at?->format('M d, Y'),
@@ -317,6 +390,280 @@ class UserManagementController extends Controller
                 'label' => $role->name,
             ])
             ->all();
+    }
+
+    private function mentorLevelOptions(): array
+    {
+        return MentorLevel::query()
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get(['id', 'name', 'hourly_rate'])
+            ->map(fn (MentorLevel $level): array => [
+                'hourlyRate' => $level->hourly_rate,
+                'id' => (string) $level->id,
+                'label' => $level->name,
+            ])
+            ->all();
+    }
+
+    private function subjectOptions(): array
+    {
+        return Subject::query()
+            ->where('status', 'active')
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (Subject $subject): array => [
+                'id' => (string) $subject->id,
+                'label' => $subject->name,
+            ])
+            ->all();
+    }
+
+    private function serializeMentorLevel(?MentorLevel $level): ?array
+    {
+        if (! $level) {
+            return null;
+        }
+
+        return [
+            'hourlyRate' => $level->hourly_rate,
+            'id' => $level->id,
+            'name' => $level->name,
+            'status' => $level->status,
+        ];
+    }
+
+    private function resolvedMentorLevel(User $user): ?MentorLevel
+    {
+        if (! $user->isMentor()) {
+            return null;
+        }
+
+        return $user->mentorProfile?->mentorLevel;
+    }
+
+    private function serializeMentorExpertise(User $user): array
+    {
+        if (! $user->isMentor()) {
+            return [];
+        }
+
+        return collect($user->mentorProfile?->expertise ?? [])
+            ->filter()
+            ->map(fn ($id): string => (string) $id)
+            ->values()
+            ->all();
+    }
+
+    private function mentorExpertiseSubjects(User $user): array
+    {
+        $expertiseIds = $this->serializeMentorExpertise($user);
+
+        if ($expertiseIds === []) {
+            return [];
+        }
+
+        return Subject::query()
+            ->whereIn('id', $expertiseIds)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (Subject $subject): array => [
+                'id' => (string) $subject->id,
+                'name' => $subject->name,
+            ])
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function syncRoleProfile(User $user, array $validated): void
+    {
+        $user->ensureRoleProfile();
+
+        if (! $user->isMentor()) {
+            return;
+        }
+
+        $user->mentorProfile()->updateOrCreate([], [
+            'expertise' => collect($validated['expertise'] ?? [])
+                ->filter()
+                ->map(fn ($id): string => (string) $id)
+                ->values()
+                ->all(),
+            'mentor_level_id' => ($validated['mentor_level_id'] ?? null) ?: null,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function validateStudentAccessData(UserRole $role, array $validated): void
+    {
+        if ($role !== UserRole::Student) {
+            return;
+        }
+
+        if ($validated['add_program_access'] ?? false) {
+            foreach ($this->initialEnrollmentRows($validated) as $index => $enrollment) {
+                foreach (['program_id', 'field_id', 'program_variant_id', 'start_date'] as $field) {
+                    if (blank($enrollment[$field] ?? null)) {
+                        throw ValidationException::withMessages([
+                            $this->enrollmentErrorKey($field, $index) => 'This field is required when adding program access.',
+                        ]);
+                    }
+                }
+
+                $program = Program::query()
+                    ->with(['fields:id', 'variants:id,field_id'])
+                    ->find($enrollment['program_id']);
+                $variant = $program
+                    ? $program->variants->firstWhere('id', (int) $enrollment['program_variant_id'])
+                    : null;
+
+                if (! $program?->fields->contains('id', (int) $enrollment['field_id'])) {
+                    throw ValidationException::withMessages([
+                        $this->enrollmentErrorKey('field_id', $index) => 'The selected field is not available for this program.',
+                    ]);
+                }
+
+                if (! $variant || $variant->field_id !== (int) $enrollment['field_id']) {
+                    throw ValidationException::withMessages([
+                        $this->enrollmentErrorKey('program_variant_id', $index) => 'The selected variant is not available for this field.',
+                    ]);
+                }
+            }
+
+            if ($this->initialEnrollmentRows($validated) === []) {
+                throw ValidationException::withMessages([
+                    'enrollments' => 'Add at least one program enrollment.',
+                ]);
+            }
+        }
+
+        if ($validated['add_try_out_access'] ?? false) {
+            foreach ($this->initialTryOutAccessRows($validated) as $index => $access) {
+                foreach (['try_out_id', 'available_from', 'available_until', 'attempt_quota'] as $field) {
+                    if (blank($access[$field] ?? null)) {
+                        throw ValidationException::withMessages([
+                            $this->tryOutAccessErrorKey($field, $index) => 'This field is required when adding try out access.',
+                        ]);
+                    }
+                }
+
+                if (filled($access['available_from'] ?? null) && filled($access['available_until'] ?? null) && $access['available_until'] < $access['available_from']) {
+                    throw ValidationException::withMessages([
+                        $this->tryOutAccessErrorKey('available_until', $index) => 'The end date must be after or equal to the start date.',
+                    ]);
+                }
+            }
+
+            if ($this->initialTryOutAccessRows($validated) === []) {
+                throw ValidationException::withMessages([
+                    'try_out_accesses' => 'Add at least one try out access.',
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     */
+    private function syncInitialStudentAccess(User $user, array $validated): void
+    {
+        if (! $user->isStudent()) {
+            return;
+        }
+
+        if ($validated['add_program_access'] ?? false) {
+            foreach ($this->initialEnrollmentRows($validated) as $enrollment) {
+                $user->programEnrollments()->create([
+                    'field_id' => $enrollment['field_id'],
+                    'max_reschedule' => ($enrollment['max_reschedule'] ?? null) ?: null,
+                    'program_id' => $enrollment['program_id'],
+                    'program_variant_id' => $enrollment['program_variant_id'],
+                    'start_date' => $enrollment['start_date'],
+                    'status' => 'active',
+                ]);
+            }
+        }
+
+        if ($validated['add_try_out_access'] ?? false) {
+            foreach ($this->initialTryOutAccessRows($validated) as $access) {
+                $user->tryOutAccesses()->create([
+                    'attempt_quota' => $access['attempt_quota'],
+                    'available_from' => $access['available_from'],
+                    'available_until' => $access['available_until'],
+                    'status' => 'active',
+                    'try_out_id' => $access['try_out_id'],
+                ]);
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array<int, array<string, mixed>>
+     */
+    private function initialEnrollmentRows(array $validated): array
+    {
+        if (filled($validated['enrollments'] ?? null)) {
+            return array_values(array_filter(
+                $validated['enrollments'],
+                fn (array $enrollment): bool => collect(['program_id', 'field_id', 'program_variant_id', 'start_date'])
+                    ->contains(fn (string $field): bool => filled($enrollment[$field] ?? null)),
+            ));
+        }
+
+        if (collect(['program_id', 'field_id', 'program_variant_id', 'start_date'])
+            ->contains(fn (string $field): bool => filled($validated[$field] ?? null))) {
+            return [[
+                'field_id' => $validated['field_id'] ?? null,
+                'max_reschedule' => $validated['max_reschedule'] ?? null,
+                'program_id' => $validated['program_id'] ?? null,
+                'program_variant_id' => $validated['program_variant_id'] ?? null,
+                'start_date' => $validated['start_date'] ?? null,
+            ]];
+        }
+
+        return [];
+    }
+
+    private function enrollmentErrorKey(string $field, int $index): string
+    {
+        return "enrollments.{$index}.{$field}";
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @return array<int, array<string, mixed>>
+     */
+    private function initialTryOutAccessRows(array $validated): array
+    {
+        if (filled($validated['try_out_accesses'] ?? null)) {
+            return array_values(array_filter(
+                $validated['try_out_accesses'],
+                fn (array $access): bool => collect(['try_out_id', 'available_from', 'available_until', 'attempt_quota'])
+                    ->contains(fn (string $field): bool => filled($access[$field] ?? null)),
+            ));
+        }
+
+        if (collect(['try_out_id', 'available_from', 'available_until', 'attempt_quota'])
+            ->contains(fn (string $field): bool => filled($validated[$field] ?? null))) {
+            return [[
+                'attempt_quota' => $validated['attempt_quota'] ?? null,
+                'available_from' => $validated['available_from'] ?? null,
+                'available_until' => $validated['available_until'] ?? null,
+                'try_out_id' => $validated['try_out_id'] ?? null,
+            ]];
+        }
+
+        return [];
+    }
+
+    private function tryOutAccessErrorKey(string $field, int $index): string
+    {
+        return "try_out_accesses.{$index}.{$field}";
     }
 
     private function programEnrollmentOptions(): array

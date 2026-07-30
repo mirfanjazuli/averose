@@ -19,7 +19,7 @@ const sidebarNavItems: NavItem[] = [
         icon: UserRound,
     },
     {
-        title: 'Security',
+        title: 'Akun',
         href: editSecurity(),
         icon: ShieldCheck,
     },

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreWorkingHourRequest;
 use App\Models\WorkingHour;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -24,17 +25,27 @@ class WorkingHourController extends Controller
         ]);
     }
 
-    public function update(StoreWorkingHourRequest $request, WorkingHour $workingHour): RedirectResponse
+    public function update(StoreWorkingHourRequest $request): RedirectResponse
     {
         $validated = $request->validated();
+        $activeDays = collect($validated['days'])->map(fn (mixed $day): int => (int) $day);
 
-        $workingHour->update([
-            'end_time' => $validated['is_active'] ? $validated['end_time'] : null,
-            'is_active' => $validated['is_active'],
-            'start_time' => $validated['is_active'] ? $validated['start_time'] : null,
-        ]);
+        DB::transaction(function () use ($activeDays, $validated): void {
+            collect(range(1, 7))->each(function (int $dayOfWeek) use ($activeDays, $validated): void {
+                $isActive = $activeDays->contains($dayOfWeek);
 
-        return back();
+                WorkingHour::query()->updateOrCreate(
+                    ['day_of_week' => $dayOfWeek],
+                    [
+                        'end_time' => $isActive ? $validated['end_time'] : null,
+                        'is_active' => $isActive,
+                        'start_time' => $isActive ? $validated['start_time'] : null,
+                    ],
+                );
+            });
+        });
+
+        return back()->with('success', 'Working hours updated.');
     }
 
     private function ensureDefaults(): void

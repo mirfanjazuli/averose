@@ -28,7 +28,7 @@ class StoreProgramRequest extends FormRequest
             'thumbnail' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'description' => ['nullable', 'string', 'max:4000'],
             'max_reschedule' => ['required', 'integer', 'min:0', 'max:255'],
-            'fields' => ['required', 'array', 'min:1'],
+            'fields' => ['sometimes', 'array', 'min:1'],
             'fields.*' => ['integer', Rule::exists('fields', 'id')],
             'subjects' => ['nullable', 'array'],
             'subjects.*' => ['integer', Rule::exists('subjects', 'id')],

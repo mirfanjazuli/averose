@@ -1,6 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
     Activity,
+    BadgeDollarSign,
     BookOpenText,
     BriefcaseBusiness,
     CalendarOff,
@@ -17,6 +18,7 @@ import {
     Play,
     Repeat2,
     NotebookPen,
+    ScrollText,
     Shapes,
     UserRoundCheck,
     Users,
@@ -52,6 +54,7 @@ export function AppSidebar() {
             } | null;
         };
         navigation?: {
+            pendingSchedules?: number;
             pendingRescheduleRequests?: number;
         };
     }>();
@@ -61,11 +64,13 @@ export function AppSidebar() {
     const canAny = (items: string[]) => items.some((item) => can(item));
     const pendingRescheduleRequests =
         page.props.navigation?.pendingRescheduleRequests ?? 0;
+    const pendingSchedules = page.props.navigation?.pendingSchedules ?? 0;
     const isSchedulesOpen = isCurrentUrl('/scheduling', undefined, true);
     const isUsersOpen =
         isCurrentUrl('/users/internal', undefined, true) ||
         isCurrentUrl('/users/students', undefined, true) ||
         isCurrentUrl('/users/mentors', undefined, true) ||
+        isCurrentUrl('/users/mentor-levels', undefined, true) ||
         isCurrentUrl('/users/roles', undefined, true);
     const isAcademicsOpen =
         isCurrentUrl('/academics/fields', undefined, true) ||
@@ -79,6 +84,7 @@ export function AppSidebar() {
         'internal.view',
         'students.view',
         'mentors.view',
+        'mentor_levels.view',
         'roles.view',
     ]);
     const showAcademics = canAny([
@@ -154,7 +160,14 @@ export function AppSidebar() {
                                                 prefetch
                                             >
                                                 <CalendarClock />
-                                                <span>Schedules</span>
+                                                <span className="min-w-0 flex-1 truncate whitespace-nowrap">
+                                                    Schedules
+                                                </span>
+                                                {pendingSchedules > 0 && (
+                                                    <span className="ml-2 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] leading-none font-semibold text-white">
+                                                        {pendingSchedules}
+                                                    </span>
+                                                )}
                                             </Link>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
@@ -297,6 +310,26 @@ export function AppSidebar() {
                                             </Link>
                                         </SidebarMenuSubButton>
                                     </SidebarMenuSubItem>
+                                    )}
+                                    {can('mentor_levels.view') && (
+                                        <SidebarMenuSubItem>
+                                            <SidebarMenuSubButton
+                                                asChild
+                                                isActive={isCurrentUrl(
+                                                    '/users/mentor-levels',
+                                                    undefined,
+                                                    true,
+                                                )}
+                                            >
+                                                <Link
+                                                    href="/users/mentor-levels"
+                                                    prefetch
+                                                >
+                                                    <BadgeDollarSign />
+                                                    <span>Mentor Levels</span>
+                                                </Link>
+                                            </SidebarMenuSubButton>
+                                        </SidebarMenuSubItem>
                                     )}
                                     {can('roles.view') && (
                                         <SidebarMenuSubItem>
@@ -501,6 +534,25 @@ export function AppSidebar() {
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
+                    )}
+
+                    {can('logs.view') && (
+                        <SidebarMenuItem>
+                            <SidebarMenuButton
+                                asChild
+                                isActive={isCurrentUrl(
+                                    '/logs',
+                                    undefined,
+                                    true,
+                                )}
+                                tooltip={{ children: 'Activity Logs' }}
+                            >
+                                <Link href="/logs" prefetch>
+                                    <ScrollText />
+                                    <span>Activity Logs</span>
+                                </Link>
+                            </SidebarMenuButton>
+                        </SidebarMenuItem>
                     )}
                 </SidebarMenu>
             </SidebarContent>

@@ -2,10 +2,10 @@ import { Form, Head, usePage } from '@inertiajs/react';
 import { ImagePlus, Info, LoaderCircle, Pencil } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
+import { EmptyState } from '@/components/admin/empty-state';
+import { StatusBadge } from '@/components/admin/status-badge';
 import InputError from '@/components/input-error';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -405,9 +405,6 @@ export default function AdminTryOutQuestions({
     const [activeQuestionId, setActiveQuestionId] = useState<string | null>(
         tryOut.questions[0]?.id ?? null,
     );
-    const closeEditTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-        null,
-    );
     const questionListRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -478,33 +475,12 @@ export default function AdminTryOutQuestions({
         };
     }, [tryOut.questions]);
 
-    useEffect(() => {
-        return () => {
-            if (closeEditTimeoutRef.current) {
-                clearTimeout(closeEditTimeoutRef.current);
-            }
-        };
-    }, []);
-
     const closeEditingQuestion = useCallback(() => {
         setEditDialogOpen(false);
-
-        if (closeEditTimeoutRef.current) {
-            clearTimeout(closeEditTimeoutRef.current);
-        }
-
-        closeEditTimeoutRef.current = setTimeout(() => {
-            setEditingQuestion(null);
-            closeEditTimeoutRef.current = null;
-        }, 150);
+        setEditingQuestion(null);
     }, []);
 
     const startEditingQuestion = (question: TryOutQuestion) => {
-        if (closeEditTimeoutRef.current) {
-            clearTimeout(closeEditTimeoutRef.current);
-            closeEditTimeoutRef.current = null;
-        }
-
         setEditingQuestion(question);
         setQuestionSource(
             richHtmlToEditableSource(
@@ -536,16 +512,14 @@ export default function AdminTryOutQuestions({
     return (
         <>
             <Head title={`${tryOut.title} Questions`} />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
+            <div className="flex h-full max-w-full min-w-0 flex-1 flex-col gap-6 overflow-hidden p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <div className="flex flex-wrap items-center gap-3">
                             <h1 className="font-heading text-2xl font-semibold">
                                 Questions
                             </h1>
-                            <Badge {...getBadgeProps('outline')}>
-                                {formatBadgeLabel(tryOut.status)}
-                            </Badge>
+                            <StatusBadge status={tryOut.status} />
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">
                             {tryOut.title}
@@ -554,9 +528,7 @@ export default function AdminTryOutQuestions({
                 </div>
 
                 {tryOut.questions.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-                        No questions available.
-                    </div>
+                    <EmptyState>No questions available.</EmptyState>
                 ) : (
                     <div className="grid gap-6 lg:grid-cols-[12rem_minmax(0,1fr)]">
                         <aside className="lg:sticky lg:top-4 lg:self-start">

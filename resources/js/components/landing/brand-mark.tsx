@@ -1,15 +1,18 @@
-import { HeartPulse } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-export default function BrandMark() {
+export default function BrandMark({
+    className,
+}: {
+    className?: string;
+}) {
     return (
-        <span className="flex items-center gap-2.5">
-            <span className="relative flex size-9 items-center justify-center rounded-xl bg-[#0f8f7a] text-white shadow-sm shadow-[#0f8f7a]/20">
-                <HeartPulse className="size-5" strokeWidth={2.4} />
-                <span className="absolute -right-1 -bottom-1 size-3 rounded-full border-2 border-white bg-[#d9a441]" />
-            </span>
-            <span className="font-heading text-xl font-semibold tracking-tight text-[#102a3a]">
-                Ave<span className="text-[#0f8f7a]">Rose</span>
-            </span>
-        </span>
+        <img
+            src="/images/averose-logo.png"
+            alt="AveRose"
+            className={cn(
+                'h-auto w-32 rounded-md object-contain drop-shadow-[0_0_28px_rgba(15,143,122,0.95)]',
+                className,
+            )}
+        />
     );
 }

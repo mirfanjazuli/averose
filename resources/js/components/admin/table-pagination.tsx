@@ -16,7 +16,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 
-type TablePaginationProps = {
+export type TablePaginationProps = {
     entity: string;
     firstItemIndex: number;
     onPageChange: (page: number) => void;
@@ -72,10 +72,13 @@ export function TablePagination({
                         onRowsPerPageChange(Number(value))
                     }
                 >
-                    <SelectTrigger className="h-9 w-20 rounded-xl">
+                    <SelectTrigger
+                        size="sm"
+                        className="h-10 min-h-10 w-20 rounded-xl py-0"
+                    >
                         <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="p-1.5">
                         <SelectItem value="5">5</SelectItem>
                         <SelectItem value="10">10</SelectItem>
                         <SelectItem value="20">20</SelectItem>

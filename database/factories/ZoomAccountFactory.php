@@ -25,4 +25,11 @@ class ZoomAccountFactory extends Factory
             'token_secret' => fake()->password(32, 48),
         ];
     }
+
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'status' => 'inactive',
+        ]);
+    }
 }

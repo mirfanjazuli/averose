@@ -1,22 +1,14 @@
-import { Form, Head, usePage } from '@inertiajs/react';
-import {
-    CalendarClock,
-    Check,
-    Clock3,
-    MessageSquareText,
-    Repeat2,
-    X,
-} from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
-import { EmptyState } from '@/components/admin/empty-state';
+import { Head, Link } from '@inertiajs/react';
+import { CalendarClock, Check, Clock3, Eye, Repeat2, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ActionMenu } from '@/components/admin/action-menu';
 import { SummaryCard } from '@/components/admin/summary-card';
-import { TablePagination } from '@/components/admin/table-pagination';
-import { TableSearch } from '@/components/admin/table-search';
-import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
+import { AdminTableSection } from '@/components/admin/table-section';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 import {
     Table,
     TableBody,
@@ -25,17 +17,31 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useClientPagination } from '@/hooks/use-client-pagination';
+import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
+import {
+    ApproveRescheduleDialog,
+    RejectRescheduleDialog,
+} from './components/review-dialogs';
 
 type RescheduleRequest = {
     adminNote: string | null;
     current: string;
+    currentEndAt: string;
+    currentStartAt: string;
     id: string;
     mentor: string;
     notes: string | null;
     program: string;
     reason: string;
     requested: string;
+    requestedEndAt: string;
+    requestedStartAt: string;
     reviewedAt: string | null;
     reviewer: string | null;
     session: string;
@@ -56,6 +62,27 @@ const summaryCards = [
     { key: 'rejected', label: 'Rejected', icon: X },
 ] as const;
 
+function formatScheduleDate(value: string) {
+    return new Intl.DateTimeFormat('id-ID', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+    }).format(new Date(value));
+}
+
+function formatScheduleTime(value: string) {
+    const formatter = new Intl.DateTimeFormat('id-ID', {
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+
+    return `${formatter.format(new Date(value))} WIB`;
+}
+
+function formatActionDate(value: string) {
+    return `${formatScheduleDate(value)}, ${formatScheduleTime(value)}`;
+}
+
 export default function RescheduleRequests({
     requests,
     summary,
@@ -63,14 +90,11 @@ export default function RescheduleRequests({
     requests: RescheduleRequest[];
     summary: Summary;
 }) {
-    const page = usePage<{ flash?: { success?: string } }>();
+    const [approveRequestId, setApproveRequestId] = useState<string | null>(
+        null,
+    );
+    const [rejectRequestId, setRejectRequestId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-
-    useEffect(() => {
-        if (page.props.flash?.success) {
-            toast.success(page.props.flash.success);
-        }
-    }, [page.props.flash?.success]);
 
     const filteredRequests = useMemo(() => {
         const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -83,7 +107,6 @@ export default function RescheduleRequests({
             [
                 request.student,
                 request.mentor,
-                request.program,
                 request.session,
                 request.reason,
                 request.notes ?? '',
@@ -111,7 +134,7 @@ export default function RescheduleRequests({
     return (
         <>
             <Head title="Reschedule Requests" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
+            <div className="flex min-h-full max-w-full min-w-0 flex-1 flex-col gap-6 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h1 className="font-heading text-2xl font-semibold">
@@ -135,181 +158,170 @@ export default function RescheduleRequests({
                     ))}
                 </div>
 
-                <Card>
-                    <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-                        <CardTitle>Requests</CardTitle>
-                        <TableSearch
-                            value={searchQuery}
-                            onChange={(value) => {
-                                setSearchQuery(value);
-                                resetPage();
-                            }}
-                            placeholder="Search requests..."
-                        />
-                    </CardHeader>
-                    <CardContent>
-                        {requests.length === 0 ? (
-                            <EmptyState>No reschedule requests yet.</EmptyState>
-                        ) : filteredRequests.length === 0 ? (
-                            <EmptyState>
-                                No reschedule requests match your search.
-                            </EmptyState>
-                        ) : (
-                            <>
-                                <div className="rounded-2xl border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Student</TableHead>
-                                                <TableHead>Session</TableHead>
-                                                <TableHead>Current</TableHead>
-                                                <TableHead>Requested</TableHead>
-                                                <TableHead>Reason</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead className="w-24 text-right" />
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {visibleRequests.map((request) => (
-                                                <TableRow key={request.id}>
-                                                    <TableCell>
-                                                        <p className="font-medium">
-                                                            {request.student}
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            Mentor:{' '}
-                                                            {request.mentor}
-                                                        </p>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <p className="font-medium">
-                                                            {request.session}
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {request.program}
-                                                        </p>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex items-center gap-2 text-sm">
-                                                            <CalendarClock className="size-4 text-muted-foreground" />
-                                                            <span>
-                                                                {
-                                                                    request.current
-                                                                }
-                                                            </span>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex items-center gap-2 text-sm">
-                                                            <Repeat2 className="size-4 text-primary" />
-                                                            <span>
-                                                                {
-                                                                    request.requested
-                                                                }
-                                                            </span>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="max-w-64">
-                                                            <p className="flex items-center gap-1.5 text-sm">
-                                                                <MessageSquareText className="size-3.5 text-muted-foreground" />
-                                                                {request.reason}
-                                                            </p>
-                                                            {request.notes && (
-                                                                <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                                                                    {
-                                                                        request.notes
-                                                                    }
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            {...getBadgeProps(
-                                                                request.status ===
-                                                                    'Approved'
-                                                                    ? 'success'
-                                                                    : request.status ===
-                                                                        'Rejected'
-                                                                      ? 'danger'
-                                                                      : 'muted',
-                                                            )}
-                                                        >
-                                                            {formatBadgeLabel(
-                                                                request.status,
-                                                            )}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        {request.status ===
-                                                        'Pending' ? (
-                                                            <div className="flex justify-end gap-2">
-                                                                <Form
-                                                                    action={`/scheduling/reschedule-requests/${request.id}/reject`}
-                                                                    method="put"
-                                                                >
-                                                                    {({
-                                                                        processing,
-                                                                    }) => (
-                                                                        <Button
-                                                                            type="submit"
-                                                                            variant="outline"
-                                                                            size="icon-sm"
-                                                                            disabled={
-                                                                                processing
-                                                                            }
-                                                                        >
-                                                                            <X className="size-4" />
-                                                                        </Button>
-                                                                    )}
-                                                                </Form>
-                                                                <Form
-                                                                    action={`/scheduling/reschedule-requests/${request.id}/approve`}
-                                                                    method="put"
-                                                                >
-                                                                    {({
-                                                                        processing,
-                                                                    }) => (
-                                                                        <Button
-                                                                            type="submit"
-                                                                            size="icon-sm"
-                                                                            disabled={
-                                                                                processing
-                                                                            }
-                                                                        >
-                                                                            <Check className="size-4" />
-                                                                        </Button>
-                                                                    )}
-                                                                </Form>
-                                                            </div>
-                                                        ) : (
-                                                            <p className="text-right text-xs text-muted-foreground">
-                                                                {request.reviewedAt
-                                                                    ? `Reviewed ${request.reviewedAt}`
-                                                                    : 'Reviewed'}
-                                                            </p>
-                                                        )}
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                                <TablePagination
-                                    entity="requests"
-                                    firstItemIndex={firstItemIndex}
-                                    onPageChange={goToPage}
-                                    onRowsPerPageChange={changeRowsPerPage}
-                                    rowsPerPage={rowsPerPage}
-                                    safeCurrentPage={safeCurrentPage}
-                                    totalItems={filteredRequests.length}
-                                    totalPages={totalPages}
-                                />
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+                <AdminTableSection
+                    emptyMessage="No reschedule requests yet."
+                    emptySearchMessage="No reschedule requests match your search."
+                    filteredItems={filteredRequests.length}
+                    pagination={{
+                        entity: 'requests',
+                        firstItemIndex,
+                        onPageChange: goToPage,
+                        onRowsPerPageChange: changeRowsPerPage,
+                        rowsPerPage,
+                        safeCurrentPage,
+                        totalItems: filteredRequests.length,
+                        totalPages,
+                    }}
+                    search={{
+                        value: searchQuery,
+                        onChange: (value) => {
+                            setSearchQuery(value);
+                            resetPage();
+                        },
+                        placeholder: 'Search requests...',
+                    }}
+                    tableMinWidth="76rem"
+                    totalItems={requests.length}
+                >
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Student</TableHead>
+                                <TableHead>Subject</TableHead>
+                                <TableHead>Mentor</TableHead>
+                                <TableHead>Current</TableHead>
+                                <TableHead className="w-12 text-center" />
+                                <TableHead>Requested</TableHead>
+                                <TableHead>Reason</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="w-12 text-right" />
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {visibleRequests.map((request) => (
+                                <TableRow key={request.id}>
+                                    <TableCell>{request.student}</TableCell>
+                                    <TableCell className="font-medium">
+                                        {request.session}
+                                    </TableCell>
+                                    <TableCell>{request.mentor}</TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                        <div className="flex items-center gap-3">
+                                            <p>
+                                                {formatScheduleDate(
+                                                    request.currentStartAt,
+                                                )}
+                                            </p>
+                                            <p className="text-muted-foreground">
+                                                {formatScheduleTime(
+                                                    request.currentStartAt,
+                                                )}
+                                            </p>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-center">
+                                        <Repeat2 className="mx-auto size-4 text-primary" />
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">
+                                        <div className="flex items-center gap-3 font-medium text-primary">
+                                            <p>
+                                                {formatScheduleDate(
+                                                    request.requestedStartAt,
+                                                )}
+                                            </p>
+                                            <p className="font-light">
+                                                {formatScheduleTime(
+                                                    request.requestedStartAt,
+                                                )}
+                                            </p>
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <p className="text-sm">
+                                            {request.reason}
+                                        </p>
+                                    </TableCell>
+                                    <TableCell>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Badge
+                                                    {...getBadgeProps(
+                                                        request.status ===
+                                                            'Approved'
+                                                            ? 'success'
+                                                            : request.status ===
+                                                                'Rejected'
+                                                              ? 'danger'
+                                                              : 'muted',
+                                                        'cursor-help',
+                                                    )}
+                                                >
+                                                    {formatBadgeLabel(
+                                                        request.status,
+                                                    )}
+                                                </Badge>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                {request.reviewedAt
+                                                    ? `${formatActionDate(request.reviewedAt)} oleh ${request.reviewer}`
+                                                    : 'Waiting for review'}
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <ActionMenu label="Open request actions">
+                                            <DropdownMenuItem asChild>
+                                                <Link
+                                                    href={`/scheduling/reschedule-requests/${request.id}`}
+                                                >
+                                                    <Eye className="size-4" />
+                                                    View detail
+                                                </Link>
+                                            </DropdownMenuItem>
+                                            {request.status === 'Pending' && (
+                                                <>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem
+                                                        onSelect={() =>
+                                                            setApproveRequestId(
+                                                                request.id,
+                                                            )
+                                                        }
+                                                    >
+                                                        <Check className="size-4" />
+                                                        Approve
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        variant="destructive"
+                                                        onSelect={() =>
+                                                            setRejectRequestId(
+                                                                request.id,
+                                                            )
+                                                        }
+                                                    >
+                                                        <X className="size-4" />
+                                                        Reject
+                                                    </DropdownMenuItem>
+                                                </>
+                                            )}
+                                        </ActionMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </AdminTableSection>
+
+                <ApproveRescheduleDialog
+                    open={approveRequestId !== null}
+                    requestId={approveRequestId}
+                    onOpenChange={(open) => !open && setApproveRequestId(null)}
+                />
+                <RejectRescheduleDialog
+                    open={rejectRequestId !== null}
+                    requestId={rejectRequestId}
+                    onOpenChange={(open) => !open && setRejectRequestId(null)}
+                />
             </div>
         </>
     );

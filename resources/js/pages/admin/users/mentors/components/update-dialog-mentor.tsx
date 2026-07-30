@@ -9,41 +9,40 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { FormUser } from '@/pages/admin/users/components/form-user';
-import type { ManagedUser } from '@/pages/admin/users/components/form-user';
+import { FormMentor } from '@/pages/admin/users/mentors/components/form-mentor';
+import type {
+    MentorFormUser,
+    MentorLevelOption,
+    SubjectOption,
+} from '@/pages/admin/users/mentors/components/form-mentor';
 
-type UpdateDialogUserProps<TUser extends ManagedUser> = {
-    description: string;
-    idPrefix: string;
+type UpdateDialogMentorProps<TUser extends MentorFormUser> = {
+    mentorLevelOptions: MentorLevelOption[];
     onError: () => void;
     onOpenChange: (open: boolean) => void;
     onSuccess: () => void;
     open: boolean;
-    roleOptions?: {
-        id: string;
-        label: string;
-    }[];
-    title: string;
+    subjectOptions: SubjectOption[];
     user: (TUser & { id: number; slug: string }) | null;
 };
 
-export function UpdateDialogUser<TUser extends ManagedUser>({
-    description,
-    idPrefix,
+export function UpdateDialogMentor<TUser extends MentorFormUser>({
+    mentorLevelOptions,
     onError,
     onOpenChange,
     onSuccess,
     open,
-    roleOptions,
-    title,
+    subjectOptions,
     user,
-}: UpdateDialogUserProps<TUser>) {
+}: UpdateDialogMentorProps<TUser>) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{title}</DialogTitle>
-                    <DialogDescription>{description}</DialogDescription>
+                    <DialogTitle>Edit mentor</DialogTitle>
+                    <DialogDescription>
+                        Update mentor account details.
+                    </DialogDescription>
                 </DialogHeader>
                 {user && (
                     <Form
@@ -57,10 +56,11 @@ export function UpdateDialogUser<TUser extends ManagedUser>({
                     >
                         {({ processing, errors }) => (
                             <>
-                                <FormUser
+                                <FormMentor
                                     errors={errors}
-                                    idPrefix={idPrefix}
-                                    roleOptions={roleOptions}
+                                    idPrefix="edit-mentor"
+                                    mentorLevelOptions={mentorLevelOptions}
+                                    subjectOptions={subjectOptions}
                                     user={user}
                                 />
                                 <DialogFooter className="pt-2">

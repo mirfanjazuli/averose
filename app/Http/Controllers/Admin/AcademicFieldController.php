@@ -18,15 +18,30 @@ class AcademicFieldController extends Controller
                 ->withCount(['programs', 'subjects'])
                 ->latest()
                 ->get()
-                ->map(fn (AcademicField $field): array => [
-                    'id' => $field->id,
-                    'name' => $field->name,
-                    'slug' => $field->slug,
-                    'description' => $field->description,
-                    'programsCount' => $field->programs_count,
-                    'subjectsCount' => $field->subjects_count,
-                    'status' => $field->status,
-                ]),
+                ->map(fn (AcademicField $field): array => $this->serializeField($field)),
+        ]);
+    }
+
+    public function show(AcademicField $academicField): Response
+    {
+        $academicField->loadCount(['programs', 'subjects']);
+
+        return Inertia::render('admin/academics/fields/show', [
+            'breadcrumbs' => [
+                [
+                    'title' => 'Academics',
+                    'href' => route('fields'),
+                ],
+                [
+                    'title' => 'Fields',
+                    'href' => route('fields'),
+                ],
+                [
+                    'title' => $academicField->name,
+                    'href' => route('fields.show', $academicField),
+                ],
+            ],
+            'field' => $this->serializeField($academicField),
         ]);
     }
 
@@ -49,5 +64,18 @@ class AcademicFieldController extends Controller
         $academicField->update(['status' => 'inactive']);
 
         return back();
+    }
+
+    private function serializeField(AcademicField $field): array
+    {
+        return [
+            'description' => $field->description,
+            'id' => $field->id,
+            'name' => $field->name,
+            'programsCount' => $field->programs_count,
+            'slug' => $field->slug,
+            'status' => $field->status,
+            'subjectsCount' => $field->subjects_count,
+        ];
     }
 }

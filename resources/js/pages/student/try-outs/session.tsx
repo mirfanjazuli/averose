@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { clearTypesetMath, hasMathSource, typesetMath } from '@/lib/mathjax';
 import { normalizeTryOutContentHtml } from '@/lib/try-out-content';
 import { cn } from '@/lib/utils';
@@ -491,7 +492,8 @@ export default function StudentTryOutSession({ tryOut }: { tryOut: TryOut }) {
                                     'General'}
                             </p>
                         </div>
-                        <div className="scrollbar-stable min-h-0 flex-1 overflow-y-auto p-5">
+                        <ScrollArea className="min-h-0 flex-1">
+                            <div className="p-5">
                             <div className="grid grid-cols-5 gap-3 md:grid-cols-4">
                                 {tryOut.questions.map((question, index) => {
                                     const answered = Boolean(
@@ -544,7 +546,8 @@ export default function StudentTryOutSession({ tryOut }: { tryOut: TryOut }) {
                                     Ragu-ragu
                                 </div>
                             </div>
-                        </div>
+                            </div>
+                        </ScrollArea>
                     </aside>
 
                     <main className="relative min-h-0 overflow-hidden">
@@ -553,7 +556,8 @@ export default function StudentTryOutSession({ tryOut }: { tryOut: TryOut }) {
                                 ref={questionContentRef}
                                 className="flex h-full flex-col"
                             >
-                                <div className="scrollbar-stable min-h-0 flex-1 overflow-y-auto px-6 py-8 md:px-16 lg:px-32">
+                                <ScrollArea className="min-h-0 flex-1">
+                                    <div className="px-6 py-8 md:px-16 lg:px-32">
                                     <div className="mx-auto max-w-4xl space-y-8">
                                         <div className="flex flex-wrap items-center justify-between gap-3">
                                             <div className="flex flex-wrap items-center gap-3">
@@ -701,7 +705,8 @@ export default function StudentTryOutSession({ tryOut }: { tryOut: TryOut }) {
                                             )}
                                         </div>
                                     </div>
-                                </div>
+                                    </div>
+                                </ScrollArea>
 
                                 <div className="shrink-0 border-t bg-background px-6 py-5 md:px-16 lg:px-32">
                                     <div className="mx-auto flex max-w-4xl items-center justify-between gap-4">

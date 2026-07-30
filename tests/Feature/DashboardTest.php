@@ -6,6 +6,7 @@ use App\Models\AcademicField;
 use App\Models\Program;
 use App\Models\ProgramVariant;
 use App\Models\Schedule;
+use App\Models\ScheduleFeedback;
 use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -223,6 +224,10 @@ class DashboardTest extends TestCase
     {
         $admin = User::factory()->admin()->create();
 
+        $this->assertFileExists(public_path('reports/averose-report-header.png'));
+        $this->assertFileExists(public_path('reports/averose-report-footer.png'));
+        $this->assertFileExists(public_path('reports/averose-report-watermark.png'));
+
         $response = $this->actingAs($admin)
             ->get(route('dashboard.download-pdf', [
                 'from' => '2026-07-01',
@@ -393,6 +398,92 @@ class DashboardTest extends TestCase
                 ->where('stats.activePrograms', 1)
                 ->where('stats.upcomingSessions', 1)
                 ->where('stats.progress', 25)
+            );
+    }
+
+    public function test_student_dashboard_receives_pending_feedback_sessions(): void
+    {
+        $student = User::factory()->student()->create();
+        $mentor = User::factory()->mentor()->create(['name' => 'Mira Mentor']);
+        $subject = Subject::factory()->create(['name' => 'Biologi']);
+
+        $firstPending = Schedule::factory()->create([
+            'mentor_id' => $mentor->id,
+            'scheduled_at' => now()->subDays(3),
+            'status' => 'completed',
+            'subject_id' => $subject->id,
+            'user_id' => $student->id,
+        ]);
+        Schedule::factory()->create([
+            'mentor_id' => $mentor->id,
+            'scheduled_at' => now()->subDays(2),
+            'status' => 'completed',
+            'subject_id' => $subject->id,
+            'user_id' => $student->id,
+        ]);
+        Schedule::factory()->create([
+            'mentor_id' => $mentor->id,
+            'scheduled_at' => now()->subDay(),
+            'status' => 'completed',
+            'subject_id' => $subject->id,
+            'user_id' => $student->id,
+        ]);
+        ScheduleFeedback::query()->create([
+            'audio_quality_rating' => 4,
+            'interactivity_rating' => 5,
+            'material_clarity_rating' => 5,
+            'mentor_id' => $mentor->id,
+            'schedule_id' => Schedule::factory()->create([
+                'mentor_id' => $mentor->id,
+                'scheduled_at' => now()->subDays(4),
+                'status' => 'completed',
+                'subject_id' => $subject->id,
+                'user_id' => $student->id,
+            ])->id,
+            'user_id' => $student->id,
+            'visual_quality_rating' => 4,
+        ]);
+
+        $this->actingAs($student)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page): Assert => $page
+                ->component('student/dashboard/index')
+                ->has('pendingFeedbackSessions', 2)
+                ->where('pendingFeedbackSessions.0.id', (string) $firstPending->id)
+                ->where('pendingFeedbackSessions.0.title', 'Biologi')
+                ->where('pendingFeedbackSessions.0.mentor', 'Mira Mentor')
+                ->where('pendingFeedbackSessions.0.mentorRating', 4.5)
+            );
+    }
+
+    public function test_student_dashboard_hides_pending_feedback_when_sessions_are_rated(): void
+    {
+        $student = User::factory()->student()->create();
+        $mentor = User::factory()->mentor()->create();
+        $schedule = Schedule::factory()->create([
+            'mentor_id' => $mentor->id,
+            'scheduled_at' => now()->subDay(),
+            'status' => 'completed',
+            'user_id' => $student->id,
+        ]);
+
+        ScheduleFeedback::query()->create([
+            'audio_quality_rating' => 4,
+            'interactivity_rating' => 4,
+            'material_clarity_rating' => 4,
+            'mentor_id' => $mentor->id,
+            'schedule_id' => $schedule->id,
+            'user_id' => $student->id,
+            'visual_quality_rating' => 4,
+        ]);
+
+        $this->actingAs($student)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page): Assert => $page
+                ->component('student/dashboard/index')
+                ->has('pendingFeedbackSessions', 0)
             );
     }
 }

@@ -12,9 +12,11 @@ import SuccessStoriesSection from '@/components/landing/success-stories-section'
 
 type LandingProgram = {
     description: string | null;
+    enrollmentsCount: number;
     eyebrow: string;
     id: number;
     slug: string;
+    subjectsCount: number;
     thumbnailUrl: string | null;
     title: string;
 };
@@ -36,14 +38,8 @@ export default function Welcome({ programs }: { programs: LandingProgram[] }) {
                 <main>
                     <HeroSection />
                     {programs.length > 0 && (
-                        <>
-                            <SectionConnector tone="whiteToSoft" />
-                            <ProgramsSection programs={programs} />
-                        </>
+                        <ProgramsSection programs={programs} />
                     )}
-                    <SectionConnector
-                        tone={programs.length > 0 ? 'softToWhite' : 'whiteToSoft'}
-                    />
                     <AdvantagesSection />
                     <SectionConnector tone="whiteToSoft" />
                     <SuccessStoriesSection />
@@ -51,7 +47,6 @@ export default function Welcome({ programs }: { programs: LandingProgram[] }) {
                     <ArticlesSection />
                     <SectionConnector tone="soft" />
                     <FaqSection />
-                    <SectionConnector tone="soft" />
                     <CtaSection />
                 </main>
                 <Footer />

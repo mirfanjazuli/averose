@@ -4,6 +4,7 @@ import {
     CircleAlert,
     Eye,
     Pencil,
+    RotateCcw,
     PowerOff,
     ShieldCheck,
     Video,
@@ -11,15 +12,9 @@ import {
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionMenu } from '@/components/admin/action-menu';
-import {
-    formatBadgeLabel,
-    getBadgeProps,
-    getStatusBadgeTone,
-} from '@/lib/badge';
-import { EmptyState } from '@/components/admin/empty-state';
+import { AdminStatusFilter } from '@/components/admin/status-filter';
 import { SummaryCard } from '@/components/admin/summary-card';
-import { TablePagination } from '@/components/admin/table-pagination';
-import { TableSearch } from '@/components/admin/table-search';
+import { AdminTableSection } from '@/components/admin/table-section';
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -31,7 +26,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
     DropdownMenuItem,
     DropdownMenuSeparator,
@@ -45,6 +39,11 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { useClientPagination } from '@/hooks/use-client-pagination';
+import {
+    formatBadgeLabel,
+    getBadgeProps,
+    getStatusBadgeTone,
+} from '@/lib/badge';
 import { CreateDialogZoomAccount } from '@/pages/admin/zoom-accounts/components/create-dialog-zoom-account';
 import { UpdateDialogZoomAccount } from '@/pages/admin/zoom-accounts/components/update-dialog-zoom-account';
 
@@ -74,6 +73,14 @@ type CapacitySummary = {
     } | null;
 };
 
+function accountStatusLabel(account: ZoomAccount) {
+    if (account.status !== 'active') {
+        return account.status;
+    }
+
+    return account.isFull ? 'Full' : 'Active';
+}
+
 export default function ZoomAccounts({
     accounts,
     capacity,
@@ -83,6 +90,7 @@ export default function ZoomAccounts({
 }) {
     const [addAccountDialogOpen, setAddAccountDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
     const [editingAccount, setEditingAccount] = useState<ZoomAccount | null>(
         null,
     );
@@ -92,19 +100,32 @@ export default function ZoomAccounts({
     const filteredAccounts = useMemo(() => {
         const normalizedSearch = searchQuery.trim().toLowerCase();
 
-        if (!normalizedSearch) {
-            return accounts;
-        }
-
         return accounts.filter((account) =>
+            (statusFilter === 'all' ||
+                accountStatusLabel(account).toLowerCase() ===
+                    statusFilter) &&
             [
                 account.name,
                 account.accountId,
                 account.clientId,
                 account.status,
+                accountStatusLabel(account),
             ].some((value) => value.toLowerCase().includes(normalizedSearch)),
         );
-    }, [accounts, searchQuery]);
+    }, [accounts, searchQuery, statusFilter]);
+    const availableStatuses = useMemo(
+        () =>
+            Array.from(
+                new Set(
+                    accounts.map((account) =>
+                        accountStatusLabel(account).toLowerCase(),
+                    ),
+                ),
+            ).sort((firstStatus, secondStatus) =>
+                firstStatus.localeCompare(secondStatus),
+            ),
+        [accounts],
+    );
     const {
         changeRowsPerPage,
         firstItemIndex,
@@ -119,7 +140,7 @@ export default function ZoomAccounts({
     return (
         <>
             <Head title="Zoom Accounts" />
-            <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4">
+            <div className="flex min-h-full min-w-0 max-w-full flex-1 flex-col gap-6 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h1 className="font-heading text-2xl font-semibold">
@@ -247,150 +268,161 @@ export default function ZoomAccounts({
                     </SummaryCard>
                 </div>
 
-                <Card>
-                    <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
-                        <CardTitle>Account list</CardTitle>
-                        <TableSearch
-                            value={searchQuery}
-                            onChange={(value) => {
-                                setSearchQuery(value);
+                <AdminTableSection
+                    emptyMessage="No Zoom accounts added yet."
+                    emptySearchMessage="No Zoom accounts match your search."
+                    filteredItems={filteredAccounts.length}
+                    pagination={{
+                        entity: 'accounts',
+                        firstItemIndex,
+                        onPageChange: goToPage,
+                        onRowsPerPageChange: changeRowsPerPage,
+                        rowsPerPage,
+                        safeCurrentPage,
+                        totalItems: filteredAccounts.length,
+                        totalPages,
+                    }}
+                    search={{
+                        value: searchQuery,
+                        onChange: (value) => {
+                            setSearchQuery(value);
+                            resetPage();
+                        },
+                        placeholder: 'Search accounts...',
+                    }}
+                    toolbarEnd={
+                        <AdminStatusFilter
+                            value={statusFilter}
+                            widthClassName="w-40"
+                            options={[
+                                { label: 'All statuses', value: 'all' },
+                                ...availableStatuses.map((status) => ({
+                                    label: formatBadgeLabel(status),
+                                    value: status,
+                                })),
+                            ]}
+                            onValueChange={(value) => {
+                                setStatusFilter(value);
                                 resetPage();
                             }}
-                            placeholder="Search accounts..."
                         />
-                    </CardHeader>
-                    <CardContent>
-                        {accounts.length === 0 ? (
-                            <EmptyState>No Zoom accounts added yet.</EmptyState>
-                        ) : filteredAccounts.length === 0 ? (
-                            <EmptyState>
-                                No Zoom accounts match your search.
-                            </EmptyState>
-                        ) : (
-                            <>
-                                <div className="rounded-2xl border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Name</TableHead>
-                                                <TableHead>
-                                                    Account ID
-                                                </TableHead>
-                                                <TableHead>Client ID</TableHead>
-                                                <TableHead>Created</TableHead>
-                                                <TableHead>Status</TableHead>
-                                                <TableHead className="w-12 text-right" />
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {visibleAccounts.map((account) => (
-                                                <TableRow key={account.id}>
-                                                    <TableCell className="font-medium">
-                                                        {account.name}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {account.accountId}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {account.clientId}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {account.createdAt}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="space-y-1">
-                                                            <Badge
-                                                                {...getBadgeProps(
-                                                                    account.status !==
-                                                                        'active'
-                                                                        ? getStatusBadgeTone(
-                                                                              account.status,
-                                                                          )
-                                                                        : account.isFull
-                                                                          ? 'danger'
-                                                                          : 'success',
-                                                                )}
-                                                            >
-                                                                {formatBadgeLabel(
-                                                                    account.status !==
-                                                                        'active'
-                                                                        ? account.status
-                                                                        : account.isFull
-                                                                          ? 'Full'
-                                                                          : 'Active',
-                                                                )}
-                                                            </Badge>
-                                                            {account.status ===
-                                                                'active' &&
-                                                                account.isFull &&
-                                                                account.releaseAt && (
-                                                                    <p className="text-xs text-muted-foreground">
-                                                                        Frees{' '}
-                                                                        {
-                                                                            account.releaseIn
-                                                                        }
-                                                                    </p>
-                                                                )}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <ActionMenu label="Open account actions">
-                                                            <DropdownMenuItem
-                                                                asChild
-                                                            >
-                                                                <Link
-                                                                    href={`/zoom-accounts/${account.slug}`}
-                                                                >
-                                                                    <Eye className="size-4" />
-                                                                    View
-                                                                </Link>
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                onClick={() =>
-                                                                    setEditingAccount(
-                                                                        account,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Pencil className="size-4" />
-                                                                Edit
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuSeparator />
-                                                            {account.status ===
-                                                                'active' && (
-                                                                <DropdownMenuItem
-                                                                    variant="destructive"
-                                                                    onClick={() =>
-                                                                        setDeletingAccount(
-                                                                            account,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <PowerOff className="size-4" />
-                                                                    Deactivate
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                        </ActionMenu>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                                <TablePagination
-                                    entity="accounts"
-                                    firstItemIndex={firstItemIndex}
-                                    onPageChange={goToPage}
-                                    onRowsPerPageChange={changeRowsPerPage}
-                                    rowsPerPage={rowsPerPage}
-                                    safeCurrentPage={safeCurrentPage}
-                                    totalItems={filteredAccounts.length}
-                                    totalPages={totalPages}
-                                />
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+                    }
+                    totalItems={accounts.length}
+                >
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Account ID</TableHead>
+                                <TableHead>Client ID</TableHead>
+                                <TableHead>Created</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="w-12 text-right" />
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {visibleAccounts.map((account) => (
+                                <TableRow key={account.id}>
+                                    <TableCell className="font-medium">
+                                        {account.name}
+                                    </TableCell>
+                                    <TableCell>{account.accountId}</TableCell>
+                                    <TableCell>{account.clientId}</TableCell>
+                                    <TableCell>{account.createdAt}</TableCell>
+                                    <TableCell>
+                                        <div className="space-y-1">
+                                            <Badge
+                                                {...getBadgeProps(
+                                                    account.status !== 'active'
+                                                        ? getStatusBadgeTone(
+                                                              account.status,
+                                                          )
+                                                        : account.isFull
+                                                          ? 'danger'
+                                                          : 'success',
+                                                )}
+                                            >
+                                                {formatBadgeLabel(
+                                                    accountStatusLabel(account),
+                                                )}
+                                            </Badge>
+                                            {account.status === 'active' &&
+                                                account.isFull &&
+                                                account.releaseAt && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Frees{' '}
+                                                        {account.releaseIn}
+                                                    </p>
+                                                )}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <ActionMenu label="Open account actions">
+                                            <DropdownMenuItem asChild>
+                                                <Link
+                                                    href={`/zoom-accounts/${account.slug}`}
+                                                >
+                                                    <Eye className="size-4" />
+                                                    View
+                                                </Link>
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    setEditingAccount(account)
+                                                }
+                                            >
+                                                <Pencil className="size-4" />
+                                                Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            {account.status !== 'active' && (
+                                                <DropdownMenuItem asChild>
+                                                    <Form
+                                                        action={`/zoom-accounts/${account.slug}/activate`}
+                                                        method="put"
+                                                        disableWhileProcessing
+                                                        onSuccess={() =>
+                                                            toast.success(
+                                                                'Zoom account activated.',
+                                                            )
+                                                        }
+                                                        onError={() =>
+                                                            toast.error(
+                                                                'Unable to activate this Zoom account.',
+                                                            )
+                                                        }
+                                                        className="w-full"
+                                                    >
+                                                        <button
+                                                            type="submit"
+                                                            className="flex w-full items-center gap-2"
+                                                        >
+                                                            <RotateCcw className="size-4" />
+                                                            Activate
+                                                        </button>
+                                                    </Form>
+                                                </DropdownMenuItem>
+                                            )}
+                                            {account.status === 'active' && (
+                                                <DropdownMenuItem
+                                                    variant="destructive"
+                                                    onClick={() =>
+                                                        setDeletingAccount(
+                                                            account,
+                                                        )
+                                                    }
+                                                >
+                                                    <PowerOff className="size-4" />
+                                                    Deactivate
+                                                </DropdownMenuItem>
+                                            )}
+                                        </ActionMenu>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </AdminTableSection>
             </div>
         </>
     );
