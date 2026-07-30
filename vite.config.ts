@@ -19,6 +19,7 @@ export default defineConfig({
         }),
         tailwindcss(),
         wayfinder({
+            command: 'php8.5',
             formVariants: true,
         }),
     ],
