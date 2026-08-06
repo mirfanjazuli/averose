@@ -1,6 +1,7 @@
 import { Link, usePage } from '@inertiajs/react';
 import type { PropsWithChildren } from 'react';
 import AppLogoIcon from '@/components/app-logo-icon';
+import HeroImage from '@/components/landing/hero-image';
 import { home } from '@/routes';
 
 export default function LoginLayout({ children }: PropsWithChildren) {
@@ -24,11 +25,7 @@ export default function LoginLayout({ children }: PropsWithChildren) {
                 </section>
 
                 <section className="sticky top-0 hidden h-svh overflow-hidden bg-white lg:block">
-                    <img
-                        src="/images/landing/future-alpha-doctor-hero.png"
-                        alt="Siswa Indonesia percaya diri mempersiapkan diri menjadi calon dokter"
-                        className="absolute inset-0 size-full object-cover object-[57%_center]"
-                    />
+                    <HeroImage className="absolute inset-0 size-full object-cover object-[57%_center]" />
                     <div className="absolute inset-y-0 left-0 w-[36%] bg-gradient-to-r from-background via-background/88 to-transparent" />
                     <div className="absolute inset-y-0 right-0 w-[24%] bg-gradient-to-l from-background/72 to-transparent" />
                     <div className="absolute inset-x-0 top-0 h-36 bg-gradient-to-b from-background to-transparent" />

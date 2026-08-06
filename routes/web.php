@@ -42,6 +42,7 @@ use Inertia\Inertia;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
+        'canonicalUrl' => route('home'),
         'programs' => Program::query()
             ->where('status', 'active')
             ->select(['id', 'name', 'slug', 'thumbnail', 'description'])

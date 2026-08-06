@@ -29,11 +29,11 @@ export default function SuccessStoriesSection() {
                         {testimonials.map((testimonial) => (
                             <article
                                 key={testimonial.name}
-                                className="flex min-h-[430px] flex-col rounded-[1.75rem] bg-white p-5 text-[#102a3a] shadow-sm shadow-[#102a3a]/[0.03] ring-1 ring-[#dcece7]"
+                                className="flex min-h-[430px] flex-col rounded-[1.75rem] bg-white p-5 text-[#102a3a] shadow-sm ring-1 shadow-[#102a3a]/[0.03] ring-[#dcece7]"
                             >
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="flex items-center gap-3">
-                                        <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#e4f5f0] text-sm font-bold text-[#0f8f7a]">
+                                        <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[#e4f5f0] text-sm font-bold text-[var(--landing-teal-strong)]">
                                             {testimonial.initials}
                                         </span>
                                         <div>
@@ -49,7 +49,7 @@ export default function SuccessStoriesSection() {
                                 </div>
 
                                 <div className="mt-8">
-                                    <p className="text-lg font-semibold leading-7">
+                                    <p className="text-lg leading-7 font-semibold">
                                         “{testimonial.result}”
                                     </p>
                                     <p className="mt-4 text-sm leading-6 text-[#526b7b]">

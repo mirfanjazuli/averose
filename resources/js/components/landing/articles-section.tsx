@@ -19,7 +19,7 @@ export default function ArticlesSection() {
                         href={instagramUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-[#0f8f7a]"
+                        className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-[var(--landing-teal-strong)]"
                     >
                         Lihat konten di Instagram
                         <ArrowRight className="size-4" />
@@ -49,7 +49,7 @@ export default function ArticlesSection() {
                                     />
                                 </div>
                                 <div className="p-5 sm:p-6">
-                                    <p className="text-xs font-semibold tracking-[0.15em] text-[#0f8f7a] uppercase">
+                                    <p className="text-xs font-semibold tracking-[0.15em] text-[var(--landing-teal-strong)] uppercase">
                                         {article.category}
                                     </p>
                                     <h3 className="mt-3 font-heading text-xl leading-snug font-semibold text-[#102a3a]">

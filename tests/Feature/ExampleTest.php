@@ -32,6 +32,7 @@ class ExampleTest extends TestCase
         $response->assertOk();
         $response->assertInertia(fn (AssertableInertia $page) => $page
             ->component('welcome')
+            ->where('canonicalUrl', route('home'))
             ->has('programs', 1)
             ->where('programs.0.title', 'Private Masuk FK')
             ->where('programs.0.description', 'Program aktif untuk landing page.')

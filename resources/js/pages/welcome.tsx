@@ -21,7 +21,13 @@ type LandingProgram = {
     title: string;
 };
 
-export default function Welcome({ programs }: { programs: LandingProgram[] }) {
+export default function Welcome({
+    canonicalUrl,
+    programs,
+}: {
+    canonicalUrl: string;
+    programs: LandingProgram[];
+}) {
     const { auth } = usePage().props;
 
     return (
@@ -31,9 +37,11 @@ export default function Welcome({ programs }: { programs: LandingProgram[] }) {
                     name="description"
                     content="AveRose adalah bimbel privat spesialis masuk Fakultas Kedokteran dengan pendampingan personal, mentor berkualitas, dan strategi belajar terukur."
                 />
+                <meta name="robots" content="index, follow" />
+                <link rel="canonical" href={canonicalUrl} />
             </Head>
 
-            <div className="min-h-screen overflow-x-clip bg-[#f8fbfa] text-[#102a3a]">
+            <div className="landing-theme min-h-screen overflow-x-clip bg-[#f8fbfa] text-[#102a3a]">
                 <Navbar isAuthenticated={Boolean(auth.user)} />
                 <main>
                     <HeroSection />

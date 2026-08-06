@@ -48,7 +48,7 @@ export default function AdvantagesSection() {
                                 key={advantage.title}
                                 className={`rounded-[1.5rem] p-6 transition duration-300 hover:-translate-y-1 ${
                                     isPrimary
-                                        ? 'bg-[#0f8f7a] text-white shadow-xl shadow-[#0f8f7a]/16'
+                                        ? 'bg-[var(--landing-teal-strong)] text-white shadow-xl shadow-[#0f8f7a]/16'
                                         : 'border border-[#dcece7] bg-[#f8fbfa] text-[#102a3a]'
                                 }`}
                             >
@@ -59,15 +59,18 @@ export default function AdvantagesSection() {
                                             : 'bg-white text-[#0f8f7a] ring-1 ring-[#dcece7]'
                                     }`}
                                 >
-                                    <Icon className="size-6" strokeWidth={1.7} />
+                                    <Icon
+                                        className="size-6"
+                                        strokeWidth={1.7}
+                                    />
                                 </div>
-                                <h3 className="mt-8 font-heading text-2xl font-semibold leading-tight">
+                                <h3 className="mt-8 font-heading text-2xl leading-tight font-semibold">
                                     {advantage.title}
                                 </h3>
                                 <p
                                     className={`mt-3 text-sm leading-6 ${
                                         isPrimary
-                                            ? 'text-white/74'
+                                            ? 'text-white/90'
                                             : 'text-[#526b7b]'
                                     }`}
                                 >

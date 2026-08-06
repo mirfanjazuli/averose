@@ -1,14 +1,14 @@
 import { ArrowRight } from 'lucide-react';
+import HeroImage from './hero-image';
 import { consultationUrl } from './links';
 
 function HeroVisual() {
     return (
         <div className="relative mx-auto aspect-[4/5] w-full max-w-[590px]">
             <div className="absolute inset-0 overflow-hidden rounded-r-[2rem] sm:rounded-r-[3rem]">
-                <img
-                    src="/images/landing/future-alpha-doctor-hero.png"
-                    alt="Siswa Indonesia percaya diri mempersiapkan diri menjadi calon dokter"
-                    className="size-full object-cover object-[57%_center] [-webkit-mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.08)_8%,rgba(0,0,0,0.52)_24%,black_43%),linear-gradient(to_bottom,transparent_0%,black_12%,black_86%,transparent_100%)] [-webkit-mask-composite:source-in] [mask-composite:intersect] [mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.08)_8%,rgba(0,0,0,0.52)_24%,black_43%),linear-gradient(to_bottom,transparent_0%,black_12%,black_86%,transparent_100%)]"
+                <HeroImage
+                    fetchPriority="high"
+                    className="size-full [mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.08)_8%,rgba(0,0,0,0.52)_24%,black_43%),linear-gradient(to_bottom,transparent_0%,black_12%,black_86%,transparent_100%)] [mask-composite:intersect] object-cover object-[57%_center] [-webkit-mask-composite:source-in] [-webkit-mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.08)_8%,rgba(0,0,0,0.52)_24%,black_43%),linear-gradient(to_bottom,transparent_0%,black_12%,black_86%,transparent_100%)]"
                 />
                 <div className="absolute inset-y-0 left-0 w-[58%] bg-gradient-to-r from-white via-white/88 to-transparent" />
                 <div className="absolute inset-y-0 right-0 w-[18%] rounded-r-[2rem] bg-gradient-to-l from-white/75 to-transparent sm:rounded-r-[3rem]" />

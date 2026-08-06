@@ -143,6 +143,11 @@
 }
 
 @layer components {
+    .landing-theme {
+        --landing-teal: #0f8f7a;
+        --landing-teal-strong: #087060;
+    }
+
     .auth-light-theme {
         color-scheme: light;
         --background: oklch(1 0 0);

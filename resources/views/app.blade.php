@@ -37,6 +37,9 @@
 
         @fonts
 
+        <link rel="preload" href="{{ Vite::asset('node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
+        <link rel="preload" href="{{ Vite::asset('node_modules/@fontsource-variable/outfit/files/outfit-latin-wght-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
+
         @if (str_contains($page['component'], 'try-out'))
             <script>
                 window.MathJax = {

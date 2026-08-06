@@ -22,7 +22,7 @@ export default function SectionHeading({
             }
         >
             <div
-                className={`mb-4 flex items-center gap-2 text-xs font-semibold tracking-[0.2em] text-[#0f8f7a] uppercase ${centered ? 'justify-center' : ''}`}
+                className={`mb-4 flex items-center gap-2 text-xs font-semibold tracking-[0.2em] text-[var(--landing-teal-strong)] uppercase ${centered ? 'justify-center' : ''}`}
             >
                 <Sparkles className="size-4" />
                 {eyebrow}
