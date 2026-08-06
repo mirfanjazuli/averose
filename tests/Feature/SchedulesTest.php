@@ -397,14 +397,18 @@ class SchedulesTest extends TestCase
             ->post(route('reschedule-requests.store', $booking), [
                 'notes' => 'Ada jadwal ujian sekolah di waktu sebelumnya.',
                 'reason' => 'Bentrok sekolah/kampus',
-                'requested_scheduled_at' => '2026-07-11 10:00:00',
+                'requested_scheduled_at' => '2026-07-11 10:00',
+                'timezone' => 'Asia/Jakarta',
             ])
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
 
         $request = RescheduleRequest::query()->firstOrFail();
 
         $this->assertSame('pending', $request->status);
         $this->assertSame($booking->id, $request->schedule_id);
+        $this->assertSame('Asia/Jakarta', $request->current_timezone);
+        $this->assertSame('Asia/Jakarta', $request->requested_timezone);
 
         $this->actingAs($admin)
             ->put(route('schedules.reschedule-requests.approve', $request))
@@ -414,18 +418,19 @@ class SchedulesTest extends TestCase
         $request->refresh();
 
         $this->assertSame('rescheduled', $booking->status);
-        $this->assertSame('2026-07-11 10:00:00', $booking->scheduled_at->format('Y-m-d H:i:s'));
+        $this->assertSame('Asia/Jakarta', $booking->timezone);
+        $this->assertSame('2026-07-11 03:00:00', $booking->scheduled_at->format('Y-m-d H:i:s'));
         $this->assertSame('approved', $request->status);
         $this->assertSame($admin->id, $request->reviewed_by);
         $this->assertDatabaseHas('schedule_histories', [
             'action' => 'reschedule_requested',
-            'description' => "Reschedule diajukan oleh {$student->name} dari 10 Jul 2026, 09:00 WIB menjadi 11 Jul 2026, 10:00 WIB.",
+            'description' => "Reschedule diajukan oleh {$student->name} dari 10 Jul 2026, 16:00 WIB menjadi 11 Jul 2026, 10:00 WIB.",
             'schedule_id' => $booking->id,
             'user_id' => $student->id,
         ]);
         $this->assertDatabaseHas('schedule_histories', [
             'action' => 'rescheduled',
-            'description' => "Waktu schedule diubah oleh {$admin->name} dari 10 Jul 2026, 09:00 WIB menjadi 11 Jul 2026, 10:00 WIB.",
+            'description' => "Waktu schedule diubah oleh {$admin->name} dari 10 Jul 2026, 16:00 WIB menjadi 11 Jul 2026, 10:00 WIB.",
             'schedule_id' => $booking->id,
             'user_id' => $admin->id,
         ]);
@@ -449,7 +454,7 @@ class SchedulesTest extends TestCase
             'current_scheduled_at' => $booking->scheduled_at,
             'duration' => 60,
             'mentor_id' => $mentor->id,
-            'requested_scheduled_at' => '2026-07-11 10:00:00',
+            'requested_scheduled_at' => '2026-07-11 10:00',
             'schedule_id' => $booking->id,
             'status' => 'pending',
             'user_id' => $student->id,
@@ -488,7 +493,8 @@ class SchedulesTest extends TestCase
         $this->actingAs($student)
             ->post(route('reschedule-requests.store', $booking), [
                 'reason' => 'Bentrok sekolah/kampus',
-                'requested_scheduled_at' => '2026-07-11 10:00:00',
+                'requested_scheduled_at' => '2026-07-11 10:00',
+                'timezone' => 'Asia/Jakarta',
             ])
             ->assertSessionHasErrors('notes');
 

@@ -32,7 +32,9 @@ class UserManagementController extends Controller
 
     public function students(): Response
     {
-        return $this->index(UserRole::Student, 'admin/users/students/index');
+        return $this->index(UserRole::Student, 'admin/users/students/index', [
+            'programOptions' => $this->programEnrollmentOptions(),
+        ]);
     }
 
     public function mentors(): Response
@@ -61,9 +63,9 @@ class UserManagementController extends Controller
                 ->values()
                 ->map(fn (ProgramEnrollment $enrollment): array => [
                     'id' => $enrollment->id,
-                    'program' => $enrollment->program?->name,
-                    'field' => $enrollment->field?->name,
-                    'variant' => $enrollment->variant?->name,
+                    'program' => $enrollment->programNameAtEnrollment(),
+                    'field' => $enrollment->fieldNameAtEnrollment(),
+                    'variant' => $enrollment->variantNameAtEnrollment(),
                     'startDate' => $enrollment->start_date?->format('M d, Y'),
                     'sessionsRemaining' => $enrollment->sessionsRemaining(),
                     'lastSessionDate' => $this->lastCompletedEnrollmentSessionDate($enrollment),
@@ -219,7 +221,7 @@ class UserManagementController extends Controller
                     'mentorLevelId' => $user->mentorProfile?->mentor_level_id,
                     'roleId' => $user->role_id,
                     'status' => $user->status,
-                    'createdAt' => $user->created_at?->format('M d, Y'),
+                    'createdAt' => $user->created_at?->toJSON(),
                 ]),
             ...$props,
         ]);
@@ -322,7 +324,7 @@ class UserManagementController extends Controller
             ->sortByDesc('scheduled_at')
             ->first()
             ?->scheduled_at
-            ?->format('M d, Y');
+            ?->toJSON();
     }
 
     private function teachingJournals(User $mentor): array
@@ -333,17 +335,15 @@ class UserManagementController extends Controller
             ->limit(10)
             ->get()
             ->map(function ($booking): array {
-                $endAt = $booking->scheduled_at->copy()->addMinutes($booking->duration);
-
                 return [
+                    'endAt' => $booking->scheduled_at->copy()->addMinutes($booking->duration)->toJSON(),
                     'id' => (string) $booking->id,
-                    'date' => $booking->scheduled_at->format('M d, Y'),
                     'duration' => "{$booking->duration} minutes",
                     'program' => $booking->enrollment?->program?->name ?? '-',
                     'status' => $booking->status,
                     'student' => $booking->user?->name ?? '-',
+                    'startAt' => $booking->scheduled_at->toJSON(),
                     'subject' => $booking->subject?->name ?? 'Session',
-                    'time' => "{$booking->scheduled_at->format('H:i')} - {$endAt->format('H:i')}",
                 ];
             })
             ->all();
@@ -365,8 +365,8 @@ class UserManagementController extends Controller
             'mentorLevelId' => $user->mentorProfile?->mentor_level_id,
             'roleId' => $user->role_id,
             'status' => $user->status,
-            'createdAt' => $user->created_at?->format('M d, Y'),
-            'updatedAt' => $user->updated_at?->format('M d, Y'),
+            'createdAt' => $user->created_at?->toJSON(),
+            'updatedAt' => $user->updated_at?->toJSON(),
         ];
     }
 

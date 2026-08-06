@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Mentor;
 use App\Http\Controllers\Controller;
 use App\Models\MentorJournal;
 use App\Models\Schedule;
+use App\Services\DateTime\UserDateTimeService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -12,6 +14,8 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
+    public function __construct(private readonly UserDateTimeService $dateTimes) {}
+
     public function __invoke(Request $request): Response
     {
         return Inertia::render('mentor/dashboard/index', [
@@ -25,9 +29,13 @@ class DashboardController extends Controller
     private function stats(Request $request): array
     {
         $mentorId = $request->user()->id;
+        $timezone = $this->dateTimes->timezoneFor($request->user());
+        $today = CarbonImmutable::now($timezone)->toDateString();
+        $todayRange = $this->dateTimes->utcDateRange($today, $today, $timezone);
         $todaySessions = Schedule::query()
             ->where('mentor_id', $mentorId)
-            ->whereDate('scheduled_at', today())
+            ->where('scheduled_at', '>=', $todayRange->startInclusive)
+            ->where('scheduled_at', '<', $todayRange->endExclusive)
             ->count();
         $upcomingSessions = Schedule::query()
             ->where('mentor_id', $mentorId)
@@ -108,7 +116,7 @@ class DashboardController extends Controller
             ->limit(5)
             ->get()
             ->map(fn (MentorJournal $journal): array => [
-                'date' => $journal->schedule?->scheduled_at?->format('D, M j') ?? $journal->created_at->format('D, M j'),
+                'sessionStartAt' => ($journal->schedule?->scheduled_at ?? $journal->created_at)->toJSON(),
                 'id' => (string) $journal->id,
                 'program' => $journal->schedule?->enrollment?->program?->name ?? '-',
                 'slug' => $journal->routeIdentifier(),
@@ -131,7 +139,6 @@ class DashboardController extends Controller
             'startAt' => $startAt->toJSON(),
             'status' => Str::headline($booking->status),
             'student' => $booking->user?->name ?? '-',
-            'time' => "{$startAt->format('D, M j, H:i')} - {$endAt->format('H:i')}",
             'title' => $booking->subject?->name ?? 'Session',
             'zoomAccount' => $booking->zoomAccount?->name,
             'zoomLink' => $booking->zoom_link,

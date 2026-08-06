@@ -23,7 +23,14 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useClientPagination } from '@/hooks/use-client-pagination';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
+import {
+    formatDate,
+    formatDateTime,
+    formatTime,
+    formatTimezoneName,
+} from '@/lib/date-time';
 import {
     ApproveRescheduleDialog,
     RejectRescheduleDialog,
@@ -31,7 +38,6 @@ import {
 
 type RescheduleRequest = {
     adminNote: string | null;
-    current: string;
     currentEndAt: string;
     currentStartAt: string;
     id: string;
@@ -39,7 +45,6 @@ type RescheduleRequest = {
     notes: string | null;
     program: string;
     reason: string;
-    requested: string;
     requestedEndAt: string;
     requestedStartAt: string;
     reviewedAt: string | null;
@@ -62,27 +67,6 @@ const summaryCards = [
     { key: 'rejected', label: 'Rejected', icon: X },
 ] as const;
 
-function formatScheduleDate(value: string) {
-    return new Intl.DateTimeFormat('id-ID', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    }).format(new Date(value));
-}
-
-function formatScheduleTime(value: string) {
-    const formatter = new Intl.DateTimeFormat('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-
-    return `${formatter.format(new Date(value))} WIB`;
-}
-
-function formatActionDate(value: string) {
-    return `${formatScheduleDate(value)}, ${formatScheduleTime(value)}`;
-}
-
 export default function RescheduleRequests({
     requests,
     summary,
@@ -90,6 +74,7 @@ export default function RescheduleRequests({
     requests: RescheduleRequest[];
     summary: Summary;
 }) {
+    const timezone = useUserTimezone();
     const [approveRequestId, setApproveRequestId] = useState<string | null>(
         null,
     );
@@ -110,12 +95,12 @@ export default function RescheduleRequests({
                 request.session,
                 request.reason,
                 request.notes ?? '',
-                request.current,
-                request.requested,
+                formatDateTime(request.currentStartAt, timezone),
+                formatDateTime(request.requestedStartAt, timezone),
                 request.status,
             ].some((value) => value.toLowerCase().includes(normalizedSearch)),
         );
-    }, [requests, searchQuery]);
+    }, [requests, searchQuery, timezone]);
     const {
         changeRowsPerPage,
         firstItemIndex,
@@ -189,9 +174,15 @@ export default function RescheduleRequests({
                                 <TableHead>Student</TableHead>
                                 <TableHead>Subject</TableHead>
                                 <TableHead>Mentor</TableHead>
-                                <TableHead>Current</TableHead>
+                                <TableHead>
+                                    Current (
+                                    {formatTimezoneName(new Date(), timezone)})
+                                </TableHead>
                                 <TableHead className="w-12 text-center" />
-                                <TableHead>Requested</TableHead>
+                                <TableHead>
+                                    Requested (
+                                    {formatTimezoneName(new Date(), timezone)})
+                                </TableHead>
                                 <TableHead>Reason</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead className="w-12 text-right" />
@@ -208,13 +199,16 @@ export default function RescheduleRequests({
                                     <TableCell className="whitespace-nowrap">
                                         <div className="flex items-center gap-3">
                                             <p>
-                                                {formatScheduleDate(
+                                                {formatDate(
                                                     request.currentStartAt,
+                                                    timezone,
                                                 )}
                                             </p>
                                             <p className="text-muted-foreground">
-                                                {formatScheduleTime(
+                                                {formatTime(
                                                     request.currentStartAt,
+                                                    timezone,
+                                                    { includeTimezone: false },
                                                 )}
                                             </p>
                                         </div>
@@ -225,13 +219,16 @@ export default function RescheduleRequests({
                                     <TableCell className="whitespace-nowrap">
                                         <div className="flex items-center gap-3 font-medium text-primary">
                                             <p>
-                                                {formatScheduleDate(
+                                                {formatDate(
                                                     request.requestedStartAt,
+                                                    timezone,
                                                 )}
                                             </p>
                                             <p className="font-light">
-                                                {formatScheduleTime(
+                                                {formatTime(
                                                     request.requestedStartAt,
+                                                    timezone,
+                                                    { includeTimezone: false },
                                                 )}
                                             </p>
                                         </div>
@@ -263,7 +260,7 @@ export default function RescheduleRequests({
                                             </TooltipTrigger>
                                             <TooltipContent>
                                                 {request.reviewedAt
-                                                    ? `${formatActionDate(request.reviewedAt)} oleh ${request.reviewer}`
+                                                    ? `${formatDateTime(request.reviewedAt, timezone)} oleh ${request.reviewer}`
                                                     : 'Waiting for review'}
                                             </TooltipContent>
                                         </Tooltip>

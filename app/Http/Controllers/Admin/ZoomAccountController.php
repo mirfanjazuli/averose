@@ -102,8 +102,8 @@ class ZoomAccountController extends Controller
             'accountId' => $account->account_id,
             'clientId' => $account->client_id,
             'status' => $account->status,
-            'createdAt' => $account->created_at?->format('M d, Y'),
-            'updatedAt' => $account->updated_at?->format('M d, Y'),
+            'createdAt' => $account->created_at?->toJSON(),
+            'updatedAt' => $account->updated_at?->toJSON(),
         ];
 
         if ($account->relationLoaded('schedules')) {
@@ -111,8 +111,7 @@ class ZoomAccountController extends Controller
 
             $serialized['activeMeetings'] = $capacity['activeMeetings'];
             $serialized['isFull'] = $capacity['isFull'];
-            $serialized['releaseAt'] = $capacity['releaseAt']?->format('M d, Y H:i');
-            $serialized['releaseIn'] = $capacity['releaseAt']?->diffForHumans();
+            $serialized['releaseAt'] = $capacity['releaseAt']?->toJSON();
         }
 
         if ($includeSecrets) {
@@ -149,8 +148,7 @@ class ZoomAccountController extends Controller
             'nearestRelease' => $nearestRelease ? [
                 'activeMeetings' => $nearestRelease['activeMeetings'],
                 'name' => $nearestRelease['name'],
-                'releaseAt' => $nearestRelease['releaseAt']->format('M d, Y H:i'),
-                'releaseIn' => $nearestRelease['releaseAt']->diffForHumans(),
+                'releaseAt' => $nearestRelease['releaseAt']->toJSON(),
                 'slug' => $nearestRelease['slug'],
             ] : null,
         ];
@@ -183,14 +181,15 @@ class ZoomAccountController extends Controller
                 $endAt = $booking->scheduled_at->copy()->addMinutes($booking->duration);
 
                 return [
+                    'endAt' => $endAt->toJSON(),
                     'id' => (string) $booking->id,
                     'meetingId' => $booking->zoom_meeting_id,
                     'mentor' => $booking->mentor?->name ?? 'Unassigned mentor',
                     'program' => $booking->enrollment?->program?->name ?? '-',
                     'status' => str($booking->status)->headline()->toString(),
                     'student' => $booking->user?->name ?? '-',
+                    'startAt' => $booking->scheduled_at->toJSON(),
                     'timingGroup' => $this->meetingTimingGroup($booking->scheduled_at, $endAt),
-                    'time' => "{$booking->scheduled_at->format('D, M j, H:i')} - {$endAt->format('H:i')}",
                     'title' => $booking->subject?->name ?? 'Session',
                     'zoomLink' => $booking->zoom_link,
                 ];

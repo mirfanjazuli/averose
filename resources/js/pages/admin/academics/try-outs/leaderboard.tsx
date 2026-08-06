@@ -13,7 +13,9 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import { getBadgeProps } from '@/lib/badge';
+import { formatDateTime } from '@/lib/date-time';
 
 type LeaderboardRow = {
     correctCount: number;
@@ -58,6 +60,7 @@ const rankClassName = (rank: number) => {
 };
 
 export default function AdminTryOutLeaderboard({ tryOut }: { tryOut: TryOut }) {
+    const timezone = useUserTimezone();
     const [searchQuery, setSearchQuery] = useState('');
     const filteredRows = useMemo(() => {
         const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -173,7 +176,12 @@ export default function AdminTryOutLeaderboard({ tryOut }: { tryOut: TryOut }) {
                                         {row.correctCount}/{row.questionCount}
                                     </TableCell>
                                     <TableCell>
-                                        {row.submittedAt ?? '-'}
+                                        {row.submittedAt
+                                            ? formatDateTime(
+                                                  row.submittedAt,
+                                                  timezone,
+                                              )
+                                            : '-'}
                                     </TableCell>
                                 </TableRow>
                             ))}

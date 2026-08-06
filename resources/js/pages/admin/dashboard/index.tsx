@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/chart';
 import type { ChartConfig } from '@/components/ui/chart';
 import { Spinner } from '@/components/ui/spinner';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
 
@@ -291,12 +292,13 @@ export default function Dashboard({
     filters: DashboardFilters;
     stats: DashboardStat[];
 }) {
+    const timezone = useUserTimezone();
     const [dateRange, setDateRange] = useState<DateRange | undefined>({
         from: parseDateForRange(filters.from),
         to: parseDateForRange(filters.to),
     });
     const [isExportingPdf, setIsExportingPdf] = useState(false);
-    const downloadPdfUrl = `/dashboard/download-pdf?from=${filters.from}&to=${filters.to}`;
+    const downloadPdfUrl = `/dashboard/download-pdf?from=${filters.from}&to=${filters.to}&timezone=${encodeURIComponent(timezone)}`;
 
     const downloadPdf = async () => {
         if (isExportingPdf) {
@@ -348,6 +350,7 @@ export default function Dashboard({
             {
                 from: formatDateForRangeQuery(range.from),
                 to: formatDateForRangeQuery(range.to),
+                timezone,
             },
             {
                 preserveScroll: true,

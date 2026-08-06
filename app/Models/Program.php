@@ -42,6 +42,11 @@ class Program extends Model
         return $this->hasMany(ProgramEnrollment::class);
     }
 
+    public function materials(): HasMany
+    {
+        return $this->hasMany(ProgramMaterial::class);
+    }
+
     protected static function booted(): void
     {
         static::saving(function (Program $program): void {

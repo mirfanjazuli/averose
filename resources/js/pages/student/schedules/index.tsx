@@ -17,6 +17,7 @@ import { TablePagination } from '@/components/admin/table-pagination';
 import InputError from '@/components/input-error';
 import { JournalAttachmentList } from '@/components/journal-attachment-list';
 import type { JournalAttachment } from '@/components/journal-attachment-list';
+import { TimezoneIndicator } from '@/components/timezone-indicator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -56,11 +57,20 @@ import {
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { useClientPagination } from '@/hooks/use-client-pagination';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import {
     formatBadgeLabel,
     getBadgeProps,
     getStatusBadgeTone,
 } from '@/lib/badge';
+import {
+    formatDate,
+    formatDateTime,
+    formatDateInput,
+    formatTimeInput,
+    formatTimeRange,
+    formatTimezoneName,
+} from '@/lib/date-time';
 import { ScheduleFeedbackDialog } from '@/pages/student/schedules/components/schedule-feedback-dialog';
 import { StudentBookSessionDialog } from '@/pages/student/schedules/components/student-book-session-dialog';
 import type { BookingSubjectOption } from '@/pages/student/schedules/components/student-book-session-dialog';
@@ -93,57 +103,15 @@ type StudentSession = {
     rescheduleRequest: {
         id: string;
         reason: string;
-        requested: string;
+        requestedEndAt: string;
+        requestedStartAt: string;
         status: string;
     } | null;
-    rescheduleSlots: {
-        label: string;
-        value: string;
-    }[];
     startAt: string;
     status: string;
-    time: string;
     title: string;
     zoomLink: string | null;
 };
-
-function formatSessionTimeRange(startAt: string, endAt: string) {
-    const formatter = new Intl.DateTimeFormat('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-
-    return `${formatter.format(new Date(startAt))} - ${formatter.format(
-        new Date(endAt),
-    )} WIB`;
-}
-
-function formatSessionDateLabel(dateValue: string) {
-    return new Intl.DateTimeFormat('id-ID', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-    }).format(new Date(dateValue));
-}
-
-function formatDateInputValue(dateValue: string) {
-    const date = new Date(dateValue);
-
-    return [
-        date.getFullYear(),
-        String(date.getMonth() + 1).padStart(2, '0'),
-        String(date.getDate()).padStart(2, '0'),
-    ].join('-');
-}
-
-function formatTimeInputValue(dateValue: string) {
-    const date = new Date(dateValue);
-
-    return [
-        String(date.getHours()).padStart(2, '0'),
-        String(date.getMinutes()).padStart(2, '0'),
-    ].join(':');
-}
 
 function dateKey(dateValue: Date) {
     return [
@@ -199,6 +167,7 @@ export default function StudentSchedules({
     sessions: StudentSession[];
     subjects: BookingSubjectOption[];
 }) {
+    const timezone = useUserTimezone();
     const [searchQuery, setSearchQuery] = useState('');
     const [reschedulingSession, setReschedulingSession] =
         useState<StudentSession | null>(null);
@@ -228,12 +197,17 @@ export default function StudentSchedules({
         setRescheduleReason('');
     };
     const currentRescheduleDateLabel = reschedulingSession
-        ? formatSessionDateLabel(reschedulingSession.startAt)
+        ? formatDate(reschedulingSession.startAt, timezone, {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric',
+          })
         : '';
     const currentRescheduleTimeLabel = reschedulingSession
-        ? `${formatSessionTimeRange(
+        ? `${formatTimeRange(
               reschedulingSession.startAt,
               reschedulingSession.endAt,
+              timezone,
           )}`
         : '';
     const [newRescheduleDate, newRescheduleTime] = rescheduleDateTime
@@ -244,7 +218,10 @@ export default function StudentSchedules({
             ? `${newRescheduleTime} - ${addMinutes(
                   newRescheduleTime,
                   sessionDurationMinutes(reschedulingSession),
-              )} WIB`
+              )} ${formatTimezoneName(
+                  new Date(`${newRescheduleDate}T${newRescheduleTime}:00`),
+                  timezone,
+              )}`
             : '';
 
     const canBookSession = subjects.some(
@@ -275,11 +252,14 @@ export default function StudentSchedules({
                 session.mentor,
                 session.program,
                 session.deliveryMode,
-                session.time,
+                formatDate(session.startAt, timezone),
+                formatTimeRange(session.startAt, session.endAt, timezone, {
+                    includeTimezone: false,
+                }),
                 session.status,
             ].some((value) => value.toLowerCase().includes(normalizedSearch)),
         );
-    }, [searchQuery, sessions]);
+    }, [searchQuery, sessions, timezone]);
     const {
         changeRowsPerPage,
         firstItemIndex,
@@ -347,6 +327,9 @@ export default function StudentSchedules({
                             Kelola jadwal, reschedule, dan sesi yang akan
                             datang.
                         </p>
+                        <div className="mt-2 md:hidden">
+                            <TimezoneIndicator />
+                        </div>
                     </div>
                     <div className="shrink-0">
                         {canBookSession ? (
@@ -413,14 +396,22 @@ export default function StudentSchedules({
 
                                         <div className="flex items-center justify-between gap-3 text-sm">
                                             <span className="text-[#526b7b]">
-                                                {formatSessionDateLabel(
+                                                {formatDate(
                                                     session.startAt,
+                                                    timezone,
+                                                    {
+                                                        day: 'numeric',
+                                                        month: 'long',
+                                                        year: 'numeric',
+                                                    },
                                                 )}
                                             </span>
                                             <span className="font-semibold text-[#0f8f7a] tabular-nums">
-                                                {formatSessionTimeRange(
+                                                {formatTimeRange(
                                                     session.startAt,
                                                     session.endAt,
+                                                    timezone,
+                                                    { includeTimezone: false },
                                                 )}
                                             </span>
                                         </div>
@@ -466,7 +457,14 @@ export default function StudentSchedules({
                                                 Mata pelajaran
                                             </TableHead>
                                             <TableHead>Tanggal</TableHead>
-                                            <TableHead>Jam</TableHead>
+                                            <TableHead>
+                                                Jam (
+                                                {formatTimezoneName(
+                                                    new Date(),
+                                                    timezone,
+                                                )}
+                                                )
+                                            </TableHead>
                                             <TableHead>Mentor</TableHead>
                                             <TableHead>Delivery</TableHead>
                                             <TableHead>Status</TableHead>
@@ -487,14 +485,24 @@ export default function StudentSchedules({
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="font-medium text-[#102a3a]">
-                                                    {formatSessionDateLabel(
+                                                    {formatDate(
                                                         session.startAt,
+                                                        timezone,
+                                                        {
+                                                            day: 'numeric',
+                                                            month: 'long',
+                                                            year: 'numeric',
+                                                        },
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="font-semibold text-[#0f8f7a] tabular-nums">
-                                                    {formatSessionTimeRange(
+                                                    {formatTimeRange(
                                                         session.startAt,
                                                         session.endAt,
+                                                        timezone,
+                                                        {
+                                                            includeTimezone: false,
+                                                        },
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-[#526b7b]">
@@ -530,11 +538,18 @@ export default function StudentSchedules({
                                                                     admin
                                                                 </Badge>
                                                                 <p className="mt-1 max-w-40 truncate text-xs text-[#526b7b]">
-                                                                    {
+                                                                    {formatTimeRange(
                                                                         session
                                                                             .rescheduleRequest
-                                                                            .requested
-                                                                    }
+                                                                            .requestedStartAt,
+                                                                        session
+                                                                            .rescheduleRequest
+                                                                            .requestedEndAt,
+                                                                        timezone,
+                                                                        {
+                                                                            includeTimezone: false,
+                                                                        },
+                                                                    )}
                                                                 </p>
                                                             </div>
                                                         ) : null}
@@ -601,12 +616,22 @@ export default function StudentSchedules({
                         >
                             {({ errors, processing }) => (
                                 <>
+                                    <input
+                                        type="hidden"
+                                        name="timezone"
+                                        value={timezone}
+                                    />
                                     <div className="rounded-lg border p-3 text-sm">
                                         <p className="font-medium">
                                             {editingSession.title}
                                         </p>
                                         <p className="mt-1 text-muted-foreground">
-                                            Saat ini: {editingSession.time}
+                                            Saat ini:{' '}
+                                            {formatTimeRange(
+                                                editingSession.startAt,
+                                                editingSession.endAt,
+                                                timezone,
+                                            )}
                                         </p>
                                     </div>
 
@@ -620,8 +645,9 @@ export default function StudentSchedules({
                                                 name="date"
                                                 type="date"
                                                 required
-                                                defaultValue={formatDateInputValue(
+                                                defaultValue={formatDateInput(
                                                     editingSession.startAt,
+                                                    timezone,
                                                 )}
                                             />
                                             <InputError message={errors.date} />
@@ -636,13 +662,16 @@ export default function StudentSchedules({
                                                 name="time"
                                                 type="time"
                                                 required
-                                                defaultValue={formatTimeInputValue(
+                                                defaultValue={formatTimeInput(
                                                     editingSession.startAt,
+                                                    timezone,
                                                 )}
                                             />
                                             <InputError message={errors.time} />
                                         </div>
                                     </div>
+
+                                    <TimezoneIndicator />
 
                                     <Button
                                         type="submit"
@@ -694,6 +723,11 @@ export default function StudentSchedules({
                         >
                             {({ errors, processing }) => (
                                 <div className="space-y-5">
+                                    <input
+                                        type="hidden"
+                                        name="timezone"
+                                        value={timezone}
+                                    />
                                     <div className="space-y-1.5">
                                         <div className="flex items-center justify-between gap-3 text-xs font-semibold text-primary">
                                             <span className="min-w-0 truncate">
@@ -837,6 +871,7 @@ export default function StudentSchedules({
                                                     errors.requested_scheduled_at
                                                 }
                                             />
+                                            <TimezoneIndicator />
                                         </div>
 
                                         <div className="grid gap-2">
@@ -967,8 +1002,14 @@ export default function StudentSchedules({
                                         Tanggal
                                     </p>
                                     <p className="mt-1 font-medium text-[#102a3a]">
-                                        {formatSessionDateLabel(
+                                        {formatDate(
                                             detailSession.startAt,
+                                            timezone,
+                                            {
+                                                day: 'numeric',
+                                                month: 'long',
+                                                year: 'numeric',
+                                            },
                                         )}
                                     </p>
                                 </div>
@@ -977,9 +1018,10 @@ export default function StudentSchedules({
                                         Jam
                                     </p>
                                     <p className="mt-1 font-semibold text-[#0f8f7a] tabular-nums">
-                                        {formatSessionTimeRange(
+                                        {formatTimeRange(
                                             detailSession.startAt,
                                             detailSession.endAt,
+                                            timezone,
                                         )}
                                     </p>
                                 </div>
@@ -1029,10 +1071,11 @@ export default function StudentSchedules({
                                         Reschedule menunggu persetujuan
                                     </p>
                                     <p className="mt-1 text-[#526b7b]">
-                                        {
+                                        {formatDateTime(
                                             detailSession.rescheduleRequest
-                                                .requested
-                                        }
+                                                .requestedStartAt,
+                                            timezone,
+                                        )}
                                     </p>
                                 </div>
                             ) : null}

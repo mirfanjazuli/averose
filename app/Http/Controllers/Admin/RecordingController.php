@@ -93,14 +93,10 @@ class RecordingController extends Controller
             ->map(function (Schedule $schedule): array {
                 return [
                     'id' => (string) $schedule->id,
-                    'label' => sprintf(
-                        '%s - %s - %s',
-                        $schedule->scheduled_at->format('M d, H:i'),
-                        $schedule->user?->name ?? 'Student',
-                        $schedule->subject?->name ?? 'Session',
-                    ),
                     'meetingId' => $schedule->zoom_meeting_id,
+                    'scheduledAt' => $schedule->scheduled_at->toJSON(),
                     'student' => $schedule->user?->name ?? '-',
+                    'subject' => $schedule->subject?->name ?? 'Session',
                     'zoomAccount' => $schedule->zoomAccount?->name ?? '-',
                 ];
             })

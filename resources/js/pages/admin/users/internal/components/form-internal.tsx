@@ -40,7 +40,7 @@ export function FormInternal({
 
     return (
         <>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4">
                 <div className="grid gap-2">
                     <Label htmlFor={`${idPrefix}-name`}>Name</Label>
                     <Input

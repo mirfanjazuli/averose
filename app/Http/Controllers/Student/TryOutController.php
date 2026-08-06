@@ -90,7 +90,7 @@ class TryOutController extends Controller
                     'score' => $attempt->score,
                     'maxScore' => $attempt->max_score ?? 100,
                     'percentageScore' => $this->percentageScore($attempt),
-                    'submittedAt' => $attempt->submitted_at?->format('d M Y, H:i'),
+                    'submittedAt' => $attempt->submitted_at?->toJSON(),
                     'tryOut' => [
                         'slug' => $attempt->tryOut->slug,
                         'title' => $attempt->tryOut->title,
@@ -215,7 +215,7 @@ class TryOutController extends Controller
                 'percentageScore' => $this->percentageScore($tryOutAttempt),
                 'scoreBreakdown' => $tryOutAttempt->score_breakdown ?? [],
                 'scoringMode' => ($tryOutAttempt->scoring_mode ?? TryOutScoringMode::RawScore)->value,
-                'submittedAt' => $tryOutAttempt->submitted_at?->format('d M Y, H:i'),
+                'submittedAt' => $tryOutAttempt->submitted_at?->toJSON(),
             ],
             'tryOut' => [
                 'id' => (string) $tryOut->id,

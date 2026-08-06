@@ -6,6 +6,8 @@ export type User = {
     permissions: string[];
     role: 'admin' | 'student' | 'mentor';
     roleName?: string | null;
+    timezone: string;
+    timezoneMode: 'auto' | 'manual';
     avatar?: string;
     email_verified_at: string | null;
     two_factor_enabled?: boolean;
@@ -23,8 +25,8 @@ export type Passkey = {
     id: number;
     name: string;
     authenticator: string | null;
-    created_at_diff: string;
-    last_used_at_diff: string | null;
+    createdAt: string;
+    lastUsedAt: string | null;
 };
 /* @end-chisel-passkeys */
 

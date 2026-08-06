@@ -11,9 +11,11 @@ import {
 import { DynamicIcon } from 'lucide-react/dynamic';
 import type { IconName } from 'lucide-react/dynamic';
 import type { ReactNode } from 'react';
-import { useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import AlertError from '@/components/alert-error';
+import { TimezoneIndicator } from '@/components/timezone-indicator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -45,6 +47,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
+import { formatTimezoneName } from '@/lib/date-time';
 import { cn } from '@/lib/utils';
 
 export type BookingSubjectOption = {
@@ -131,6 +135,49 @@ function createSessionRow(): BookingSessionRow {
     };
 }
 
+function bookingErrorMessages(errors: Record<string, string>): string[] {
+    const groupedMessages = new Map<
+        string,
+        { generic: boolean; sessionNumbers: Set<number> }
+    >();
+
+    Object.entries(errors).forEach(([field, message]) => {
+        const sessionMatch = field.match(/^sessions\.(\d+)\./);
+        const group = groupedMessages.get(message) ?? {
+            generic: false,
+            sessionNumbers: new Set<number>(),
+        };
+
+        if (sessionMatch) {
+            group.sessionNumbers.add(Number(sessionMatch[1]) + 1);
+        } else {
+            group.generic = true;
+        }
+
+        groupedMessages.set(message, group);
+    });
+
+    return Array.from(groupedMessages.entries()).map(([message, group]) => {
+        if (group.generic || group.sessionNumbers.size === 0) {
+            return message;
+        }
+
+        const sessions = Array.from(group.sessionNumbers)
+            .sort((left, right) => left - right)
+            .join(', ');
+
+        return `Sesi ${sessions}: ${message}`;
+    });
+}
+
+function hasScheduleInputError(errors: Record<string, string>): boolean {
+    return Object.keys(errors).some(
+        (field) =>
+            ['date', 'dates', 'time', 'timezone'].includes(field) ||
+            /^sessions\.\d+\.(date|time)$/.test(field),
+    );
+}
+
 function DateTimePicker({
     date,
     disabledDate,
@@ -211,12 +258,57 @@ function DateTimePicker({
     );
 }
 
+const SubjectOption = memo(function SubjectOption({
+    checked,
+    onSelect,
+    subject,
+}: {
+    checked: boolean;
+    onSelect: (subject: BookingSubjectOption) => void;
+    subject: BookingSubjectOption;
+}) {
+    const disabled = !subject.enrollmentId || subject.sessionsRemaining === 0;
+
+    return (
+        <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onSelect(subject)}
+            className={cn(
+                'bg-background flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-xl border p-3 text-center transition-colors',
+                checked
+                    ? 'border-[#0f8f7a] bg-[#edf7f4] shadow-sm'
+                    : 'border-border hover:border-[#0f8f7a]/40',
+                disabled && 'cursor-not-allowed opacity-50',
+            )}
+        >
+            <span
+                className={cn(
+                    'bg-muted flex size-8 items-center justify-center rounded-lg',
+                    checked && 'bg-white text-[#0f8f7a]',
+                )}
+            >
+                <DynamicIcon
+                    name={subject.icon ?? 'book-open'}
+                    fallback={() => <BookOpen className="size-4" />}
+                    className="size-4"
+                />
+            </span>
+            <p className="line-clamp-2 text-xs font-semibold leading-snug">
+                {subject.label}
+            </p>
+        </button>
+    );
+});
+
 export function StudentBookSessionDialog({
     onOpenChange,
     open,
     subjects,
     trigger,
 }: StudentBookSessionDialogProps) {
+    const timezone = useUserTimezone();
+    const timezoneName = formatTimezoneName(new Date(), timezone);
     const submitAllowedRef = useRef(false);
     const [internalBookingOpen, setInternalBookingOpen] = useState(false);
     const [currentStep, setCurrentStep] = useState(0);
@@ -231,20 +323,17 @@ export function StudentBookSessionDialog({
 
         return date;
     }, []);
-    const subjectsByProgram = useMemo(
-        () =>
-            subjects.reduce<Record<string, BookingSubjectOption[]>>(
-                (groups, subject) => {
-                    const program = subject.program ?? 'Tanpa program';
+    const subjectsByProgram = useMemo(() => {
+        const groups: Record<string, BookingSubjectOption[]> = {};
 
-                    groups[program] = [...(groups[program] ?? []), subject];
+        subjects.forEach((subject) => {
+            const program = subject.program ?? 'Tanpa program';
 
-                    return groups;
-                },
-                {},
-            ),
-        [subjects],
-    );
+            (groups[program] ??= []).push(subject);
+        });
+
+        return groups;
+    }, [subjects]);
     const selectedSubject = useMemo(
         () =>
             subjects.find((subject) => subject.value === selectedSubjectValue),
@@ -293,21 +382,16 @@ export function StudentBookSessionDialog({
         setSessions([createSessionRow()]);
     };
 
-    const selectSubject = (subject: BookingSubjectOption) => {
+    const selectSubject = useCallback((subject: BookingSubjectOption) => {
         if (!subject.enrollmentId || subject.sessionsRemaining === 0) {
             return;
         }
 
-        if (selectedSubjectValue === subject.value) {
-            setSelectedSubjectValue('');
-            setSessions([createSessionRow()]);
-
-            return;
-        }
-
-        setSelectedSubjectValue(subject.value);
+        setSelectedSubjectValue((currentValue) =>
+            currentValue === subject.value ? '' : subject.value,
+        );
         setSessions([createSessionRow()]);
-    };
+    }, []);
 
     const updateSession = (
         sessionId: string,
@@ -417,8 +501,18 @@ export function StudentBookSessionDialog({
                             setBookingOpen(false);
                             resetBooking();
                         }}
-                        onError={() => {
+                        onError={(errors) => {
                             submitAllowedRef.current = false;
+
+                            const messages = bookingErrorMessages(errors);
+
+                            if (hasScheduleInputError(errors)) {
+                                setCurrentStep(1);
+                            }
+
+                            if (messages[0]) {
+                                toast.error(messages[0]);
+                            }
                         }}
                         onSubmitCapture={(event) => {
                             if (submitAllowedRef.current) {
@@ -441,8 +535,11 @@ export function StudentBookSessionDialog({
                         }}
                         className="flex min-h-0 flex-1 flex-col overflow-hidden"
                     >
-                        {({ errors, processing }) => (
-                            <>
+                        {({ errors, processing }) => {
+                            const errorMessages = bookingErrorMessages(errors);
+
+                            return (
+                                <>
                                 <div className="min-h-0 flex-1 px-6 pb-2">
                                     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border bg-background">
                                         <div className="border-b bg-muted/20 p-4">
@@ -556,64 +653,23 @@ export function StudentBookSessionDialog({
                                                                         {programSubjects.map(
                                                                             (
                                                                                 subject,
-                                                                            ) => {
-                                                                                const checked =
-                                                                                    selectedSubjectValue ===
-                                                                                    subject.value;
-                                                                                const disabled =
-                                                                                    !subject.enrollmentId ||
-                                                                                    subject.sessionsRemaining ===
-                                                                                        0;
-
-                                                                                return (
-                                                                                    <button
-                                                                                        key={
-                                                                                            subject.value
-                                                                                        }
-                                                                                        type="button"
-                                                                                        disabled={
-                                                                                            disabled
-                                                                                        }
-                                                                                        onClick={() =>
-                                                                                            selectSubject(
-                                                                                                subject,
-                                                                                            )
-                                                                                        }
-                                                                                        className={cn(
-                                                                                            'flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-xl border bg-background p-3 text-center transition-colors',
-                                                                                            checked
-                                                                                                ? 'border-[#0f8f7a] bg-[#edf7f4] shadow-sm'
-                                                                                                : 'border-border hover:border-[#0f8f7a]/40',
-                                                                                            disabled &&
-                                                                                                'cursor-not-allowed opacity-50',
-                                                                                        )}
-                                                                                    >
-                                                                                        <span
-                                                                                            className={cn(
-                                                                                                'flex size-8 items-center justify-center rounded-lg bg-muted',
-                                                                                                checked &&
-                                                                                                    'bg-white text-[#0f8f7a]',
-                                                                                            )}
-                                                                                        >
-                                                                                            <DynamicIcon
-                                                                                                name={
-                                                                                                    subject.icon ??
-                                                                                                    'book-open'
-                                                                                                }
-                                                                                                fallback={() => (
-                                                                                                    <BookOpen className="size-4" />
-                                                                                                )}
-                                                                                                className="size-4"
-                                                                                            />
-                                                                                        </span>
-                                                                                        <p className="line-clamp-2 text-xs leading-snug font-semibold">
-                                                                                            {
-                                                                                                subject.label
-                                                                                            }
-                                                                                        </p>
-                                                                                    </button>
-                                                                                );
-                                                                            },
+                                                                            ) => (
+                                                                                <SubjectOption
+                                                                                    key={
+                                                                                        subject.value
+                                                                                    }
+                                                                                    checked={
+                                                                                        selectedSubjectValue ===
+                                                                                        subject.value
+                                                                                    }
+                                                                                    onSelect={
+                                                                                        selectSubject
+                                                                                    }
+                                                                                    subject={
+                                                                                        subject
+                                                                                    }
+                                                                                />
+                                                                            ),
                                                                         )}
                                                                     </div>
                                                                 </div>
@@ -634,6 +690,7 @@ export function StudentBookSessionDialog({
                                                                         tanggal
                                                                         dan jam
                                                                     </p>
+                                                                    <TimezoneIndicator />
                                                                 </div>
                                                                 {selectedSubject.sessionsRemaining !==
                                                                     null && (
@@ -843,7 +900,7 @@ export function StudentBookSessionDialog({
                                                                                         ? `${session.time} - ${addMinutes(
                                                                                               session.time,
                                                                                               selectedSubject.duration,
-                                                                                          )} WIB`
+                                                                                          )} ${timezoneName}`
                                                                                         : 'Belum ada jam'}
                                                                                 </TableCell>
                                                                             </TableRow>
@@ -857,16 +914,16 @@ export function StudentBookSessionDialog({
                                         </div>
                                     </div>
 
-                                    {(errors.sessions ||
-                                        errors.subject_id ||
-                                        errors.program_enrollment_id) && (
-                                        <p className="px-6 pb-5 text-sm text-destructive">
-                                            {errors.sessions ??
-                                                errors.subject_id ??
-                                                errors.program_enrollment_id}
-                                        </p>
-                                    )}
                                 </div>
+
+                                {errorMessages.length > 0 && (
+                                    <div className="shrink-0 px-6 pb-2">
+                                        <AlertError
+                                            errors={errorMessages}
+                                            title="Jadwal belum dapat disimpan"
+                                        />
+                                    </div>
+                                )}
 
                                 <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 bg-background/95 px-6 pt-3 pb-4 backdrop-blur">
                                     <Button
@@ -919,6 +976,11 @@ export function StudentBookSessionDialog({
                                 </div>
 
                                 <div hidden>
+                                    <input
+                                        type="hidden"
+                                        name="timezone"
+                                        value={timezone}
+                                    />
                                     {flattenedSessions.map((session, index) => (
                                         <div key={session.id}>
                                             <input
@@ -946,8 +1008,9 @@ export function StudentBookSessionDialog({
                                         </div>
                                     ))}
                                 </div>
-                            </>
-                        )}
+                                </>
+                            );
+                        }}
                     </Form>
                 )}
             </DialogContent>

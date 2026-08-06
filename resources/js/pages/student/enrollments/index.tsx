@@ -10,11 +10,16 @@ import {
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatBadgeLabel, getBadgeProps, getStatusBadgeTone } from '@/lib/badge';
+import {
+    formatBadgeLabel,
+    getBadgeProps,
+    getStatusBadgeTone,
+} from '@/lib/badge';
 
 type Enrollment = {
     duration: number | null;
     field: string | null;
+    href: string;
     id: number;
     maxReschedule: number | null;
     program: string | null;
@@ -51,7 +56,9 @@ function enrollmentProgress(enrollment: Enrollment) {
 
     return Math.min(
         100,
-        Math.round(((enrollment.sessionsUsed ?? 0) / enrollment.sessions) * 100),
+        Math.round(
+            ((enrollment.sessionsUsed ?? 0) / enrollment.sessions) * 100,
+        ),
     );
 }
 
@@ -71,7 +78,7 @@ export default function StudentEnrollments({
     return (
         <>
             <Head title="Program" />
-            <div className="flex h-full min-w-0 max-w-full flex-1 flex-col gap-8 py-4 text-[#102a3a] md:gap-10 md:py-6">
+            <div className="flex h-full max-w-full min-w-0 flex-1 flex-col gap-8 py-4 text-[#102a3a] md:gap-10 md:py-6">
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                         <h1 className="font-heading text-2xl leading-tight font-semibold tracking-tight text-[#102a3a] md:text-4xl">
@@ -120,7 +127,7 @@ export default function StudentEnrollments({
                             return (
                                 <article
                                     key={enrollment.id}
-                                    className="overflow-hidden rounded-md bg-white shadow-sm shadow-[#102a3a]/[0.03] ring-1 ring-[#dcece7]"
+                                    className="overflow-hidden rounded-md bg-white shadow-sm ring-1 shadow-[#102a3a]/[0.03] ring-[#dcece7]"
                                 >
                                     <div className="space-y-5 p-5 sm:p-6">
                                         <div className="flex items-start justify-between gap-4">
@@ -230,15 +237,23 @@ export default function StudentEnrollments({
                                                     enrollment.startDate,
                                                 )}
                                             </div>
-                                            <Button
-                                                asChild
-                                                variant="outline"
-                                                className="rounded-xl border-[#dcece7] text-[#102a3a] hover:bg-[#edf7f4] hover:text-[#0f8f7a]"
-                                            >
-                                                <Link href="/schedules">
-                                                    Atur jadwal
+                                            <div className="flex items-center gap-3">
+                                                <Link
+                                                    href={enrollment.href}
+                                                    className="text-sm font-semibold text-[#0f8f7a] hover:underline"
+                                                >
+                                                    Lihat program
                                                 </Link>
-                                            </Button>
+                                                <Button
+                                                    asChild
+                                                    variant="outline"
+                                                    className="rounded-xl border-[#dcece7] text-[#102a3a] hover:bg-[#edf7f4] hover:text-[#0f8f7a]"
+                                                >
+                                                    <Link href="/schedules">
+                                                        Atur jadwal
+                                                    </Link>
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                 </article>

@@ -39,11 +39,13 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { useClientPagination } from '@/hooks/use-client-pagination';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import {
     formatBadgeLabel,
     getBadgeProps,
     getStatusBadgeTone,
 } from '@/lib/badge';
+import { formatDate, formatRelativeDateTime } from '@/lib/date-time';
 import { CreateDialogZoomAccount } from '@/pages/admin/zoom-accounts/components/create-dialog-zoom-account';
 import { UpdateDialogZoomAccount } from '@/pages/admin/zoom-accounts/components/update-dialog-zoom-account';
 
@@ -57,7 +59,6 @@ type ZoomAccount = {
     clientId: string;
     createdAt: string | null;
     releaseAt?: string | null;
-    releaseIn?: string | null;
     status: string;
     updatedAt: string | null;
 };
@@ -68,7 +69,6 @@ type CapacitySummary = {
         activeMeetings: number;
         name: string;
         releaseAt: string;
-        releaseIn: string;
         slug: string;
     } | null;
 };
@@ -88,6 +88,7 @@ export default function ZoomAccounts({
     accounts: ZoomAccount[];
     capacity: CapacitySummary;
 }) {
+    const timezone = useUserTimezone();
     const [addAccountDialogOpen, setAddAccountDialogOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
@@ -262,7 +263,9 @@ export default function ZoomAccounts({
                                 className="mt-1 block truncate text-xs text-primary hover:underline"
                             >
                                 {capacity.nearestRelease.name} frees{' '}
-                                {capacity.nearestRelease.releaseIn}
+                                {formatRelativeDateTime(
+                                    capacity.nearestRelease.releaseAt,
+                                )}
                             </Link>
                         )}
                     </SummaryCard>
@@ -328,7 +331,11 @@ export default function ZoomAccounts({
                                     </TableCell>
                                     <TableCell>{account.accountId}</TableCell>
                                     <TableCell>{account.clientId}</TableCell>
-                                    <TableCell>{account.createdAt}</TableCell>
+                                    <TableCell>
+                                        {account.createdAt
+                                            ? formatDate(account.createdAt, timezone)
+                                            : '-'}
+                                    </TableCell>
                                     <TableCell>
                                         <div className="space-y-1">
                                             <Badge
@@ -351,7 +358,9 @@ export default function ZoomAccounts({
                                                 account.releaseAt && (
                                                     <p className="text-xs text-muted-foreground">
                                                         Frees{' '}
-                                                        {account.releaseIn}
+                                                        {formatRelativeDateTime(
+                                                            account.releaseAt,
+                                                        )}
                                                     </p>
                                                 )}
                                         </div>

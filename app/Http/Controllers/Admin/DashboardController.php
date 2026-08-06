@@ -8,8 +8,14 @@ use App\Models\ProgramEnrollment;
 use App\Models\Schedule;
 use App\Models\Subject;
 use App\Models\User;
+use App\Rules\IanaTimezone;
+use App\Services\DateTime\UserDateTimeService;
 use App\UserRole;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Carbon\CarbonPeriod;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Carbon;
@@ -21,6 +27,8 @@ use Mpdf\Output\Destination;
 
 class DashboardController extends Controller
 {
+    public function __construct(private readonly UserDateTimeService $dateTimes) {}
+
     /**
      * Handle the incoming request.
      */
@@ -49,9 +57,10 @@ class DashboardController extends Controller
             'activityPeriodLabel' => $this->isFullYearRange($dateRange) ? 'Bulan' : 'Tanggal',
             'activityTableTitle' => $this->isFullYearRange($dateRange) ? 'Data Bulanan' : 'Data Harian',
             'charts' => $charts,
-            'generatedAt' => now(),
+            'generatedAt' => $this->dateTimes->toLocal(now(), $dateRange['timezone']),
             'period' => $dateRange['from']->format('d M Y').' - '.$dateRange['to']->format('d M Y'),
             'stats' => $stats,
+            'timezone' => $dateRange['timezone'],
         ])->render();
 
         $tempDir = storage_path('app/mpdf');
@@ -84,67 +93,73 @@ class DashboardController extends Controller
     }
 
     /**
-     * @return array{from: Carbon, to: Carbon}
+     * @return array{from: CarbonImmutable, to: CarbonImmutable, startInclusive: CarbonImmutable, endExclusive: CarbonImmutable, timezone: string}
      */
     private function adminDateRange(Request $request): array
     {
-        $from = $this->parseDateQuery($request->query('from'))?->startOfDay() ?? now()->startOfMonth();
-        $to = $this->parseDateQuery($request->query('to'))?->endOfDay() ?? now()->endOfMonth();
+        $validated = $request->validate([
+            'timezone' => ['sometimes', 'string', 'max:64', new IanaTimezone],
+        ]);
+        $timezone = $validated['timezone'] ?? $this->dateTimes->timezoneFor($request->user());
+        $now = CarbonImmutable::now($timezone);
+        $from = $this->parseDateQuery($request->query('from'), $timezone) ?? $now->startOfMonth();
+        $to = $this->parseDateQuery($request->query('to'), $timezone) ?? $now->endOfMonth()->startOfDay();
 
         if ($to->lt($from)) {
-            [$from, $to] = [$to->copy()->startOfDay(), $from->copy()->endOfDay()];
+            [$from, $to] = [$to, $from];
         }
 
-        return [
-            'from' => $from,
-            'to' => $to,
-        ];
+        return $this->dateRangeFromLocalDates($from, $to, $timezone);
     }
 
-    private function parseDateQuery(mixed $value): ?Carbon
+    private function parseDateQuery(mixed $value, string $timezone): ?CarbonImmutable
     {
         if (! is_string($value) || blank($value)) {
             return null;
         }
 
         try {
-            return Carbon::parse($value);
+            $date = CarbonImmutable::createFromFormat('!Y-m-d', $value, $timezone);
+
+            return $date !== false && $date->format('Y-m-d') === $value ? $date : null;
         } catch (\Throwable) {
             return null;
         }
     }
 
     /**
-     * @param  array{from: Carbon, to: Carbon}  $dateRange
+     * @param  array{from: CarbonImmutable, to: CarbonImmutable, startInclusive: CarbonImmutable, endExclusive: CarbonImmutable, timezone: string}  $dateRange
      */
     private function adminStats(array $dateRange): array
     {
         $previousDateRange = $this->previousDateRange($dateRange);
         $sessionsInRange = Schedule::query()
-            ->whereBetween('scheduled_at', [$dateRange['from'], $dateRange['to']])
+            ->where('scheduled_at', '>=', $dateRange['startInclusive'])
+            ->where('scheduled_at', '<', $dateRange['endExclusive'])
             ->count();
         $previousSessionsInRange = Schedule::query()
-            ->whereBetween('scheduled_at', [$previousDateRange['from'], $previousDateRange['to']])
+            ->where('scheduled_at', '>=', $previousDateRange['startInclusive'])
+            ->where('scheduled_at', '<', $previousDateRange['endExclusive'])
             ->count();
         $totalDays = max(1, (int) $dateRange['from']->diffInDays($dateRange['to']) + 1);
         $previousTotalDays = max(1, (int) $previousDateRange['from']->diffInDays($previousDateRange['to']) + 1);
         $averageSessionsPerDay = $sessionsInRange / $totalDays;
         $previousAverageSessionsPerDay = $previousSessionsInRange / $previousTotalDays;
         $programsInRange = Program::query()
-            ->where('created_at', '<=', $dateRange['to'])
+            ->where('created_at', '<', $dateRange['endExclusive'])
             ->count();
         $previousProgramsInRange = Program::query()
-            ->where('created_at', '<=', $previousDateRange['to'])
+            ->where('created_at', '<', $previousDateRange['endExclusive'])
             ->count();
         $activeMentorsInRange = User::query()
             ->where('role', UserRole::Mentor)
             ->where('status', 'active')
-            ->where('created_at', '<=', $dateRange['to'])
+            ->where('created_at', '<', $dateRange['endExclusive'])
             ->count();
         $previousActiveMentorsInRange = User::query()
             ->where('role', UserRole::Mentor)
             ->where('status', 'active')
-            ->where('created_at', '<=', $previousDateRange['to'])
+            ->where('created_at', '<', $previousDateRange['endExclusive'])
             ->count();
 
         return [
@@ -176,37 +191,64 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param  array{from: Carbon, to: Carbon}  $dateRange
-     * @return array{from: Carbon, to: Carbon}
+     * @param  array{from: CarbonImmutable, to: CarbonImmutable, startInclusive: CarbonImmutable, endExclusive: CarbonImmutable, timezone: string}  $dateRange
+     * @return array{from: CarbonImmutable, to: CarbonImmutable, startInclusive: CarbonImmutable, endExclusive: CarbonImmutable, timezone: string}
      */
     private function previousDateRange(array $dateRange): array
     {
         if ($this->isFullYearRange($dateRange)) {
-            return [
-                'from' => $dateRange['from']->copy()->subYear()->startOfYear(),
-                'to' => $dateRange['from']->copy()->subYear()->endOfYear(),
-            ];
+            return $this->dateRangeFromLocalDates(
+                $dateRange['from']->subYear()->startOfYear(),
+                $dateRange['from']->subYear()->endOfYear()->startOfDay(),
+                $dateRange['timezone'],
+            );
         }
 
         if ($this->isFullMonthRange($dateRange)) {
-            return [
-                'from' => $dateRange['from']->copy()->subMonthNoOverflow()->startOfMonth(),
-                'to' => $dateRange['from']->copy()->subMonthNoOverflow()->endOfMonth(),
-            ];
+            return $this->dateRangeFromLocalDates(
+                $dateRange['from']->subMonthNoOverflow()->startOfMonth(),
+                $dateRange['from']->subMonthNoOverflow()->endOfMonth()->startOfDay(),
+                $dateRange['timezone'],
+            );
         }
 
         if ($this->isFullWeekRange($dateRange)) {
-            return [
-                'from' => $dateRange['from']->copy()->subWeek()->startOfWeek(Carbon::MONDAY),
-                'to' => $dateRange['from']->copy()->subWeek()->endOfWeek(Carbon::SUNDAY),
-            ];
+            return $this->dateRangeFromLocalDates(
+                $dateRange['from']->subWeek()->startOfWeek(Carbon::MONDAY),
+                $dateRange['from']->subWeek()->endOfWeek(Carbon::SUNDAY)->startOfDay(),
+                $dateRange['timezone'],
+            );
         }
 
         $totalDays = max(1, (int) $dateRange['from']->diffInDays($dateRange['to']) + 1);
 
+        return $this->dateRangeFromLocalDates(
+            $dateRange['from']->subDays($totalDays),
+            $dateRange['to']->subDays($totalDays),
+            $dateRange['timezone'],
+        );
+    }
+
+    /**
+     * @return array{from: CarbonImmutable, to: CarbonImmutable, startInclusive: CarbonImmutable, endExclusive: CarbonImmutable, timezone: string}
+     */
+    private function dateRangeFromLocalDates(
+        CarbonInterface $from,
+        CarbonInterface $to,
+        string $timezone,
+    ): array {
+        $range = $this->dateTimes->utcDateRange(
+            $from->toDateString(),
+            $to->toDateString(),
+            $timezone,
+        );
+
         return [
-            'from' => $dateRange['from']->copy()->subDays($totalDays),
-            'to' => $dateRange['to']->copy()->subDays($totalDays),
+            'endExclusive' => $range->endExclusive,
+            'from' => CarbonImmutable::instance($from)->setTimezone($timezone)->startOfDay(),
+            'startInclusive' => $range->startInclusive,
+            'timezone' => $timezone,
+            'to' => CarbonImmutable::instance($to)->setTimezone($timezone)->startOfDay(),
         ];
     }
 
@@ -276,22 +318,24 @@ class DashboardController extends Controller
     private function dailySessionTotals(array $dateRange): array
     {
         if ($this->isFullYearRange($dateRange)) {
-            $totals = Schedule::query()
-                ->selectRaw($this->monthBucketExpression('scheduled_at').' as month, count(*) as total')
-                ->whereBetween('scheduled_at', [$dateRange['from'], $dateRange['to']])
-                ->groupBy('month')
-                ->pluck('total', 'month');
+            $totals = $this->groupedDateTimeTotals(
+                Schedule::query(),
+                'scheduled_at',
+                $dateRange,
+                'month',
+            );
 
             return $this->monthlyChartItems($dateRange, $totals);
         }
 
         $startDate = $dateRange['from']->toDateString();
         $endDate = $dateRange['to']->toDateString();
-        $totals = Schedule::query()
-            ->selectRaw('date(scheduled_at) as date, count(*) as total')
-            ->whereBetween('scheduled_at', [$dateRange['from'], $dateRange['to']])
-            ->groupBy('date')
-            ->pluck('total', 'date');
+        $totals = $this->groupedDateTimeTotals(
+            Schedule::query(),
+            'scheduled_at',
+            $dateRange,
+            'date',
+        );
 
         return collect(CarbonPeriod::create($startDate, $endDate))
             ->map(fn ($date): array => [
@@ -307,22 +351,24 @@ class DashboardController extends Controller
     private function dailyProgramRegistrants(array $dateRange): array
     {
         if ($this->isFullYearRange($dateRange)) {
-            $totals = ProgramEnrollment::query()
-                ->selectRaw($this->monthBucketExpression('created_at').' as month, count(*) as total')
-                ->whereBetween('created_at', [$dateRange['from'], $dateRange['to']])
-                ->groupBy('month')
-                ->pluck('total', 'month');
+            $totals = $this->groupedDateTimeTotals(
+                ProgramEnrollment::query(),
+                'created_at',
+                $dateRange,
+                'month',
+            );
 
             return $this->monthlyChartItems($dateRange, $totals);
         }
 
         $startDate = $dateRange['from']->toDateString();
         $endDate = $dateRange['to']->toDateString();
-        $totals = ProgramEnrollment::query()
-            ->selectRaw('date(created_at) as date, count(*) as total')
-            ->whereBetween('created_at', [$dateRange['from'], $dateRange['to']])
-            ->groupBy('date')
-            ->pluck('total', 'date');
+        $totals = $this->groupedDateTimeTotals(
+            ProgramEnrollment::query(),
+            'created_at',
+            $dateRange,
+            'date',
+        );
 
         return collect(CarbonPeriod::create($startDate, $endDate))
             ->map(fn ($date): array => [
@@ -359,15 +405,63 @@ class DashboardController extends Controller
             && $dateRange['to']->isSameDay($dateRange['from']->copy()->endOfWeek(Carbon::SUNDAY));
     }
 
-    private function monthBucketExpression(string $column): string
+    private function monthBucketExpression(string $column, string $timezone): string
     {
         $driver = Schedule::query()->getConnection()->getDriverName();
+        $timezone = str_replace("'", "''", $timezone);
 
         return match ($driver) {
-            'mysql', 'mariadb' => "date_format({$column}, '%Y-%m')",
-            'pgsql' => "to_char({$column}, 'YYYY-MM')",
+            'mysql', 'mariadb' => "date_format(convert_tz({$column}, '+00:00', '{$timezone}'), '%Y-%m')",
+            'pgsql' => "to_char({$column} AT TIME ZONE 'UTC' AT TIME ZONE '{$timezone}', 'YYYY-MM')",
             default => "strftime('%Y-%m', {$column})",
         };
+    }
+
+    private function dateBucketExpression(string $column, string $timezone): string
+    {
+        $driver = Schedule::query()->getConnection()->getDriverName();
+        $timezone = str_replace("'", "''", $timezone);
+
+        return match ($driver) {
+            'mysql', 'mariadb' => "date(convert_tz({$column}, '+00:00', '{$timezone}'))",
+            'pgsql' => "to_char({$column} AT TIME ZONE 'UTC' AT TIME ZONE '{$timezone}', 'YYYY-MM-DD')",
+            default => "date({$column})",
+        };
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     * @param  array{from: CarbonImmutable, to: CarbonImmutable, startInclusive: CarbonImmutable, endExclusive: CarbonImmutable, timezone: string}  $dateRange
+     * @return Collection<string, int>
+     */
+    private function groupedDateTimeTotals(
+        Builder $query,
+        string $column,
+        array $dateRange,
+        string $bucket,
+    ): Collection {
+        $query
+            ->where($column, '>=', $dateRange['startInclusive'])
+            ->where($column, '<', $dateRange['endExclusive']);
+
+        if ($query->getConnection()->getDriverName() === 'sqlite') {
+            $format = $bucket === 'month' ? 'Y-m' : 'Y-m-d';
+
+            return $query
+                ->get([$column])
+                ->countBy(fn (Model $model): string => $this->dateTimes
+                    ->toLocal($model->getAttribute($column), $dateRange['timezone'])
+                    ->format($format));
+        }
+
+        $expression = $bucket === 'month'
+            ? $this->monthBucketExpression($column, $dateRange['timezone'])
+            : $this->dateBucketExpression($column, $dateRange['timezone']);
+
+        return $query
+            ->selectRaw("{$expression} as bucket, count(*) as total")
+            ->groupBy('bucket')
+            ->pluck('total', 'bucket');
     }
 
     /**
@@ -381,7 +475,7 @@ class DashboardController extends Controller
             '1 month',
             $dateRange['to']->copy()->startOfMonth(),
         ))
-            ->map(fn (Carbon $date): array => [
+            ->map(fn (CarbonInterface $date): array => [
                 'label' => $date->format('M'),
                 'value' => (int) ($totals[$date->format('Y-m')] ?? 0),
             ])
@@ -394,7 +488,9 @@ class DashboardController extends Controller
     private function popularPrograms(array $dateRange): array
     {
         return Program::query()
-            ->withCount(['enrollments' => fn ($query) => $query->whereBetween('created_at', [$dateRange['from'], $dateRange['to']])])
+            ->withCount(['enrollments' => fn ($query) => $query
+                ->where('created_at', '>=', $dateRange['startInclusive'])
+                ->where('created_at', '<', $dateRange['endExclusive'])])
             ->orderByDesc('enrollments_count')
             ->orderBy('name')
             ->limit(5)
@@ -412,7 +508,9 @@ class DashboardController extends Controller
     private function popularSubjects(array $dateRange): array
     {
         return Subject::query()
-            ->withCount(['schedules' => fn ($query) => $query->whereBetween('scheduled_at', [$dateRange['from'], $dateRange['to']])])
+            ->withCount(['schedules' => fn ($query) => $query
+                ->where('scheduled_at', '>=', $dateRange['startInclusive'])
+                ->where('scheduled_at', '<', $dateRange['endExclusive'])])
             ->orderByDesc('schedules_count')
             ->orderBy('name')
             ->limit(5)

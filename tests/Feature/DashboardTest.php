@@ -9,6 +9,7 @@ use App\Models\Schedule;
 use App\Models\ScheduleFeedback;
 use App\Models\Subject;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -98,9 +99,11 @@ class DashboardTest extends TestCase
             'program_variant_id' => $variant->id,
             'start_date' => '2026-07-01',
             'status' => 'active',
+        ]);
+        $enrollment->forceFill([
             'created_at' => '2026-07-10 09:00:00',
             'updated_at' => '2026-07-10 09:00:00',
-        ]);
+        ])->save();
 
         Schedule::factory()->create([
             'user_id' => $student->id,
@@ -142,6 +145,28 @@ class DashboardTest extends TestCase
                 ->where('stats.1.trend.label', '1')
                 ->where('charts.popularSubjects.items.0.value', 1)
                 ->where('charts.popularPrograms.items.0.value', 1)
+            );
+    }
+
+    public function test_admin_dashboard_date_filter_uses_the_users_utc_boundaries(): void
+    {
+        $admin = User::factory()->admin()->create(['timezone' => 'Asia/Jakarta']);
+
+        Schedule::factory()->create(['scheduled_at' => '2026-07-30 16:59:59']);
+        Schedule::factory()->create(['scheduled_at' => '2026-07-30 17:00:00']);
+        Schedule::factory()->create(['scheduled_at' => '2026-07-31 16:59:59']);
+        Schedule::factory()->create(['scheduled_at' => '2026-07-31 17:00:00']);
+
+        $this->actingAs($admin)
+            ->get(route('dashboard', [
+                'from' => '2026-07-31',
+                'to' => '2026-07-31',
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('stats.1.value', '2')
+                ->where('charts.sessionTotals.items.0.label', '31 Jul')
+                ->where('charts.sessionTotals.items.0.value', 2)
             );
     }
 
@@ -238,6 +263,31 @@ class DashboardTest extends TestCase
             ->assertHeader('content-disposition', 'attachment; filename="admin-dashboard-2026-07-01-2026-07-31.pdf"');
 
         $this->assertStringStartsWith('%PDF', $response->getContent());
+    }
+
+    public function test_dashboard_pdf_metadata_identifies_the_user_timezone(): void
+    {
+        $charts = [
+            'sessionTotals' => ['items' => []],
+            'programRegistrants' => ['items' => []],
+            'popularPrograms' => ['title' => 'Program Terpopuler', 'items' => []],
+            'popularSubjects' => ['title' => 'Mata Pelajaran Terpopuler', 'items' => []],
+        ];
+
+        $html = view('reports.admin-dashboard', [
+            'activityPeriodLabel' => 'Tanggal',
+            'activityTableTitle' => 'Data Harian',
+            'charts' => $charts,
+            'generatedAt' => CarbonImmutable::parse('2026-07-31 16:40:00', 'Asia/Makassar'),
+            'period' => '01 Jul 2026 - 31 Jul 2026',
+            'stats' => [],
+            'timezone' => 'Asia/Makassar',
+        ])->render();
+
+        $this->assertStringContainsString(
+            '31 Jul 2026 16:40 WITA (Asia/Makassar)',
+            $html,
+        );
     }
 
     public function test_mentor_users_can_visit_the_dashboard(): void

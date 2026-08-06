@@ -1,4 +1,6 @@
 import { createInertiaApp } from '@inertiajs/react';
+import { configureEcho } from '@laravel/echo-react';
+import { TimezoneSynchronizer } from '@/components/timezone-synchronizer';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { initializeTheme } from '@/hooks/use-appearance';
@@ -8,33 +10,45 @@ import MentorLayout from '@/layouts/mentor-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import SettingsRoleLayout from '@/layouts/settings/role-layout';
 import StudentLayout from '@/layouts/student-layout';
+configureEcho({
+    broadcaster: 'reverb',
+});
 
 const appName = import.meta.env.VITE_APP_NAME || 'AveRose';
+
+function TimezoneLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <>
+            <TimezoneSynchronizer />
+            {children}
+        </>
+    );
+}
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
     layout: (name) => {
         switch (true) {
             case name === 'welcome':
-                return null;
+                return TimezoneLayout;
             case name.startsWith('landing/'):
-                return null;
+                return TimezoneLayout;
             case name === 'student/try-outs/session':
-                return null;
+                return TimezoneLayout;
             case name === 'student/try-outs/results/show':
-                return null;
+                return TimezoneLayout;
             case name.startsWith('auth/'):
-                return AuthLayout;
+                return [TimezoneLayout, AuthLayout];
             case name.startsWith('settings/'):
-                return [SettingsRoleLayout, SettingsLayout];
+                return [TimezoneLayout, SettingsRoleLayout, SettingsLayout];
             case name.startsWith('admin/'):
-                return AppLayout;
+                return [TimezoneLayout, AppLayout];
             case name.startsWith('mentor/'):
-                return MentorLayout;
+                return [TimezoneLayout, MentorLayout];
             case name.startsWith('student/'):
-                return StudentLayout;
+                return [TimezoneLayout, StudentLayout];
             default:
-                return AppLayout;
+                return [TimezoneLayout, AppLayout];
         }
     },
     strictMode: true,

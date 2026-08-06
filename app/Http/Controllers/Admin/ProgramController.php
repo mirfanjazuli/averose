@@ -9,15 +9,15 @@ use App\Models\Program;
 use App\Models\ProgramEnrollment;
 use App\Models\ProgramVariant;
 use App\Models\Subject;
+use App\Services\ProgramAssetStorage;
 use App\Support\StorageUrl;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
+use Throwable;
 
 class ProgramController extends Controller
 {
@@ -34,7 +34,7 @@ class ProgramController extends Controller
                     'name' => $program->name,
                     'slug' => $program->slug,
                     'thumbnail' => $program->thumbnail,
-                    'thumbnailUrl' => StorageUrl::forPath($program->thumbnail),
+                    'thumbnailUrl' => StorageUrl::forPath($program->thumbnail, ProgramAssetStorage::DISK),
                     'description' => $program->description,
                     'maxReschedule' => $program->max_reschedule,
                     'field' => $program->fields->pluck('name')->join(', ') ?: 'No field',
@@ -54,21 +54,40 @@ class ProgramController extends Controller
         ]);
     }
 
-    public function store(StoreProgramRequest $request): RedirectResponse
-    {
+    public function store(
+        StoreProgramRequest $request,
+        ProgramAssetStorage $storage,
+    ): RedirectResponse {
         $validated = $request->validated();
+        $uploadedThumbnail = null;
 
-        $program = Program::create([
-            'name' => $validated['name'],
-            'thumbnail' => $this->storeThumbnail($request->file('thumbnail')),
-            'description' => $validated['description'] ?? null,
-            'max_reschedule' => $validated['max_reschedule'],
-        ]);
+        try {
+            $program = DB::transaction(function () use ($request, $validated, $storage, &$uploadedThumbnail): Program {
+                $program = Program::create([
+                    'name' => $validated['name'],
+                    'description' => $validated['description'] ?? null,
+                    'max_reschedule' => $validated['max_reschedule'],
+                ]);
 
-        if (isset($validated['fields'])) {
-            $program->fields()->syncWithoutDetaching($validated['fields']);
-            $program->subjects()->syncWithoutDetaching($validated['subjects'] ?? []);
-            $this->syncProgramVariants($program, $validated['variants'] ?? []);
+                if ($request->hasFile('thumbnail')) {
+                    $uploadedThumbnail = $storage->storeThumbnail($request->file('thumbnail'), $program);
+                    $program->update(['thumbnail' => $uploadedThumbnail]);
+                }
+
+                if (isset($validated['fields'])) {
+                    $program->fields()->syncWithoutDetaching($validated['fields']);
+                    $program->subjects()->syncWithoutDetaching($validated['subjects'] ?? []);
+                    $this->syncProgramVariants($program, $validated['variants'] ?? []);
+                }
+
+                return $program;
+            });
+        } catch (Throwable $exception) {
+            if ($uploadedThumbnail) {
+                $storage->deletePath($uploadedThumbnail);
+            }
+
+            throw $exception;
         }
 
         return redirect()
@@ -92,10 +111,12 @@ class ProgramController extends Controller
             'subjects:id,name',
             'variants:id,field_id,name,session,duration,price,status',
             'variants.field:id,name',
+            'materials:id,uuid,program_id,title,description,disk,path,original_name,mime_type,size,status,created_at',
         ]);
         $program->loadCount('subjects');
 
         return Inertia::render('admin/academics/programs/show', [
+            'canManageMaterials' => request()->user()?->hasPermission('programs.update') ?? false,
             'breadcrumbs' => [
                 [
                     'title' => 'Academics',
@@ -115,7 +136,7 @@ class ProgramController extends Controller
                 'name' => $program->name,
                 'slug' => $program->slug,
                 'thumbnail' => $program->thumbnail,
-                'thumbnailUrl' => StorageUrl::forPath($program->thumbnail),
+                'thumbnailUrl' => StorageUrl::forPath($program->thumbnail, ProgramAssetStorage::DISK),
                 'description' => $program->description,
                 'maxReschedule' => $program->max_reschedule,
                 'field' => $program->fields->pluck('name')->join(', ') ?: 'No field',
@@ -141,6 +162,20 @@ class ProgramController extends Controller
                     'price' => $variant->price,
                     'status' => $variant->status,
                 ]),
+                'materials' => $program->materials
+                    ->sortByDesc('created_at')
+                    ->values()
+                    ->map(fn ($material): array => [
+                        'description' => $material->description,
+                        'mimeType' => $material->mime_type,
+                        'name' => $material->original_name,
+                        'size' => $material->size,
+                        'status' => $material->status,
+                        'title' => $material->title,
+                        'uploadedAt' => $material->created_at?->toISOString(),
+                        'url' => route('program-materials.show', $material),
+                        'uuid' => $material->uuid,
+                    ]),
             ],
             'fieldOptions' => AcademicField::query()
                 ->where('status', 'active')
@@ -189,26 +224,48 @@ class ProgramController extends Controller
         return back();
     }
 
-    public function update(StoreProgramRequest $request, Program $program): RedirectResponse
-    {
+    public function update(
+        StoreProgramRequest $request,
+        Program $program,
+        ProgramAssetStorage $storage,
+    ): RedirectResponse {
         $validated = $request->validated();
+        $oldThumbnail = $program->thumbnail;
+        $newThumbnail = null;
 
-        $attributes = [
-            'name' => $validated['name'],
-            'description' => $validated['description'] ?? null,
-            'max_reschedule' => $validated['max_reschedule'],
-        ];
+        try {
+            DB::transaction(function () use ($request, $validated, $program, $storage, &$newThumbnail): void {
+                $program->update([
+                    'name' => $validated['name'],
+                    'description' => $validated['description'] ?? null,
+                    'max_reschedule' => $validated['max_reschedule'],
+                ]);
 
-        if ($request->hasFile('thumbnail')) {
-            $attributes['thumbnail'] = $this->replaceThumbnail($program, $request->file('thumbnail'));
+                if ($request->hasFile('thumbnail')) {
+                    $newThumbnail = $storage->storeThumbnail($request->file('thumbnail'), $program);
+                    $program->update(['thumbnail' => $newThumbnail]);
+                }
+
+                if (isset($validated['fields'])) {
+                    $program->fields()->syncWithoutDetaching($validated['fields']);
+                    $program->subjects()->syncWithoutDetaching($validated['subjects'] ?? []);
+                    $this->syncProgramVariants($program, $validated['variants'] ?? []);
+                }
+            });
+        } catch (Throwable $exception) {
+            if ($newThumbnail) {
+                $storage->deletePath($newThumbnail);
+            }
+
+            throw $exception;
         }
 
-        $program->update($attributes);
-
-        if (isset($validated['fields'])) {
-            $program->fields()->syncWithoutDetaching($validated['fields']);
-            $program->subjects()->syncWithoutDetaching($validated['subjects'] ?? []);
-            $this->syncProgramVariants($program, $validated['variants'] ?? []);
+        if ($newThumbnail && $oldThumbnail) {
+            try {
+                $storage->deletePath($oldThumbnail);
+            } catch (Throwable $exception) {
+                report($exception);
+            }
         }
 
         return back();
@@ -438,28 +495,5 @@ class ProgramController extends Controller
         }
 
         return (string) $currentValue !== (string) $value;
-    }
-
-    private function storeThumbnail(?UploadedFile $thumbnail): ?string
-    {
-        if (! $thumbnail) {
-            return null;
-        }
-
-        return $thumbnail->store('program-thumbnails', $this->assetDiskName());
-    }
-
-    private function replaceThumbnail(Program $program, UploadedFile $thumbnail): string
-    {
-        if ($program->thumbnail) {
-            Storage::disk($this->assetDiskName())->delete($program->thumbnail);
-        }
-
-        return $thumbnail->store('program-thumbnails', $this->assetDiskName());
-    }
-
-    private function assetDiskName(): string
-    {
-        return (string) config('filesystems.default', 'local');
     }
 }

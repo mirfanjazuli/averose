@@ -1,13 +1,8 @@
 import { Form } from '@inertiajs/react';
-import {
-    Check,
-    ChevronsUpDown,
-    MapPin,
-    Plus,
-    Video,
-} from 'lucide-react';
+import { Check, ChevronsUpDown, MapPin, Plus, Video } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+import { TimezoneIndicator } from '@/components/timezone-indicator';
 import { Button } from '@/components/ui/button';
 import {
     Command,
@@ -25,11 +20,13 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
-    ToggleGroup,
-    ToggleGroupItem,
-} from '@/components/ui/toggle-group';
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import { MentorAvailabilitySelect } from '@/pages/admin/scheduling/schedules/components/mentor-availability-select';
 import {
     ScheduleDatePicker,
@@ -312,6 +309,7 @@ export function CreateDialogSchedule({
     onSuccess,
     open,
 }: CreateDialogScheduleProps) {
+    const timezone = useUserTimezone();
     const [studentId, setStudentId] = useState('');
     const [enrollmentId, setEnrollmentId] = useState('');
     const [subjectId, setSubjectId] = useState('');
@@ -354,10 +352,11 @@ export function CreateDialogSchedule({
             date,
             duration: String(selectedEnrollment.duration),
             time,
+            timezone,
         });
 
         return `/scheduling/schedules/mentor-options?${query.toString()}`;
-    }, [date, selectedEnrollment, time]);
+    }, [date, selectedEnrollment, time, timezone]);
 
     const resetForm = () => {
         setStudentId('');
@@ -403,6 +402,11 @@ export function CreateDialogSchedule({
                 >
                     {({ errors, processing }) => (
                         <>
+                            <input
+                                type="hidden"
+                                name="timezone"
+                                value={timezone}
+                            />
                             <input
                                 type="hidden"
                                 name="program_enrollment_id"
@@ -467,7 +471,9 @@ export function CreateDialogSchedule({
                                     value={subjectId}
                                     onValueChange={setSubjectId}
                                     disabled={!selectedEnrollment}
-                                    subjects={selectedEnrollment?.subjects ?? []}
+                                    subjects={
+                                        selectedEnrollment?.subjects ?? []
+                                    }
                                 />
                                 {errors.subject_id && (
                                     <p className="text-xs text-destructive">
@@ -554,6 +560,8 @@ export function CreateDialogSchedule({
                                     )}
                                 </div>
                             </div>
+
+                            <TimezoneIndicator label="Time zone" />
 
                             <div className="space-y-2">
                                 <Label>Mentor</Label>

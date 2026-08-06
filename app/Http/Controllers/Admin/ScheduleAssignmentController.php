@@ -6,13 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\AssignScheduleRequest;
 use App\Models\Schedule;
 use App\Models\User;
+use App\NotificationEvent;
 use App\Notifications\ScheduleNotification;
+use App\Rules\IanaTimezone;
 use App\ScheduleDeliveryMode;
+use App\Services\DateTime\UserDateTimeService;
 use App\Services\Scheduling\MentorAvailabilityService;
 use App\Services\Scheduling\ZoomAccountAvailabilityService;
 use App\Services\Zoom\ZoomMeetingService;
 use App\UserRole;
-use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -23,6 +25,7 @@ use Illuminate\Validation\ValidationException;
 class ScheduleAssignmentController extends Controller
 {
     public function __construct(
+        private readonly UserDateTimeService $dateTimes,
         private readonly MentorAvailabilityService $mentorAvailability,
         private readonly ZoomAccountAvailabilityService $zoomAccountAvailability,
         private readonly ZoomMeetingService $zoomMeetings,
@@ -34,12 +37,13 @@ class ScheduleAssignmentController extends Controller
             'date' => ['required', 'date_format:Y-m-d'],
             'duration' => ['required', 'integer', 'min:1', 'max:1440'],
             'time' => ['required', 'date_format:H:i'],
+            'timezone' => ['required', 'string', 'max:64', new IanaTimezone],
         ]);
 
         return $this->mentorOptionsResponse(
-            CarbonImmutable::parse(
+            $this->dateTimes->fromLocal(
                 "{$validated['date']} {$validated['time']}",
-                config('app.timezone'),
+                $validated['timezone'],
             ),
             (int) $validated['duration'],
         );
@@ -81,9 +85,8 @@ class ScheduleAssignmentController extends Controller
                     'available' => $conflict === null,
                     'conflict' => $conflict ? [
                         'code' => $conflict->code,
-                        'endAt' => $conflict->scheduled_at->copy()->addMinutes($conflict->duration)->toJSON(),
-                        'startAt' => $conflict->scheduled_at->toJSON(),
-                        'time' => $this->formatConflictTime($conflict),
+                        'endAt' => $this->dateTimes->toUtcIso($conflict->scheduled_at->copy()->addMinutes($conflict->duration)),
+                        'startAt' => $this->dateTimes->toUtcIso($conflict->scheduled_at),
                     ] : null,
                     'hourlyRate' => $mentorLevel?->hourly_rate,
                     'id' => (string) $mentor->id,
@@ -126,7 +129,7 @@ class ScheduleAssignmentController extends Controller
 
             if ($conflict) {
                 throw ValidationException::withMessages([
-                    'mentor_id' => "Mentor sudah memiliki jadwal pada {$this->formatConflictTime($conflict)}.",
+                    'mentor_id' => "Mentor sudah memiliki jadwal pada {$this->formatConflictTime($conflict, $this->dateTimes->timezoneFor($request->user()))}.",
                 ]);
             }
 
@@ -179,21 +182,20 @@ class ScheduleAssignmentController extends Controller
             $newMentor = $booking->mentor;
             $student = $booking->user;
             $scheduleCode = $booking->code ?? "Schedule #{$booking->id}";
-            $scheduleTime = $this->formatNotificationScheduleTime($booking->scheduled_at);
             $studentName = $booking->user?->name ?? 'a student';
 
-            DB::afterCommit(function () use ($newMentor, $student, $scheduleCode, $scheduleTime, $studentName, $booking): void {
+            DB::afterCommit(function () use ($newMentor, $student, $scheduleCode, $studentName, $booking): void {
                 $newMentor?->notify(new ScheduleNotification(
-                    event: 'schedule_assigned',
+                    event: NotificationEvent::ScheduleAssigned,
                     title: 'New schedule assigned',
-                    message: "{$scheduleCode} with {$studentName} is scheduled for {$scheduleTime}.",
+                    message: "{$scheduleCode} with {$studentName} has been assigned to you.",
                     scheduleCode: $scheduleCode,
                     url: "/schedules/{$booking->id}",
                 ));
                 $student?->notify(new ScheduleNotification(
-                    event: 'mentor_assigned',
+                    event: NotificationEvent::MentorAssigned,
                     title: 'Mentor sudah ditetapkan',
-                    message: "{$newMentor?->name} akan mendampingi {$scheduleCode} pada {$scheduleTime}.",
+                    message: "{$newMentor?->name} akan mendampingi {$scheduleCode}.",
                     scheduleCode: $scheduleCode,
                     url: '/schedules',
                 ));
@@ -202,7 +204,7 @@ class ScheduleAssignmentController extends Controller
             if ($previousMentor && $previousMentor->isNot($newMentor)) {
                 DB::afterCommit(function () use ($previousMentor, $scheduleCode): void {
                     $previousMentor->notify(new ScheduleNotification(
-                        event: 'schedule_reassigned',
+                        event: NotificationEvent::ScheduleReassigned,
                         title: 'Schedule reassigned',
                         message: "You are no longer assigned to {$scheduleCode}.",
                         scheduleCode: $scheduleCode,
@@ -215,15 +217,11 @@ class ScheduleAssignmentController extends Controller
         return back()->with('success', 'Session assigned.');
     }
 
-    private function formatNotificationScheduleTime(\DateTimeInterface $date): string
+    private function formatConflictTime(Schedule $schedule, string $timezone): string
     {
-        return $date->format('d M Y, H:i').' WIB';
-    }
+        $startAt = $this->dateTimes->toLocal($schedule->scheduled_at, $timezone);
+        $endAt = $startAt->addMinutes($schedule->duration);
 
-    private function formatConflictTime(Schedule $schedule): string
-    {
-        $endAt = $schedule->scheduled_at->copy()->addMinutes($schedule->duration);
-
-        return $schedule->scheduled_at->format('H:i').'–'.$endAt->format('H:i').' WIB';
+        return $startAt->format('H:i').'–'.$endAt->format('H:i').' '.$startAt->format('T');
     }
 }

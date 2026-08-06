@@ -12,6 +12,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
+import { formatDate } from '@/lib/date-time';
 
 type MentorLevel = {
     hourlyRate: string;
@@ -47,6 +49,8 @@ export default function MentorLevelDetail({
     level: MentorLevel;
     mentors: Mentor[];
 }) {
+    const timezone = useUserTimezone();
+
     return (
         <>
             <Head title={level.name} />
@@ -115,7 +119,12 @@ export default function MentorLevelDetail({
                                                 {mentor.email}
                                             </TableCell>
                                             <TableCell>
-                                                {mentor.createdAt ?? '-'}
+                                                {mentor.createdAt
+                                                    ? formatDate(
+                                                          mentor.createdAt,
+                                                          timezone,
+                                                      )
+                                                    : '-'}
                                             </TableCell>
                                             <TableCell>
                                                 <StatusBadge

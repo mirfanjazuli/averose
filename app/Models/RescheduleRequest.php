@@ -8,13 +8,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['schedule_id', 'user_id', 'mentor_id', 'reviewed_by', 'current_scheduled_at', 'requested_scheduled_at', 'duration', 'reason', 'notes', 'status', 'admin_note', 'reviewed_at'])]
+#[Fillable(['schedule_id', 'user_id', 'mentor_id', 'reviewed_by', 'current_scheduled_at', 'current_timezone', 'requested_scheduled_at', 'requested_timezone', 'duration', 'reason', 'notes', 'status', 'admin_note', 'reviewed_at'])]
 class RescheduleRequest extends Model
 {
     /** @use HasFactory<RescheduleRequestFactory> */
     use HasFactory;
 
     protected $table = 'reschedule_requests';
+
+    protected $attributes = [
+        'current_timezone' => 'Asia/Jakarta',
+        'requested_timezone' => 'Asia/Jakarta',
+    ];
 
     public function schedule(): BelongsTo
     {

@@ -8,12 +8,14 @@ use App\Http\Requests\StoreAdminScheduleRequest;
 use App\Http\Requests\UpdateAdminScheduleRequest;
 use App\Models\ProgramEnrollment;
 use App\Models\Schedule;
+use App\NotificationEvent;
 use App\Notifications\ScheduleNotification;
 use App\ScheduleDeliveryMode;
+use App\Services\DateTime\UserDateTimeService;
+use App\Services\Scheduling\BusinessCalendarService;
 use App\Services\Scheduling\MentorAvailabilityService;
 use App\Services\Scheduling\ZoomAccountAvailabilityService;
 use App\Services\Zoom\ZoomMeetingService;
-use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +28,8 @@ class ScheduleController extends Controller
     use FormatsScheduleSessions;
 
     public function __construct(
+        private readonly BusinessCalendarService $businessCalendar,
+        private readonly UserDateTimeService $dateTimes,
         private readonly MentorAvailabilityService $mentorAvailability,
         private readonly ZoomAccountAvailabilityService $zoomAccountAvailability,
         private readonly ZoomMeetingService $zoomMeetings,
@@ -64,10 +68,7 @@ class ScheduleController extends Controller
                 ]);
             }
 
-            $scheduledAt = CarbonImmutable::parse(
-                "{$data['date']} {$data['time']}",
-                config('app.timezone'),
-            );
+            $scheduledAt = $request->scheduledAtUtc();
             $duration = $enrollment->variant?->duration ?? 60;
             $mentor = $this->mentorAvailability->lockActiveMentor((int) $data['mentor_id']);
 
@@ -84,13 +85,16 @@ class ScheduleController extends Controller
             );
 
             if ($conflict) {
-                $conflictEndAt = $conflict->scheduled_at->copy()->addMinutes($conflict->duration);
+                $timezone = $request->timezone();
+                $conflictStartAt = $this->dateTimes->toLocal($conflict->scheduled_at, $timezone);
+                $conflictEndAt = $conflictStartAt->addMinutes($conflict->duration);
 
                 throw ValidationException::withMessages([
                     'mentor_id' => sprintf(
-                        'Mentor sudah memiliki jadwal pada %s–%s WIB.',
-                        $conflict->scheduled_at->format('H:i'),
+                        'Mentor sudah memiliki jadwal pada %s–%s %s.',
+                        $conflictStartAt->format('H:i'),
                         $conflictEndAt->format('H:i'),
+                        $conflictStartAt->format('T'),
                     ),
                 ]);
             }
@@ -104,7 +108,9 @@ class ScheduleController extends Controller
                 'mentor_id' => $mentor->id,
                 'program_enrollment_id' => $enrollment->id,
                 'scheduled_at' => $scheduledAt,
+                'timezone' => $request->timezone(),
                 'status' => 'assigned',
+                'timezone' => $request->timezone(),
                 'subject_id' => $data['subject_id'],
                 'user_id' => $data['user_id'],
             ]);
@@ -141,20 +147,19 @@ class ScheduleController extends Controller
 
             $student = $schedule->user;
             $scheduleCode = $schedule->code ?? "Schedule #{$schedule->id}";
-            $scheduleTime = $scheduledAt->format('d M Y, H:i').' WIB';
 
-            DB::afterCommit(function () use ($mentor, $student, $schedule, $scheduleCode, $scheduleTime): void {
+            DB::afterCommit(function () use ($mentor, $student, $schedule, $scheduleCode): void {
                 $mentor->notify(new ScheduleNotification(
-                    event: 'schedule_assigned',
+                    event: NotificationEvent::ScheduleAssigned,
                     title: 'New schedule assigned',
-                    message: "{$scheduleCode} is scheduled for {$scheduleTime}.",
+                    message: "{$scheduleCode} has been assigned to you.",
                     scheduleCode: $scheduleCode,
                     url: "/schedules/{$schedule->id}",
                 ));
                 $student?->notify(new ScheduleNotification(
-                    event: 'mentor_assigned',
+                    event: NotificationEvent::MentorAssigned,
                     title: 'Mentor sudah ditetapkan',
-                    message: "{$mentor->name} akan mendampingi {$scheduleCode} pada {$scheduleTime}.",
+                    message: "{$mentor->name} akan mendampingi {$scheduleCode}.",
                     scheduleCode: $scheduleCode,
                     url: '/schedules',
                 ));
@@ -167,15 +172,16 @@ class ScheduleController extends Controller
     public function update(UpdateAdminScheduleRequest $request, Schedule $schedule): RedirectResponse
     {
         $data = $request->validated();
-        $scheduledAt = CarbonImmutable::parse(
-            "{$data['date']} {$data['time']}",
-            config('app.timezone'),
-        );
+        $scheduledAt = $request->scheduledAtUtc();
 
         if ($scheduledAt->isPast()) {
             throw ValidationException::withMessages([
                 'date' => 'The schedule must be in the future.',
             ]);
+        }
+
+        if ($reason = $this->businessCalendar->unavailabilityReason($scheduledAt, $schedule->duration)) {
+            throw ValidationException::withMessages(['date' => $reason]);
         }
 
         DB::transaction(function () use ($request, $schedule, $scheduledAt): void {
@@ -192,8 +198,9 @@ class ScheduleController extends Controller
             }
 
             $previousScheduledAt = $schedule->scheduled_at->copy();
+            $previousTimezone = $schedule->timezone;
 
-            if ($previousScheduledAt->equalTo($scheduledAt)) {
+            if ($previousScheduledAt->equalTo($scheduledAt) && $schedule->timezone === $request->timezone()) {
                 return;
             }
 
@@ -214,19 +221,23 @@ class ScheduleController extends Controller
                 );
 
                 if ($conflict) {
-                    $conflictEndAt = $conflict->scheduled_at->copy()->addMinutes($conflict->duration);
+                    $timezone = $request->timezone();
+                    $conflictStartAt = $this->dateTimes->toLocal($conflict->scheduled_at, $timezone);
+                    $conflictEndAt = $conflictStartAt->addMinutes($conflict->duration);
 
                     throw ValidationException::withMessages([
                         'date' => sprintf(
-                            'Mentor sudah memiliki jadwal pada %s–%s WIB.',
-                            $conflict->scheduled_at->format('H:i'),
+                            'Mentor sudah memiliki jadwal pada %s–%s %s.',
+                            $conflictStartAt->format('H:i'),
                             $conflictEndAt->format('H:i'),
+                            $conflictStartAt->format('T'),
                         ),
                     ]);
                 }
             }
 
             $schedule->scheduled_at = $scheduledAt;
+            $schedule->timezone = $request->timezone();
 
             if ($schedule->delivery_mode === ScheduleDeliveryMode::Online && $schedule->mentor_id) {
                 $zoomAccount = $this->zoomAccountAvailability->findFor($schedule);
@@ -249,32 +260,35 @@ class ScheduleController extends Controller
             $schedule->recordHistory('updated', sprintf(
                 'Waktu schedule diubah oleh %s dari %s menjadi %s.',
                 $request->user()->name,
-                $this->formatHistoryScheduleTime($previousScheduledAt),
-                $this->formatHistoryScheduleTime($schedule->scheduled_at),
+                $this->formatHistoryScheduleTime($previousScheduledAt, $request->timezone()),
+                $this->formatHistoryScheduleTime($schedule->scheduled_at, $request->timezone()),
             ), $request->user(), [
                 'scheduled_at' => [
                     'from' => $previousScheduledAt->toDateTimeString(),
                     'to' => $schedule->scheduled_at->toDateTimeString(),
+                ],
+                'timezone' => [
+                    'from' => $previousTimezone,
+                    'to' => $request->timezone(),
                 ],
             ], $request->ip());
 
             $mentor = $schedule->mentor;
             $student = $schedule->user;
             $scheduleCode = $schedule->code ?? "Schedule #{$schedule->id}";
-            $scheduleTime = $this->formatHistoryScheduleTime($schedule->scheduled_at);
 
-            DB::afterCommit(function () use ($mentor, $student, $schedule, $scheduleCode, $scheduleTime): void {
+            DB::afterCommit(function () use ($mentor, $student, $schedule, $scheduleCode): void {
                 $mentor?->notify(new ScheduleNotification(
-                    event: 'schedule_updated',
+                    event: NotificationEvent::ScheduleUpdated,
                     title: 'Schedule updated',
-                    message: "{$scheduleCode} has been moved to {$scheduleTime}.",
+                    message: "{$scheduleCode} has been updated.",
                     scheduleCode: $scheduleCode,
                     url: "/schedules/{$schedule->id}",
                 ));
                 $student?->notify(new ScheduleNotification(
-                    event: 'schedule_updated',
+                    event: NotificationEvent::ScheduleUpdated,
                     title: 'Jadwal diperbarui',
-                    message: "{$scheduleCode} dipindahkan ke {$scheduleTime}.",
+                    message: "{$scheduleCode} telah diperbarui.",
                     scheduleCode: $scheduleCode,
                     url: '/schedules',
                 ));
@@ -368,8 +382,10 @@ class ScheduleController extends Controller
             ->all();
     }
 
-    private function formatHistoryScheduleTime(CarbonInterface $date): string
+    private function formatHistoryScheduleTime(CarbonInterface $date, string $timezone): string
     {
-        return $date->copy()->locale('id')->translatedFormat('d M Y, H:i').' WIB';
+        $localDate = $this->dateTimes->toLocal($date, $timezone)->locale('id');
+
+        return $localDate->translatedFormat('d M Y, H:i').' '.$localDate->format('T');
     }
 }

@@ -6,9 +6,11 @@ use App\Models\RescheduleRequest;
 use App\Models\Schedule;
 use App\Models\User;
 use App\Models\ZoomAccount;
+use App\NotificationEvent;
 use App\Notifications\ScheduleNotification;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -102,6 +104,54 @@ class NotificationsTest extends TestCase
         $this->assertSame(0, $student->unreadNotifications()->count());
     }
 
+    public function test_user_can_authorize_only_their_notification_channel(): void
+    {
+        config(['broadcasting.default' => 'reverb']);
+        Broadcast::forgetDrivers();
+        require base_path('routes/channels.php');
+
+        $student = User::factory()->student()->create();
+        $otherStudent = User::factory()->student()->create();
+
+        $this->actingAs($student)
+            ->postJson('/broadcasting/auth', [
+                'channel_name' => "private-App.Models.User.{$student->id}",
+                'socket_id' => '1234.5678',
+            ])
+            ->assertOk();
+
+        $this->actingAs($student)
+            ->postJson('/broadcasting/auth', [
+                'channel_name' => "private-App.Models.User.{$otherStudent->id}",
+                'socket_id' => '1234.5678',
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_prune_removes_only_old_read_notifications(): void
+    {
+        $student = User::factory()->student()->create();
+        $student->notify($this->notification(1));
+        $student->notify($this->notification(2));
+        $notifications = $student->notifications()->oldest()->get();
+        $oldRead = $notifications->firstOrFail();
+        $oldUnread = $notifications->last();
+
+        $oldRead->forceFill([
+            'created_at' => now()->subDays(181),
+            'read_at' => now()->subDays(180),
+        ])->save();
+        $oldUnread->forceFill([
+            'created_at' => now()->subDays(181),
+            'read_at' => null,
+        ])->save();
+
+        $this->artisan('notifications:prune')->assertSuccessful();
+
+        $this->assertDatabaseMissing('notifications', ['id' => $oldRead->id]);
+        $this->assertDatabaseHas('notifications', ['id' => $oldUnread->id]);
+    }
+
     public function test_assignment_notifies_student_and_new_mentor(): void
     {
         Notification::fake();
@@ -123,13 +173,13 @@ class NotificationsTest extends TestCase
         Notification::assertSentTo(
             $mentor,
             ScheduleNotification::class,
-            fn (ScheduleNotification $notification): bool => $notification->event === 'schedule_assigned'
+            fn (ScheduleNotification $notification): bool => $notification->event === NotificationEvent::ScheduleAssigned
                 && $notification->url === "/schedules/{$schedule->id}",
         );
         Notification::assertSentTo(
             $student,
             ScheduleNotification::class,
-            fn (ScheduleNotification $notification): bool => $notification->event === 'mentor_assigned'
+            fn (ScheduleNotification $notification): bool => $notification->event === NotificationEvent::MentorAssigned
                 && $notification->url === '/schedules',
         );
     }
@@ -154,7 +204,8 @@ class NotificationsTest extends TestCase
             ->post(route('reschedule-requests.store', $schedule), [
                 'notes' => 'Ada ujian sekolah.',
                 'reason' => 'Bentrok sekolah/kampus',
-                'requested_scheduled_at' => '2026-07-11 10:00:00',
+                'requested_scheduled_at' => '2026-07-11 10:00',
+                'timezone' => 'Asia/Jakarta',
             ])
             ->assertRedirect();
 
@@ -167,12 +218,12 @@ class NotificationsTest extends TestCase
         Notification::assertSentTo(
             $mentor,
             ScheduleNotification::class,
-            fn (ScheduleNotification $notification): bool => $notification->event === 'reschedule_requested',
+            fn (ScheduleNotification $notification): bool => $notification->event === NotificationEvent::RescheduleRequested,
         );
         Notification::assertSentTo(
             $student,
             ScheduleNotification::class,
-            fn (ScheduleNotification $notification): bool => $notification->event === 'reschedule_approved',
+            fn (ScheduleNotification $notification): bool => $notification->event === NotificationEvent::RescheduleApproved,
         );
 
         CarbonImmutable::setTestNow();
@@ -206,13 +257,13 @@ class NotificationsTest extends TestCase
         Notification::assertSentTo(
             $student,
             ScheduleNotification::class,
-            fn (ScheduleNotification $notification): bool => $notification->event === 'reschedule_rejected'
+            fn (ScheduleNotification $notification): bool => $notification->event === NotificationEvent::RescheduleRejected
                 && str_contains($notification->message, 'Catatan internal admin.'),
         );
         Notification::assertSentTo(
             $mentor,
             ScheduleNotification::class,
-            fn (ScheduleNotification $notification): bool => $notification->event === 'reschedule_rejected'
+            fn (ScheduleNotification $notification): bool => $notification->event === NotificationEvent::RescheduleRejected
                 && ! str_contains($notification->message, 'Catatan internal admin.'),
         );
     }
@@ -245,7 +296,7 @@ class NotificationsTest extends TestCase
     private function notification(int $number = 1): ScheduleNotification
     {
         return new ScheduleNotification(
-            event: 'mentor_assigned',
+            event: NotificationEvent::MentorAssigned,
             title: 'Mentor sudah ditetapkan',
             message: 'Mentor untuk jadwalmu sudah tersedia.',
             scheduleCode: sprintf('SCH-2026-%06d', $number),

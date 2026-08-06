@@ -238,7 +238,7 @@ class UsersTest extends TestCase
                 ->where('enrollments.0.program', 'UI Design')
                 ->where('enrollments.0.maxReschedule', 4)
                 ->where('enrollments.0.sessionsRemaining', 0)
-                ->where('enrollments.0.lastSessionDate', 'Aug 01, 2026')
+                ->where('enrollments.0.lastSessionDate', '2026-08-01T09:00:00.000000Z')
             );
     }
 

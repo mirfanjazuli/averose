@@ -2,6 +2,10 @@
 
 namespace Tests\Feature\Settings;
 
+use App\Models\AcademicField;
+use App\Models\Program;
+use App\Models\ProgramEnrollment;
+use App\Models\ProgramVariant;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -61,9 +65,19 @@ class ProfileUpdateTest extends TestCase
         $this->assertNotNull($user->refresh()->email_verified_at);
     }
 
-    public function test_user_can_delete_their_account()
+    public function test_user_can_anonymize_their_account_without_losing_enrollment_history()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->student()->create();
+        $originalEmail = $user->email;
+        $field = AcademicField::factory()->create();
+        $program = Program::factory()->create();
+        $variant = ProgramVariant::factory()->for($field, 'field')->create();
+        $enrollment = ProgramEnrollment::factory()
+            ->for($user)
+            ->for($program)
+            ->for($field, 'field')
+            ->for($variant, 'variant')
+            ->create();
 
         $response = $this
             ->actingAs($user)
@@ -76,7 +90,16 @@ class ProfileUpdateTest extends TestCase
             ->assertRedirect(route('home'));
 
         $this->assertGuest();
-        $this->assertNull($user->fresh());
+        $user->refresh();
+
+        $this->assertSame('inactive', $user->status);
+        $this->assertSame('Deleted user', $user->name);
+        $this->assertNotSame($originalEmail, $user->email);
+        $this->assertStringEndsWith('@averose.invalid', $user->email);
+        $this->assertDatabaseHas('program_enrollments', [
+            'id' => $enrollment->id,
+            'user_id' => $user->id,
+        ]);
     }
 
     public function test_correct_password_must_be_provided_to_delete_account()

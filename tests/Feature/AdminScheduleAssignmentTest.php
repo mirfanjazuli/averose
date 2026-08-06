@@ -84,7 +84,8 @@ class AdminScheduleAssignmentTest extends TestCase
             ->assertJsonCount(3, 'mentors')
             ->assertJsonPath('mentors.0.id', (string) $busyMentor->id)
             ->assertJsonPath('mentors.0.available', false)
-            ->assertJsonPath('mentors.0.conflict.time', '09:30–10:30 WIB')
+            ->assertJsonPath('mentors.0.conflict.startAt', '2026-07-10T09:30:00Z')
+            ->assertJsonPath('mentors.0.conflict.endAt', '2026-07-10T10:30:00Z')
             ->assertJsonPath('mentors.1.id', (string) $completedMentor->id)
             ->assertJsonPath('mentors.1.available', true)
             ->assertJsonPath('mentors.1.conflict', null)
@@ -100,7 +101,7 @@ class AdminScheduleAssignmentTest extends TestCase
         $this->scheduleFixture([
             'duration' => 60,
             'mentor_id' => $busyMentor->id,
-            'scheduled_at' => '2026-07-10 09:30:00',
+            'scheduled_at' => '2026-07-10 02:30:00',
             'status' => 'assigned',
         ]);
 
@@ -109,6 +110,7 @@ class AdminScheduleAssignmentTest extends TestCase
                 'date' => '2026-07-10',
                 'duration' => 60,
                 'time' => '09:00',
+                'timezone' => 'Asia/Jakarta',
             ]))
             ->assertOk()
             ->assertJsonCount(2, 'mentors')
@@ -135,6 +137,7 @@ class AdminScheduleAssignmentTest extends TestCase
                 'program_enrollment_id' => $enrollment->id,
                 'subject_id' => $subject->id,
                 'time' => '13:30',
+                'timezone' => 'Asia/Jakarta',
                 'user_id' => $student->id,
             ])
             ->assertRedirect();
@@ -145,9 +148,10 @@ class AdminScheduleAssignmentTest extends TestCase
             'duration' => $enrollment->variant->duration,
             'mentor_id' => $mentor->id,
             'program_enrollment_id' => $enrollment->id,
-            'scheduled_at' => '2026-07-10 13:30:00',
+            'scheduled_at' => '2026-07-10 06:30:00',
             'status' => 'assigned',
             'subject_id' => $subject->id,
+            'timezone' => 'Asia/Jakarta',
             'user_id' => $student->id,
         ]);
         $this->assertSame(1, $enrollment->refresh()->sessions_used);
@@ -177,6 +181,7 @@ class AdminScheduleAssignmentTest extends TestCase
                 'program_enrollment_id' => $enrollment->id,
                 'subject_id' => $subject->id,
                 'time' => '13:30',
+                'timezone' => 'Asia/Jakarta',
                 'user_id' => $student->id,
             ])
             ->assertRedirect()
@@ -203,7 +208,7 @@ class AdminScheduleAssignmentTest extends TestCase
         $this->scheduleFixture([
             'duration' => 60,
             'mentor_id' => $mentor->id,
-            'scheduled_at' => '2026-07-10 14:00:00',
+            'scheduled_at' => '2026-07-10 07:00:00',
             'status' => 'assigned',
         ]);
 
@@ -215,6 +220,7 @@ class AdminScheduleAssignmentTest extends TestCase
                 'program_enrollment_id' => $enrollment->id,
                 'subject_id' => $subject->id,
                 'time' => '13:30',
+                'timezone' => 'Asia/Jakarta',
                 'user_id' => $student->id,
             ])
             ->assertSessionHasErrors('mentor_id');
@@ -222,7 +228,7 @@ class AdminScheduleAssignmentTest extends TestCase
         $this->assertSame(0, $enrollment->refresh()->sessions_used);
         $this->assertDatabaseMissing('schedules', [
             'program_enrollment_id' => $enrollment->id,
-            'scheduled_at' => '2026-07-10 13:30:00',
+            'scheduled_at' => '2026-07-10 06:30:00',
         ]);
 
         CarbonImmutable::setTestNow();
@@ -247,6 +253,7 @@ class AdminScheduleAssignmentTest extends TestCase
                 'program_enrollment_id' => $enrollment->id,
                 'subject_id' => $subject->id,
                 'time' => '13:30',
+                'timezone' => 'Asia/Jakarta',
                 'user_id' => $student->id,
             ])
             ->assertSessionHasErrors('program_enrollment_id');
@@ -354,7 +361,7 @@ class AdminScheduleAssignmentTest extends TestCase
                 'mentor_id' => $mentor->id,
             ])
             ->assertSessionHasErrors([
-                'mentor_id' => 'Mentor sudah memiliki jadwal pada 09:30–10:30 WIB.',
+                'mentor_id' => 'Mentor sudah memiliki jadwal pada 16:30–17:30 WIB.',
             ]);
 
         $booking->refresh();
@@ -475,17 +482,18 @@ class AdminScheduleAssignmentTest extends TestCase
             ->put(route('scheduling.schedules.update', $booking), [
                 'date' => '2026-07-11',
                 'time' => '13:30',
+                'timezone' => 'Asia/Jakarta',
             ])
             ->assertRedirect()
             ->assertSessionDoesntHaveErrors();
 
         $this->assertSame(
-            '2026-07-11 13:30:00',
+            '2026-07-11 06:30:00',
             $booking->refresh()->scheduled_at->format('Y-m-d H:i:s'),
         );
         $this->assertDatabaseHas('schedule_histories', [
             'action' => 'updated',
-            'description' => "Waktu schedule diubah oleh {$admin->name} dari 10 Jul 2026, 09:00 WIB menjadi 11 Jul 2026, 13:30 WIB.",
+            'description' => "Waktu schedule diubah oleh {$admin->name} dari 10 Jul 2026, 16:00 WIB menjadi 11 Jul 2026, 13:30 WIB.",
             'schedule_id' => $booking->id,
             'user_id' => $admin->id,
         ]);
@@ -507,6 +515,7 @@ class AdminScheduleAssignmentTest extends TestCase
             ->put(route('scheduling.schedules.update', $booking), [
                 'date' => '2026-07-11',
                 'time' => '13:30',
+                'timezone' => 'Asia/Jakarta',
             ])
             ->assertSessionHasErrors('date');
 
@@ -533,7 +542,7 @@ class AdminScheduleAssignmentTest extends TestCase
         $this->scheduleFixture([
             'delivery_mode' => 'offline',
             'mentor_id' => $mentor->id,
-            'scheduled_at' => '2026-07-11 13:00:00',
+            'scheduled_at' => '2026-07-11 07:00:00',
             'status' => 'assigned',
         ]);
 
@@ -541,6 +550,7 @@ class AdminScheduleAssignmentTest extends TestCase
             ->put(route('scheduling.schedules.update', $booking), [
                 'date' => '2026-07-11',
                 'time' => '13:30',
+                'timezone' => 'Asia/Jakarta',
             ])
             ->assertSessionHasErrors('date');
 
@@ -575,7 +585,7 @@ class AdminScheduleAssignmentTest extends TestCase
             'services.zoom.api_url' => 'https://api.zoom.test/v2',
             'services.zoom.auth_url' => 'https://zoom.test/oauth/token',
             'services.zoom.create_real_meetings' => true,
-            'app.timezone' => 'Asia/Jakarta',
+            'app.timezone' => 'UTC',
         ]);
 
         Http::fake([
@@ -623,8 +633,8 @@ class AdminScheduleAssignmentTest extends TestCase
 
             return $request->data()['settings']['auto_recording'] === 'cloud'
                 && $request->data()['settings']['join_before_host'] === true
-                && $request->data()['start_time'] === '2026-07-10T09:00:00'
-                && $request->data()['timezone'] === 'Asia/Jakarta';
+                && $request->data()['start_time'] === '2026-07-10T09:00:00Z'
+                && $request->data()['timezone'] === 'UTC';
         });
     }
 

@@ -66,6 +66,8 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import { ProgramMaterialsSection } from './components/program-materials-section';
+import type { ProgramMaterial } from './components/program-materials-section';
 
 type ProgramOption = {
     id: string;
@@ -104,6 +106,7 @@ type Program = {
     fields: ProgramField[];
     id: number;
     maxReschedule: number;
+    materials: ProgramMaterial[];
     name: string;
     slug: string;
     status: string;
@@ -346,9 +349,11 @@ function SearchMultiSelect({
 }
 
 export default function ProgramDetail({
+    canManageMaterials,
     fieldOptions,
     program,
 }: {
+    canManageMaterials: boolean;
     fieldOptions: ProgramFieldOption[];
     program: Program;
 }) {
@@ -472,9 +477,7 @@ export default function ProgramDetail({
                         <p className="text-sm">{program.maxReschedule}</p>
                     </div>
                     <div className="grid min-h-10 gap-2 md:grid-cols-[14rem_1fr] md:items-center">
-                        <p className="text-sm text-muted-foreground">
-                            Status
-                        </p>
+                        <p className="text-sm text-muted-foreground">Status</p>
                         <div>
                             <StatusBadge status={program.status} />
                         </div>
@@ -542,8 +545,7 @@ export default function ProgramDetail({
                                                     </span>
                                                     <span>&middot;</span>
                                                     <span>
-                                                        {variantsCount}{' '}
-                                                        variants
+                                                        {variantsCount} variants
                                                     </span>
                                                 </span>
                                             </button>
@@ -569,9 +571,7 @@ export default function ProgramDetail({
                                                     selectedProgramFieldSubjects.map(
                                                         (subject) => (
                                                             <Badge
-                                                                key={
-                                                                    subject.id
-                                                                }
+                                                                key={subject.id}
                                                                 variant="outline"
                                                                 className="max-w-44 truncate"
                                                             >
@@ -651,9 +651,7 @@ export default function ProgramDetail({
                                                     {selectedProgramFieldVariants.map(
                                                         (variant) => (
                                                             <TableRow
-                                                                key={
-                                                                    variant.id
-                                                                }
+                                                                key={variant.id}
                                                             >
                                                                 <TableCell className="font-medium">
                                                                     {
@@ -722,6 +720,12 @@ export default function ProgramDetail({
                     )}
                 </section>
 
+                <ProgramMaterialsSection
+                    canManage={canManageMaterials}
+                    materials={program.materials}
+                    programSlug={program.slug}
+                />
+
                 <Dialog
                     open={!!fieldDialog}
                     onOpenChange={(open) => {
@@ -758,9 +762,7 @@ export default function ProgramDetail({
                                     toast.success('Field updated.');
                                 }}
                                 onError={() => {
-                                    toast.error(
-                                        'Please check the field form.',
-                                    );
+                                    toast.error('Please check the field form.');
                                 }}
                                 className="grid gap-5"
                             >
@@ -790,17 +792,16 @@ export default function ProgramDetail({
                                                 searchPlaceholder="Search field..."
                                                 emptyMessage="No field found."
                                                 onValueChange={(value) =>
-                                                    setFieldDialog(
-                                                        (current) =>
-                                                            current
-                                                                ? {
-                                                                      ...current,
-                                                                      fieldId:
-                                                                          value,
-                                                                      subjectIds:
-                                                                          [],
-                                                                  }
-                                                                : current,
+                                                    setFieldDialog((current) =>
+                                                        current
+                                                            ? {
+                                                                  ...current,
+                                                                  fieldId:
+                                                                      value,
+                                                                  subjectIds:
+                                                                      [],
+                                                              }
+                                                            : current,
                                                     )
                                                 }
                                             />
@@ -935,9 +936,7 @@ export default function ProgramDetail({
                                                 }
                                             />
                                             <InputError
-                                                message={
-                                                    errors.target_field_id
-                                                }
+                                                message={errors.target_field_id}
                                             />
                                         </div>
 
@@ -998,9 +997,7 @@ export default function ProgramDetail({
                                         ? `/academics/programs/${program.slug}/variants/${variantDialog.variant.id}`
                                         : `/academics/programs/${program.slug}/variants`
                                 }
-                                method={
-                                    variantDialog.variant ? 'put' : 'post'
-                                }
+                                method={variantDialog.variant ? 'put' : 'post'}
                                 disableWhileProcessing
                                 onSuccess={() => {
                                     setVariantDialog(null);
@@ -1089,7 +1086,9 @@ export default function ProgramDetail({
                                                 placeholder="1500000"
                                                 aria-invalid={!!errors.price}
                                             />
-                                            <InputError message={errors.price} />
+                                            <InputError
+                                                message={errors.price}
+                                            />
                                         </div>
                                         <DialogFooter className="pt-2">
                                             <DialogClose asChild>

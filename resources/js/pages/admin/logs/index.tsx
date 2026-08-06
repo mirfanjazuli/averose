@@ -12,8 +12,10 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { useClientPagination } from '@/hooks/use-client-pagination';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
 import type { BadgeTone } from '@/lib/badge';
+import { formatDateTime } from '@/lib/date-time';
 
 type ActivityLog = {
     action: string;
@@ -53,6 +55,7 @@ export default function Logs({
 }: {
     logs: ActivityLog[];
 }) {
+    const timezone = useUserTimezone();
     const [searchQuery, setSearchQuery] = useState('');
     const [actionFilter, setActionFilter] = useState('all');
     const availableActions = useMemo(
@@ -80,7 +83,7 @@ export default function Logs({
 
             return [
                 log.action,
-                log.createdAt ?? '',
+                log.createdAt ? formatDateTime(log.createdAt, timezone) : '',
                 log.description ?? '',
                 log.ipAddress ?? '',
                 log.method,
@@ -91,7 +94,7 @@ export default function Logs({
                 log.userRole ?? '',
             ].some((value) => value.toLowerCase().includes(normalizedSearch));
         });
-    }, [actionFilter, logs, searchQuery]);
+    }, [actionFilter, logs, searchQuery, timezone]);
     const {
         changeRowsPerPage,
         firstItemIndex,
@@ -171,7 +174,12 @@ export default function Logs({
                             {visibleLogs.map((log) => (
                                 <TableRow key={log.id}>
                                     <TableCell className="whitespace-nowrap text-muted-foreground">
-                                        {log.createdAt ?? '-'}
+                                        {log.createdAt
+                                            ? formatDateTime(
+                                                  log.createdAt,
+                                                  timezone,
+                                              )
+                                            : '-'}
                                     </TableCell>
                                     <TableCell>
                                         <span className="font-medium">

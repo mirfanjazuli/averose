@@ -2,6 +2,7 @@ import { Form, Head, usePage } from '@inertiajs/react';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
 import Heading from '@/components/heading';
 import InputError from '@/components/input-error';
+import { TimezonePreferenceForm } from '@/components/settings/timezone-preference-form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,10 +11,11 @@ import type { Auth } from '@/types';
 
 type PageProps = {
     auth: Auth;
+    timezones: Array<{ label: string; value: string }>;
 };
 
 export default function Profile() {
-    const { auth } = usePage<PageProps>().props;
+    const { auth, timezones } = usePage<PageProps>().props;
 
     return (
         <>
@@ -74,8 +76,21 @@ export default function Profile() {
                         </>
                     )}
                 </Form>
-            </div>
 
+                <div className="space-y-6 border-t pt-6">
+                    <Heading
+                        variant="small"
+                        title="Time zone"
+                        description="Choose how dates and times are displayed"
+                    />
+                    <TimezonePreferenceForm
+                        key={`${auth.user.timezoneMode}:${auth.user.timezone}`}
+                        mode={auth.user.timezoneMode}
+                        timezone={auth.user.timezone}
+                        timezones={timezones}
+                    />
+                </div>
+            </div>
         </>
     );
 }

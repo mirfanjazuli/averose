@@ -5,12 +5,14 @@ import { useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
+import { formatDate } from '@/lib/date-time';
 
 type Recording = {
     id: string;
     mentor: string;
     program: string;
-    recordedDate: string;
+    recordedAt: string | null;
     source: string;
     subject: string;
     title: string;
@@ -29,6 +31,7 @@ export default function StudentRecordings({
 }: {
     recordings: Recording[];
 }) {
+    const timezone = useUserTimezone();
     const [searchQuery, setSearchQuery] = useState('');
     const filteredRecordings = useMemo(() => {
         const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -43,10 +46,12 @@ export default function StudentRecordings({
                 recording.mentor,
                 recording.subject,
                 recording.program,
-                recording.recordedDate,
+                recording.recordedAt
+                    ? formatDate(recording.recordedAt, timezone)
+                    : '',
             ].some((value) => value.toLowerCase().includes(normalizedSearch)),
         );
-    }, [recordings, searchQuery]);
+    }, [recordings, searchQuery, timezone]);
 
     return (
         <>
@@ -129,7 +134,12 @@ export default function StudentRecordings({
                                                     variant="outline"
                                                     className="border-[#dcece7] text-[#526b7b]"
                                                 >
-                                                    {recording.recordedDate}
+                                                    {recording.recordedAt
+                                                        ? formatDate(
+                                                              recording.recordedAt,
+                                                              timezone,
+                                                          )
+                                                        : '-'}
                                                 </Badge>
                                             </div>
 

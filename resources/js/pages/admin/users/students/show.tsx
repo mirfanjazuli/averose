@@ -1,30 +1,23 @@
 import { Form, Head, Link, usePage } from '@inertiajs/react';
-import { ClipboardList, GraduationCap, Plus, PowerOff } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+    ChevronDown,
+    ClipboardList,
+    GraduationCap,
+    Plus,
+    PowerOff,
+} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/admin/empty-state';
 import { StatusBadge } from '@/components/admin/status-badge';
 import { TableScrollArea } from '@/components/admin/table-scroll-area';
-import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import { DialogClose, DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
     Table,
     TableBody,
@@ -34,6 +27,12 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
+import { formatDate, formatDateTime } from '@/lib/date-time';
+import { CreateDialogProgramEnrollment } from '@/pages/admin/users/students/components/create-dialog-program-enrollment';
+import { CreateDialogTryOutAccess } from '@/pages/admin/users/students/components/create-dialog-try-out-access';
+import type { ProgramEnrollmentOption } from '@/pages/admin/users/students/components/program-enrollment-form';
+import type { TryOutAccessOption } from '@/pages/admin/users/students/components/try-out-access-form';
 type User = {
     createdAt: string | null;
     email: string;
@@ -58,25 +57,6 @@ type Enrollment = {
     variant: string | null;
 };
 
-type ProgramOption = {
-    fields: {
-        id: string;
-        label: string;
-    }[];
-    id: string;
-    label: string;
-    maxReschedule: number;
-    variants: {
-        duration: number;
-        fieldId: string;
-        id: string;
-        label: string;
-        price: string;
-        session: number;
-        status: string;
-    }[];
-};
-
 type TryOutAccess = {
     attemptQuota: number;
     attemptsUsed: number;
@@ -92,11 +72,6 @@ type TryOutAccess = {
     };
 };
 
-type TryOutOption = {
-    id: string;
-    title: string;
-};
-
 export default function StudentDetail({
     enrollments,
     programOptions,
@@ -105,47 +80,24 @@ export default function StudentDetail({
     user,
 }: {
     enrollments: Enrollment[];
-    programOptions: ProgramOption[];
+    programOptions: ProgramEnrollmentOption[];
     tryOutAccesses: TryOutAccess[];
-    tryOutOptions: TryOutOption[];
+    tryOutOptions: TryOutAccessOption[];
     user: User;
 }) {
+    const timezone = useUserTimezone();
     const page = usePage<{
         flash?: {
             success?: string;
         };
     }>();
     const shownSuccessToast = useRef<string | null>(null);
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [accessMode, setAccessMode] = useState<'program' | 'try-out'>(
-        'program',
-    );
-    const [selectedProgramId, setSelectedProgramId] = useState('');
-    const [selectedFieldId, setSelectedFieldId] = useState('');
-    const [selectedVariantId, setSelectedVariantId] = useState('');
-    const [selectedTryOutId, setSelectedTryOutId] = useState('');
-
-    const selectedProgram = useMemo(
+    const [programEnrollmentOpen, setProgramEnrollmentOpen] = useState(
         () =>
-            programOptions.find((program) => program.id === selectedProgramId),
-        [programOptions, selectedProgramId],
+            new URLSearchParams(page.url.split('?')[1] ?? '').get('action') ===
+            'enroll',
     );
-    const fieldOptions = selectedProgram?.fields ?? [];
-    const variantOptions = useMemo(
-        () =>
-            (selectedProgram?.variants ?? []).filter(
-                (variant) => variant.fieldId === selectedFieldId,
-            ),
-        [selectedFieldId, selectedProgram],
-    );
-
-    const resetFormState = () => {
-        setSelectedProgramId('');
-        setSelectedFieldId('');
-        setSelectedVariantId('');
-        setSelectedTryOutId('');
-        setAccessMode('program');
-    };
+    const [tryOutAccessOpen, setTryOutAccessOpen] = useState(false);
 
     useEffect(() => {
         if (page.props.flash?.success !== 'Student added.') {
@@ -201,13 +153,21 @@ export default function StudentDetail({
                             <p className="text-sm text-muted-foreground">
                                 Created
                             </p>
-                            <p className="text-sm">{user.createdAt ?? '-'}</p>
+                            <p className="text-sm">
+                                {user.createdAt
+                                    ? formatDateTime(user.createdAt, timezone)
+                                    : '-'}
+                            </p>
                         </div>
                         <div className="grid min-h-10 gap-2 md:grid-cols-[14rem_1fr] md:items-center">
                             <p className="text-sm text-muted-foreground">
                                 Last updated
                             </p>
-                            <p className="text-sm">{user.updatedAt ?? '-'}</p>
+                            <p className="text-sm">
+                                {user.updatedAt
+                                    ? formatDateTime(user.updatedAt, timezone)
+                                    : '-'}
+                            </p>
                         </div>
                     </div>
                 </section>
@@ -226,499 +186,47 @@ export default function StudentDetail({
                                     Try Outs
                                 </TabsTrigger>
                             </TabsList>
-                            <Dialog
-                                open={dialogOpen}
-                                onOpenChange={(open) => {
-                                    setDialogOpen(open);
-
-                                    if (!open) {
-                                        resetFormState();
-                                    }
-                                }}
-                            >
-                                <DialogTrigger asChild>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
                                     <Button className="ml-auto gap-2">
                                         <Plus className="size-4" />
                                         Add enrollment
+                                        <ChevronDown className="size-4" />
                                     </Button>
-                                </DialogTrigger>
-                                <DialogContent className="sm:max-w-xl">
-                                    <DialogHeader>
-                                        <DialogTitle>
-                                            Add student access
-                                        </DialogTitle>
-                                        <DialogDescription>
-                                            Assign a program enrollment or
-                                            private try out access.
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <Tabs
-                                        value={accessMode}
-                                        onValueChange={(value) =>
-                                            setAccessMode(
-                                                value as typeof accessMode,
-                                            )
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent
+                                    align="end"
+                                >
+                                    <DropdownMenuItem
+                                        onSelect={() =>
+                                            setProgramEnrollmentOpen(true)
                                         }
                                     >
-                                        <TabsList className="grid w-full grid-cols-2">
-                                            <TabsTrigger value="program">
-                                                <GraduationCap className="size-4" />
-                                                Program
-                                            </TabsTrigger>
-                                            <TabsTrigger value="try-out">
-                                                <ClipboardList className="size-4" />
-                                                Try Out
-                                            </TabsTrigger>
-                                        </TabsList>
-                                        <TabsContent value="program">
-                                            <Form
-                                                action={`/users/students/${user.slug}/enrollments`}
-                                                method="post"
-                                                resetOnSuccess
-                                                disableWhileProcessing
-                                                onSuccess={() => {
-                                                    setDialogOpen(false);
-                                                    resetFormState();
-                                                    toast.success(
-                                                        'Enrollment added.',
-                                                    );
-                                                }}
-                                                onError={() =>
-                                                    toast.error(
-                                                        'Please check the enrollment form.',
-                                                    )
-                                                }
-                                                className="grid gap-5 pt-3"
-                                            >
-                                                {({ processing, errors }) => (
-                                                    <>
-                                                        <input
-                                                            type="hidden"
-                                                            name="program_id"
-                                                            value={
-                                                                selectedProgramId
-                                                            }
-                                                        />
-                                                        <input
-                                                            type="hidden"
-                                                            name="field_id"
-                                                            value={
-                                                                selectedFieldId
-                                                            }
-                                                        />
-                                                        <input
-                                                            type="hidden"
-                                                            name="program_variant_id"
-                                                            value={
-                                                                selectedVariantId
-                                                            }
-                                                        />
-                                                        <div className="grid gap-2">
-                                                            <Label htmlFor="enrollment-program">
-                                                                Program
-                                                            </Label>
-                                                            <Select
-                                                                value={
-                                                                    selectedProgramId
-                                                                }
-                                                                onValueChange={(
-                                                                    value,
-                                                                ) => {
-                                                                    setSelectedProgramId(
-                                                                        value,
-                                                                    );
-                                                                    setSelectedFieldId(
-                                                                        '',
-                                                                    );
-                                                                    setSelectedVariantId(
-                                                                        '',
-                                                                    );
-                                                                }}
-                                                            >
-                                                                <SelectTrigger
-                                                                    id="enrollment-program"
-                                                                    className="w-full"
-                                                                    aria-invalid={
-                                                                        !!errors.program_id
-                                                                    }
-                                                                >
-                                                                    <SelectValue placeholder="Select program" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {programOptions.map(
-                                                                        (
-                                                                            program,
-                                                                        ) => (
-                                                                            <SelectItem
-                                                                                key={
-                                                                                    program.id
-                                                                                }
-                                                                                value={
-                                                                                    program.id
-                                                                                }
-                                                                            >
-                                                                                {
-                                                                                    program.label
-                                                                                }
-                                                                            </SelectItem>
-                                                                        ),
-                                                                    )}
-                                                                </SelectContent>
-                                                            </Select>
-                                                            <InputError
-                                                                message={
-                                                                    errors.program_id
-                                                                }
-                                                            />
-                                                        </div>
-                                                        <div className="grid gap-2">
-                                                            <Label htmlFor="enrollment-field">
-                                                                Field
-                                                            </Label>
-                                                            <Select
-                                                                value={
-                                                                    selectedFieldId
-                                                                }
-                                                                onValueChange={(
-                                                                    value,
-                                                                ) => {
-                                                                    setSelectedFieldId(
-                                                                        value,
-                                                                    );
-                                                                    setSelectedVariantId(
-                                                                        '',
-                                                                    );
-                                                                }}
-                                                                disabled={
-                                                                    !selectedProgram
-                                                                }
-                                                            >
-                                                                <SelectTrigger
-                                                                    id="enrollment-field"
-                                                                    className="w-full"
-                                                                    aria-invalid={
-                                                                        !!errors.field_id
-                                                                    }
-                                                                >
-                                                                    <SelectValue placeholder="Select field" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {fieldOptions.map(
-                                                                        (
-                                                                            field,
-                                                                        ) => (
-                                                                            <SelectItem
-                                                                                key={
-                                                                                    field.id
-                                                                                }
-                                                                                value={
-                                                                                    field.id
-                                                                                }
-                                                                            >
-                                                                                {
-                                                                                    field.label
-                                                                                }
-                                                                            </SelectItem>
-                                                                        ),
-                                                                    )}
-                                                                </SelectContent>
-                                                            </Select>
-                                                            <InputError
-                                                                message={
-                                                                    errors.field_id
-                                                                }
-                                                            />
-                                                        </div>
-                                                        <div className="grid gap-2">
-                                                            <Label htmlFor="enrollment-variant">
-                                                                Variant
-                                                            </Label>
-                                                            <Select
-                                                                value={
-                                                                    selectedVariantId
-                                                                }
-                                                                onValueChange={
-                                                                    setSelectedVariantId
-                                                                }
-                                                                disabled={
-                                                                    !selectedFieldId
-                                                                }
-                                                            >
-                                                                <SelectTrigger
-                                                                    id="enrollment-variant"
-                                                                    className="w-full"
-                                                                    aria-invalid={
-                                                                        !!errors.program_variant_id
-                                                                    }
-                                                                >
-                                                                    <SelectValue placeholder="Select variant" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {variantOptions.map(
-                                                                        (
-                                                                            variant,
-                                                                        ) => (
-                                                                            <SelectItem
-                                                                                key={
-                                                                                    variant.id
-                                                                                }
-                                                                                value={
-                                                                                    variant.id
-                                                                                }
-                                                                            >
-                                                                                {
-                                                                                    variant.label
-                                                                                }
-                                                                            </SelectItem>
-                                                                        ),
-                                                                    )}
-                                                                </SelectContent>
-                                                            </Select>
-                                                            <InputError
-                                                                message={
-                                                                    errors.program_variant_id
-                                                                }
-                                                            />
-                                                        </div>
-                                                        <div className="grid gap-2">
-                                                            <Label htmlFor="enrollment-start-date">
-                                                                Start date
-                                                            </Label>
-                                                            <Input
-                                                                id="enrollment-start-date"
-                                                                name="start_date"
-                                                                type="date"
-                                                                aria-invalid={
-                                                                    !!errors.start_date
-                                                                }
-                                                            />
-                                                            <InputError
-                                                                message={
-                                                                    errors.start_date
-                                                                }
-                                                            />
-                                                        </div>
-                                                        <div className="grid gap-2">
-                                                            <Label htmlFor="enrollment-max-reschedule">
-                                                                Max reschedule
-                                                            </Label>
-                                                            <Input
-                                                                id="enrollment-max-reschedule"
-                                                                name="max_reschedule"
-                                                                type="number"
-                                                                min="0"
-                                                                placeholder={
-                                                                    selectedProgram
-                                                                        ? `Default ${selectedProgram.maxReschedule}`
-                                                                        : 'Optional overwrite'
-                                                                }
-                                                                aria-invalid={
-                                                                    !!errors.max_reschedule
-                                                                }
-                                                            />
-                                                            <InputError
-                                                                message={
-                                                                    errors.max_reschedule
-                                                                }
-                                                            />
-                                                        </div>
-                                                        <DialogFooter className="pt-2">
-                                                            <DialogClose
-                                                                asChild
-                                                            >
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    disabled={
-                                                                        processing
-                                                                    }
-                                                                >
-                                                                    Cancel
-                                                                </Button>
-                                                            </DialogClose>
-                                                            <Button
-                                                                type="submit"
-                                                                disabled={
-                                                                    processing
-                                                                }
-                                                            >
-                                                                Save enrollment
-                                                            </Button>
-                                                        </DialogFooter>
-                                                    </>
-                                                )}
-                                            </Form>
-                                        </TabsContent>
-                                        <TabsContent value="try-out">
-                                            <Form
-                                                action={`/users/students/${user.slug}/try-out-access`}
-                                                method="post"
-                                                resetOnSuccess
-                                                disableWhileProcessing
-                                                onSuccess={() => {
-                                                    setDialogOpen(false);
-                                                    resetFormState();
-                                                    toast.success(
-                                                        'Try out access added.',
-                                                    );
-                                                }}
-                                                onError={() =>
-                                                    toast.error(
-                                                        'Please check the try out access form.',
-                                                    )
-                                                }
-                                                className="grid gap-5 pt-3"
-                                            >
-                                                {({ processing, errors }) => (
-                                                    <>
-                                                        <input
-                                                            type="hidden"
-                                                            name="try_out_id"
-                                                            value={
-                                                                selectedTryOutId
-                                                            }
-                                                        />
-                                                        <div className="grid gap-2">
-                                                            <Label htmlFor="try-out-id">
-                                                                Try out
-                                                            </Label>
-                                                            <Select
-                                                                value={
-                                                                    selectedTryOutId
-                                                                }
-                                                                onValueChange={
-                                                                    setSelectedTryOutId
-                                                                }
-                                                            >
-                                                                <SelectTrigger
-                                                                    id="try-out-id"
-                                                                    className="w-full"
-                                                                    aria-invalid={
-                                                                        !!errors.try_out_id
-                                                                    }
-                                                                >
-                                                                    <SelectValue placeholder="Select private try out" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {tryOutOptions.map(
-                                                                        (
-                                                                            tryOut,
-                                                                        ) => (
-                                                                            <SelectItem
-                                                                                key={
-                                                                                    tryOut.id
-                                                                                }
-                                                                                value={
-                                                                                    tryOut.id
-                                                                                }
-                                                                            >
-                                                                                {
-                                                                                    tryOut.title
-                                                                                }
-                                                                            </SelectItem>
-                                                                        ),
-                                                                    )}
-                                                                </SelectContent>
-                                                            </Select>
-                                                            <InputError
-                                                                message={
-                                                                    errors.try_out_id
-                                                                }
-                                                            />
-                                                        </div>
-                                                        <div className="grid gap-4 md:grid-cols-2">
-                                                            <div className="grid gap-2">
-                                                                <Label htmlFor="try-out-start-date">
-                                                                    Start date
-                                                                </Label>
-                                                                <Input
-                                                                    id="try-out-start-date"
-                                                                    name="available_from"
-                                                                    type="date"
-                                                                    aria-invalid={
-                                                                        !!errors.available_from
-                                                                    }
-                                                                />
-                                                                <InputError
-                                                                    message={
-                                                                        errors.available_from
-                                                                    }
-                                                                />
-                                                            </div>
-                                                            <div className="grid gap-2">
-                                                                <Label htmlFor="try-out-end-date">
-                                                                    End date
-                                                                </Label>
-                                                                <Input
-                                                                    id="try-out-end-date"
-                                                                    name="available_until"
-                                                                    type="date"
-                                                                    aria-invalid={
-                                                                        !!errors.available_until
-                                                                    }
-                                                                />
-                                                                <InputError
-                                                                    message={
-                                                                        errors.available_until
-                                                                    }
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                        <input
-                                                            type="hidden"
-                                                            name="status"
-                                                            value="active"
-                                                        />
-                                                        <div className="grid gap-2">
-                                                            <Label htmlFor="try-out-attempt-quota">
-                                                                Attempts
-                                                            </Label>
-                                                            <Input
-                                                                id="try-out-attempt-quota"
-                                                                name="attempt_quota"
-                                                                type="number"
-                                                                min="1"
-                                                                defaultValue="1"
-                                                                aria-invalid={
-                                                                    !!errors.attempt_quota
-                                                                }
-                                                            />
-                                                            <InputError
-                                                                message={
-                                                                    errors.attempt_quota
-                                                                }
-                                                            />
-                                                        </div>
-                                                        <DialogFooter className="pt-2">
-                                                            <DialogClose
-                                                                asChild
-                                                            >
-                                                                <Button
-                                                                    type="button"
-                                                                    variant="outline"
-                                                                    disabled={
-                                                                        processing
-                                                                    }
-                                                                >
-                                                                    Cancel
-                                                                </Button>
-                                                            </DialogClose>
-                                                            <Button
-                                                                type="submit"
-                                                                disabled={
-                                                                    processing
-                                                                }
-                                                            >
-                                                                Save access
-                                                            </Button>
-                                                        </DialogFooter>
-                                                    </>
-                                                )}
-                                            </Form>
-                                        </TabsContent>
-                                    </Tabs>
-                                </DialogContent>
-                            </Dialog>
+                                        <GraduationCap className="size-4" />
+                                        Program
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onSelect={() =>
+                                            setTryOutAccessOpen(true)
+                                        }
+                                    >
+                                        <ClipboardList className="size-4" />
+                                        Try out
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                            <CreateDialogProgramEnrollment
+                                open={programEnrollmentOpen}
+                                onOpenChange={setProgramEnrollmentOpen}
+                                programOptions={programOptions}
+                                studentSlug={user.slug}
+                            />
+                            <CreateDialogTryOutAccess
+                                open={tryOutAccessOpen}
+                                onOpenChange={setTryOutAccessOpen}
+                                studentSlug={user.slug}
+                                tryOutOptions={tryOutOptions}
+                            />
                         </div>
                         <TabsContent value="programs">
                             {enrollments.length === 0 ? (
@@ -774,9 +282,10 @@ export default function StudentDetail({
                                                                     <p className="text-xs text-muted-foreground">
                                                                         Last
                                                                         session:{' '}
-                                                                        {
-                                                                            enrollment.lastSessionDate
-                                                                        }
+                                                                        {formatDate(
+                                                                            enrollment.lastSessionDate,
+                                                                            timezone,
+                                                                        )}
                                                                     </p>
                                                                 )}
                                                             {enrollment.maxReschedule !==

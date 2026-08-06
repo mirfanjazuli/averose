@@ -12,13 +12,17 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['user_id', 'mentor_id', 'zoom_account_id', 'program_enrollment_id', 'subject_id', 'scheduled_at', 'duration', 'delivery_mode', 'zoom_link', 'zoom_meeting_id', 'zoom_start_url', 'zoom_passcode', 'assigned_at', 'status'])]
+#[Fillable(['user_id', 'mentor_id', 'zoom_account_id', 'program_enrollment_id', 'subject_id', 'scheduled_at', 'timezone', 'duration', 'delivery_mode', 'zoom_link', 'zoom_meeting_id', 'zoom_start_url', 'zoom_passcode', 'assigned_at', 'status'])]
 class Schedule extends Model
 {
     /** @use HasFactory<ScheduleFactory> */
     use HasFactory;
 
     protected $table = 'schedules';
+
+    protected $attributes = [
+        'timezone' => 'Asia/Jakarta',
+    ];
 
     public function user(): BelongsTo
     {

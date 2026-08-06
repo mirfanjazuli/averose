@@ -1,16 +1,9 @@
 import { Head, Link, usePage } from '@inertiajs/react';
-import {
-    ArrowRight,
-    ArrowUpRight,
-    PlayCircle,
-} from 'lucide-react';
+import { ArrowRight, ArrowUpRight, PlayCircle } from 'lucide-react';
 import { useState } from 'react';
 
-import {
-    Alert,
-    AlertDescription,
-    AlertTitle,
-} from '@/components/ui/alert';
+import { TimezoneIndicator } from '@/components/timezone-indicator';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,6 +26,11 @@ import {
     getBadgeProps,
     getStatusBadgeTone,
 } from '@/lib/badge';
+import {
+    formatDateInput,
+    formatDateTime,
+    formatTimeRange,
+} from '@/lib/date-time';
 import { ScheduleFeedbackDialog } from '@/pages/student/schedules/components/schedule-feedback-dialog';
 import type { ScheduleFeedbackSession } from '@/pages/student/schedules/components/schedule-feedback-dialog';
 import { StudentBookSessionDialog } from '@/pages/student/schedules/components/student-book-session-dialog';
@@ -46,7 +44,6 @@ type StudentSession = {
     program: string;
     startAt: string;
     status: string;
-    time: string;
     title: string;
     zoomLink: string | null;
 };
@@ -68,56 +65,58 @@ type StudentStats = {
     upcomingSessions: number;
 };
 
-function formatRelativeSessionDay(dateValue: string) {
+function formatRelativeSessionDay(dateValue: string, timezone: string) {
     const sessionDate = new Date(dateValue);
     const today = new Date();
     const tomorrow = new Date();
     tomorrow.setDate(today.getDate() + 1);
 
-    if (sessionDate.toDateString() === today.toDateString()) {
+    if (
+        formatDateInput(sessionDate, timezone) ===
+        formatDateInput(today, timezone)
+    ) {
         return 'Hari ini';
     }
 
-    if (sessionDate.toDateString() === tomorrow.toDateString()) {
+    if (
+        formatDateInput(sessionDate, timezone) ===
+        formatDateInput(tomorrow, timezone)
+    ) {
         return 'Besok';
     }
 
     return null;
 }
 
-function formatSessionDate(dateValue: string) {
+function formatSessionDate(dateValue: string, timezone: string) {
     const sessionDate = new Date(dateValue);
 
     return {
-        day: new Intl.DateTimeFormat('id-ID', { day: '2-digit' }).format(
-            sessionDate,
-        ),
-        month: new Intl.DateTimeFormat('id-ID', { month: 'short' }).format(
-            sessionDate,
-        ),
+        day: formatDateTime(sessionDate, timezone, { day: '2-digit' }),
+        month: formatDateTime(sessionDate, timezone, { month: 'short' }),
     };
 }
 
-function formatSessionTimeLabel(startAt: string, endAt: string) {
-    const relativeDay = formatRelativeSessionDay(startAt);
-    const timeRange = formatSessionTimeRange(startAt, endAt);
+function formatSessionTimeLabel(
+    startAt: string,
+    endAt: string,
+    timezone: string,
+) {
+    const relativeDay = formatRelativeSessionDay(startAt, timezone);
+    const timeRange = formatTimeRange(startAt, endAt, timezone, {
+        includeTimezone: false,
+    });
 
     return relativeDay ? `${relativeDay}, ${timeRange}` : timeRange;
 }
 
-function formatSessionTimeRange(startAt: string, endAt: string) {
-    const formatter = new Intl.DateTimeFormat('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-
-    return `${formatter.format(new Date(startAt))} - ${formatter.format(
-        new Date(endAt),
-    )}`;
-}
-
-function greetingForCurrentTime() {
-    const hour = new Date().getHours();
+function greetingForCurrentTime(timezone: string) {
+    const hour = Number(
+        formatDateTime(new Date(), timezone, {
+            hour: '2-digit',
+            hourCycle: 'h23',
+        }),
+    );
 
     if (hour >= 4 && hour < 11) {
         return 'Selamat pagi';
@@ -148,6 +147,7 @@ export default function StudentDashboard({
     subjects: BookingSubjectOption[];
 }) {
     const { auth } = usePage().props;
+    const timezone = auth.user.timezone;
     const [bookingOpen, setBookingOpen] = useState(false);
     const [feedbackOpen, setFeedbackOpen] = useState(false);
     const [feedbackReminderOpen, setFeedbackReminderOpen] = useState(false);
@@ -201,12 +201,13 @@ export default function StudentDashboard({
     return (
         <>
             <Head title="Dashboard" />
-            <div className="flex h-full min-w-0 max-w-full flex-1 flex-col gap-8 py-4 text-[#102a3a] md:gap-10 md:py-6">
+            <div className="flex h-full max-w-full min-w-0 flex-1 flex-col gap-8 py-4 text-[#102a3a] md:gap-10 md:py-6">
                 <div className="space-y-6">
                     <section className="flex h-full flex-col gap-5 py-2 md:flex-row md:items-start md:justify-between md:gap-8 md:py-4">
                         <div className="min-w-0">
                             <h1 className="max-w-3xl font-heading text-2xl leading-tight font-semibold tracking-tight text-[#102a3a] md:text-4xl">
-                                {greetingForCurrentTime()}{', '}
+                                {greetingForCurrentTime(timezone)}
+                                {', '}
                                 <span className="font-bold text-[#0f8f7a]">
                                     {studentName}
                                 </span>
@@ -275,14 +276,16 @@ export default function StudentDashboard({
                             </button>
                         </Alert>
                     ) : null}
-
                 </div>
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
                     <section className="space-y-3">
                         <div className="flex items-center justify-between gap-3">
-                            <h2 className="font-heading text-md font-semibold text-[#102a3a]">
-                                Sesi terdekat
-                            </h2>
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-md font-heading font-semibold text-[#102a3a]">
+                                    Sesi terdekat
+                                </h2>
+                                <TimezoneIndicator compact />
+                            </div>
                             <Link
                                 href="/schedules"
                                 className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#0f8f7a] transition-colors hover:text-[#0b7668]"
@@ -293,10 +296,11 @@ export default function StudentDashboard({
                         </div>
 
                         {sessions.length > 0 ? (
-                            <div className="divide-y divide-[#edf3f1] overflow-hidden rounded-md bg-white shadow-sm shadow-[#102a3a]/[0.03] ring-1 ring-[#dcece7]">
+                            <div className="divide-y divide-[#edf3f1] overflow-hidden rounded-md bg-white shadow-sm ring-1 shadow-[#102a3a]/[0.03] ring-[#dcece7]">
                                 {sessions.slice(0, 4).map((session) => {
                                     const sessionDate = formatSessionDate(
                                         session.startAt,
+                                        timezone,
                                     );
                                     const canJoin = canJoinSession(session);
 
@@ -320,6 +324,7 @@ export default function StudentDashboard({
                                                             {formatSessionTimeLabel(
                                                                 session.startAt,
                                                                 session.endAt,
+                                                                timezone,
                                                             )}
                                                         </p>
                                                         <Badge
@@ -344,6 +349,7 @@ export default function StudentDashboard({
                                                         {formatSessionTimeLabel(
                                                             session.startAt,
                                                             session.endAt,
+                                                            timezone,
                                                         )}
                                                     </p>
                                                     <Badge
@@ -359,7 +365,7 @@ export default function StudentDashboard({
                                                         )}
                                                     </Badge>
                                                 </div>
-                                                <p className="mt-2 truncate font-semibold leading-6 text-[#102a3a]">
+                                                <p className="mt-2 truncate leading-6 font-semibold text-[#102a3a]">
                                                     {session.title}{' '}
                                                     <span className="font-normal text-[#526b7b]">
                                                         · {session.mentor}
@@ -368,8 +374,7 @@ export default function StudentDashboard({
                                             </div>
 
                                             <div className="flex items-center justify-start md:min-h-9 md:justify-end">
-                                                {canJoin &&
-                                                session.zoomLink ? (
+                                                {canJoin && session.zoomLink ? (
                                                     <Button
                                                         asChild
                                                         size="sm"

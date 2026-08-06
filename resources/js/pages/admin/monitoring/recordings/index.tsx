@@ -41,17 +41,19 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import {
     formatBadgeLabel,
     getBadgeProps,
     getStatusBadgeTone,
 } from '@/lib/badge';
+import { formatDate } from '@/lib/date-time';
 
 type Recording = {
     id: string;
     mentor: string;
     program: string;
-    recordedDate: string;
+    recordedAt: string | null;
     source: string;
     status: string;
     student: string;
@@ -64,9 +66,10 @@ type Recording = {
 
 type SessionOption = {
     id: string;
-    label: string;
     meetingId: string | null;
+    scheduledAt: string;
     student: string;
+    subject: string;
     zoomAccount: string;
 };
 
@@ -77,6 +80,7 @@ export default function AdminRecordings({
     recordings: Recording[];
     sessionOptions: SessionOption[];
 }) {
+    const timezone = useUserTimezone();
     const [searchQuery, setSearchQuery] = useState('');
     const [open, setOpen] = useState(false);
     const [deactivatingRecording, setDeactivatingRecording] =
@@ -166,7 +170,12 @@ export default function AdminRecordings({
                                                                     session.id
                                                                 }
                                                             >
-                                                                {session.label}
+                                                                {formatDate(
+                                                                    session.scheduledAt,
+                                                                    timezone,
+                                                                )}{' '}
+                                                                - {session.student} -{' '}
+                                                                {session.subject}
                                                             </SelectItem>
                                                         ),
                                                     )}
@@ -346,7 +355,12 @@ export default function AdminRecordings({
                                     <TableCell>{recording.mentor}</TableCell>
                                     <TableCell>{recording.subject}</TableCell>
                                     <TableCell>
-                                        {recording.recordedDate}
+                                        {recording.recordedAt
+                                            ? formatDate(
+                                                  recording.recordedAt,
+                                                  timezone,
+                                              )
+                                            : '-'}
                                     </TableCell>
                                     <TableCell>
                                         <Badge {...getBadgeProps('muted')}>

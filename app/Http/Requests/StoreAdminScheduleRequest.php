@@ -3,7 +3,10 @@
 namespace App\Http\Requests;
 
 use App\Models\ProgramEnrollment;
+use App\Rules\IanaTimezone;
 use App\ScheduleDeliveryMode;
+use App\Services\DateTime\UserDateTimeService;
+use App\Services\Scheduling\BusinessCalendarService;
 use App\UserRole;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -41,6 +44,7 @@ class StoreAdminScheduleRequest extends FormRequest
             'program_enrollment_id' => ['required', 'integer', 'exists:program_enrollments,id'],
             'subject_id' => ['required', 'integer', 'exists:subjects,id'],
             'time' => ['required', 'date_format:H:i'],
+            'timezone' => ['required', 'string', 'max:64', new IanaTimezone],
             'user_id' => [
                 'required',
                 'integer',
@@ -57,17 +61,14 @@ class StoreAdminScheduleRequest extends FormRequest
                     return;
                 }
 
-                $scheduledAt = CarbonImmutable::parse(
-                    "{$this->string('date')} {$this->string('time')}",
-                    config('app.timezone'),
-                );
+                $scheduledAt = $this->scheduledAtUtc();
 
                 if ($scheduledAt->isPast()) {
                     $validator->errors()->add('date', 'The schedule date and time must be in the future.');
                 }
 
                 $enrollment = ProgramEnrollment::query()
-                    ->with(['program.subjects:id', 'variant:id,session'])
+                    ->with(['program.subjects:id', 'variant:id,session,duration'])
                     ->whereKey($this->integer('program_enrollment_id'))
                     ->where('user_id', $this->integer('user_id'))
                     ->where('status', 'active')
@@ -86,7 +87,29 @@ class StoreAdminScheduleRequest extends FormRequest
                 if ($enrollment->sessionsRemaining() < 1) {
                     $validator->errors()->add('program_enrollment_id', 'There are no remaining sessions for this enrollment.');
                 }
+
+                $reason = app(BusinessCalendarService::class)->unavailabilityReason(
+                    $scheduledAt,
+                    $enrollment->variant?->duration ?? 60,
+                );
+
+                if ($reason) {
+                    $validator->errors()->add('date', $reason);
+                }
             },
         ];
+    }
+
+    public function scheduledAtUtc(): CarbonImmutable
+    {
+        return app(UserDateTimeService::class)->fromLocal(
+            "{$this->string('date')} {$this->string('time')}",
+            $this->timezone(),
+        );
+    }
+
+    public function timezone(): string
+    {
+        return $this->string('timezone')->toString();
     }
 }

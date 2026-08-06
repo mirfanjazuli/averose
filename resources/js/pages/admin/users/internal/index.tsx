@@ -36,11 +36,13 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { useClientPagination } from '@/hooks/use-client-pagination';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import {
     formatBadgeLabel,
     getBadgeProps,
     getStatusBadgeTone,
 } from '@/lib/badge';
+import { formatDate } from '@/lib/date-time';
 import { CreateDialogInternal } from '@/pages/admin/users/internal/components/create-dialog-internal';
 import type {
     InternalFormUser,
@@ -65,6 +67,7 @@ export default function InternalUsers({
     roleOptions: InternalRoleOption[];
     users: User[];
 }) {
+    const timezone = useUserTimezone();
     const [addDialogOpen, setAddDialogOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [deletingUser, setDeletingUser] = useState<User | null>(null);
@@ -282,7 +285,11 @@ export default function InternalUsers({
                                             {formatBadgeLabel(user.status)}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell>{user.createdAt ?? '-'}</TableCell>
+                                    <TableCell>
+                                        {user.createdAt
+                                            ? formatDate(user.createdAt, timezone)
+                                            : '-'}
+                                    </TableCell>
                                     <TableCell className="text-right">
                                         <ActionMenu label="Open internal user actions">
                                             <DropdownMenuItem

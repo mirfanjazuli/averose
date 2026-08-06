@@ -1,6 +1,7 @@
 import { Form } from '@inertiajs/react';
 import { useState } from 'react';
 
+import { TimezoneIndicator } from '@/components/timezone-indicator';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -9,6 +10,8 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
+import { formatDateInput, formatTimeInput } from '@/lib/date-time';
 import {
     ScheduleDatePicker,
     ScheduleTimePicker,
@@ -29,26 +32,14 @@ type EditDialogScheduleProps = {
     schedule: EditableSchedule | null;
 };
 
-function scheduleDateParts(value?: string) {
+function scheduleDateParts(value: string | undefined, timezone: string) {
     if (!value) {
         return { date: '', time: '' };
     }
 
-    const parts = new Intl.DateTimeFormat('en-CA', {
-        day: '2-digit',
-        hour: '2-digit',
-        hour12: false,
-        minute: '2-digit',
-        month: '2-digit',
-        timeZone: 'Asia/Jakarta',
-        year: 'numeric',
-    }).formatToParts(new Date(value));
-    const part = (type: Intl.DateTimeFormatPartTypes) =>
-        parts.find((item) => item.type === type)?.value ?? '';
-
     return {
-        date: `${part('year')}-${part('month')}-${part('day')}`,
-        time: `${part('hour')}:${part('minute')}`,
+        date: formatDateInput(value, timezone),
+        time: formatTimeInput(value, timezone),
     };
 }
 
@@ -59,7 +50,8 @@ export function EditDialogSchedule({
     open,
     schedule,
 }: EditDialogScheduleProps) {
-    const initialValue = scheduleDateParts(schedule?.startAt);
+    const timezone = useUserTimezone();
+    const initialValue = scheduleDateParts(schedule?.startAt, timezone);
     const [date, setDate] = useState(initialValue.date);
     const [time, setTime] = useState(initialValue.time);
 
@@ -84,6 +76,11 @@ export function EditDialogSchedule({
                 >
                     {({ errors, processing }) => (
                         <>
+                            <input
+                                type="hidden"
+                                name="timezone"
+                                value={timezone}
+                            />
                             <div className="space-y-1">
                                 <p className="font-medium">{schedule.title}</p>
                                 <p className="text-sm text-muted-foreground">
@@ -127,6 +124,8 @@ export function EditDialogSchedule({
                                     )}
                                 </div>
                             </div>
+
+                            <TimezoneIndicator label="Time zone" />
 
                             <div className="flex justify-end gap-2 pt-2">
                                 <Button

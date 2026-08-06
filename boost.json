@@ -12,6 +12,7 @@
         "laravel-best-practices",
         "wayfinder-development",
         "inertia-react-development",
+        "echo-react-development",
         "tailwindcss-development"
     ]
 }

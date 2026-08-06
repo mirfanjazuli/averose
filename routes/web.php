@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\LogController;
 use App\Http\Controllers\Admin\MentorJournalController;
 use App\Http\Controllers\Admin\MentorLevelController;
 use App\Http\Controllers\Admin\ProgramController;
+use App\Http\Controllers\Admin\ProgramMaterialController as AdminProgramMaterialController;
 use App\Http\Controllers\Admin\PublicHolidayController as AdminPublicHolidayController;
 use App\Http\Controllers\Admin\RecordingController as AdminRecordingController;
 use App\Http\Controllers\Admin\RescheduleRequestController as AdminRescheduleRequestController;
@@ -25,6 +26,7 @@ use App\Http\Controllers\Mentor\SessionCompletionController;
 use App\Http\Controllers\SchedulePageController;
 use App\Http\Controllers\Shared\MentorJournalAttachmentController;
 use App\Http\Controllers\Shared\NotificationController;
+use App\Http\Controllers\Shared\ProgramMaterialController as SharedProgramMaterialController;
 use App\Http\Controllers\Shared\TryOutAssetController;
 use App\Http\Controllers\Student\EnrollmentController as StudentEnrollmentController;
 use App\Http\Controllers\Student\RecordingController as StudentRecordingController;
@@ -33,6 +35,7 @@ use App\Http\Controllers\Student\ScheduleController as StudentScheduleController
 use App\Http\Controllers\Student\ScheduleFeedbackController as StudentScheduleFeedbackController;
 use App\Http\Controllers\Student\TryOutController as StudentTryOutController;
 use App\Models\Program;
+use App\Services\ProgramAssetStorage;
 use App\Support\StorageUrl;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -53,7 +56,7 @@ Route::get('/', function () {
                 'id' => $program->id,
                 'slug' => $program->slug,
                 'subjectsCount' => $program->subjects_count,
-                'thumbnailUrl' => StorageUrl::forPath($program->thumbnail),
+                'thumbnailUrl' => StorageUrl::forPath($program->thumbnail, ProgramAssetStorage::DISK),
                 'title' => $program->name,
             ]),
     ]);
@@ -73,7 +76,7 @@ Route::get('programs', function () {
                 'id' => $program->id,
                 'slug' => $program->slug,
                 'subjectsCount' => $program->subjects_count,
-                'thumbnailUrl' => StorageUrl::forPath($program->thumbnail),
+                'thumbnailUrl' => StorageUrl::forPath($program->thumbnail, ProgramAssetStorage::DISK),
                 'title' => $program->name,
             ]),
     ]);
@@ -100,7 +103,7 @@ Route::get('programs/{program:slug}', function (Program $program) {
                 ])
                 ->values(),
             'subjectsCount' => $program->subjects_count,
-            'thumbnailUrl' => StorageUrl::forPath($program->thumbnail),
+            'thumbnailUrl' => StorageUrl::forPath($program->thumbnail, ProgramAssetStorage::DISK),
             'title' => $program->name,
             'variants' => $program->variants
                 ->map(fn ($variant): array => [
@@ -117,6 +120,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
     Route::get('schedules', SchedulePageController::class)->name('mentor.schedules');
     Route::get('journal-attachments/{mentor_journal_attachment:uuid}', [MentorJournalAttachmentController::class, 'show'])->name('mentor-journal-attachments.show');
+    Route::get('program-materials/{program_material:uuid}', [SharedProgramMaterialController::class, 'show'])->name('program-materials.show');
     Route::get('try-out-assets/{try_out_asset:uuid}', [TryOutAssetController::class, 'show'])->name('try-out-assets.show');
 
     Route::middleware('role:admin')->group(function () {
@@ -218,6 +222,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 Route::post('{program}/variants', [ProgramController::class, 'storeVariant'])->middleware('permission:programs.update')->name('programs.variants.store');
                 Route::put('{program}/variants/{variant}', [ProgramController::class, 'updateVariant'])->middleware('permission:programs.update')->name('programs.variants.update');
                 Route::delete('{program}/variants/{variant}', [ProgramController::class, 'destroyVariant'])->middleware('permission:programs.update')->name('programs.variants.destroy');
+                Route::post('{program}/materials', [AdminProgramMaterialController::class, 'store'])->middleware('permission:programs.update')->name('programs.materials.store');
+                Route::put('{program}/materials/{program_material}', [AdminProgramMaterialController::class, 'update'])->middleware('permission:programs.update')->name('programs.materials.update');
+                Route::put('{program}/materials/{program_material}/status', [AdminProgramMaterialController::class, 'updateStatus'])->middleware('permission:programs.update')->name('programs.materials.status');
                 Route::get('{program}', [ProgramController::class, 'show'])->middleware('permission:programs.view')->name('programs.show');
                 Route::put('{program}', [ProgramController::class, 'update'])->middleware('permission:programs.update')->name('programs.update');
                 Route::delete('{program}', [ProgramController::class, 'destroy'])->middleware('permission:programs.delete')->name('programs.destroy');
@@ -280,7 +287,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::middleware('role:student')->group(function () {
-        Route::get('enrollments', StudentEnrollmentController::class)->name('enrollments');
+        Route::get('enrollments', [StudentEnrollmentController::class, 'index'])->name('enrollments');
+        Route::get('enrollments/{program_enrollment}', [StudentEnrollmentController::class, 'show'])->name('enrollments.show');
         Route::get('recordings', [StudentRecordingController::class, 'index'])->name('student.recordings');
 
         Route::prefix('schedules')->group(function () {

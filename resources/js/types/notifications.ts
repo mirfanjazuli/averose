@@ -1,6 +1,15 @@
+export type NotificationEvent =
+    | 'mentor_assigned'
+    | 'reschedule_approved'
+    | 'reschedule_rejected'
+    | 'reschedule_requested'
+    | 'schedule_assigned'
+    | 'schedule_reassigned'
+    | 'schedule_updated';
+
 export type AppNotification = {
     createdAt: string | null;
-    event: string;
+    event: NotificationEvent;
     id: string;
     isRead: boolean;
     message: string;

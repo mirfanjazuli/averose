@@ -25,11 +25,13 @@ class RescheduleRequestFactory extends Factory
         return [
             'admin_note' => null,
             'current_scheduled_at' => $currentScheduledAt,
+            'current_timezone' => 'Asia/Jakarta',
             'duration' => fake()->randomElement([60, 90, 120]),
             'mentor_id' => User::factory()->mentor(),
             'notes' => fake()->optional()->sentence(),
             'reason' => 'Class schedule overlap',
             'requested_scheduled_at' => $requestedScheduledAt,
+            'requested_timezone' => 'Asia/Jakarta',
             'reviewed_at' => null,
             'reviewed_by' => null,
             'schedule_id' => Schedule::factory(),

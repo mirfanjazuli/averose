@@ -3,7 +3,9 @@ import { Check, X } from 'lucide-react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
+import { formatDate, formatDateTime, formatTimeRange } from '@/lib/date-time';
 import {
     ApproveRescheduleDialog,
     RejectRescheduleDialog,
@@ -27,40 +29,6 @@ type RescheduleRequestDetail = {
     student: string;
 };
 
-function formatDate(value: string) {
-    return new Intl.DateTimeFormat('id-ID', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    }).format(new Date(value));
-}
-
-function formatTimeRange(startAt: string, endAt: string) {
-    const formatter = new Intl.DateTimeFormat('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-
-    return `${formatter.format(new Date(startAt))} - ${formatter.format(new Date(endAt))} WIB`;
-}
-
-function formatTime(value: string) {
-    const formatter = new Intl.DateTimeFormat('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-
-    return `${formatter.format(new Date(value))} WIB`;
-}
-
-function formatDateTime(value: string | null) {
-    if (!value) {
-        return null;
-    }
-
-    return `${formatDate(value)}, ${formatTime(value)}`;
-}
-
 function DetailItem({ label, value }: { label: string; value: string | null }) {
     return (
         <div className="grid min-h-10 gap-2 md:grid-cols-[12rem_1fr] md:items-start">
@@ -75,6 +43,7 @@ export default function RescheduleRequestDetail({
 }: {
     request: RescheduleRequestDetail;
 }) {
+    const timezone = useUserTimezone();
     const [approveDialogOpen, setApproveDialogOpen] = useState(false);
     const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
     const isPending = request.status === 'Pending';
@@ -136,13 +105,14 @@ export default function RescheduleRequestDetail({
                             </h2>
                             <DetailItem
                                 label="Date"
-                                value={formatDate(request.currentStartAt)}
+                                value={formatDate(request.currentStartAt, timezone)}
                             />
                             <DetailItem
                                 label="Time"
                                 value={formatTimeRange(
                                     request.currentStartAt,
                                     request.currentEndAt,
+                                    timezone,
                                 )}
                             />
                         </div>
@@ -152,13 +122,14 @@ export default function RescheduleRequestDetail({
                             </h2>
                             <DetailItem
                                 label="Date"
-                                value={formatDate(request.requestedStartAt)}
+                                value={formatDate(request.requestedStartAt, timezone)}
                             />
                             <DetailItem
                                 label="Time"
                                 value={formatTimeRange(
                                     request.requestedStartAt,
                                     request.requestedEndAt,
+                                    timezone,
                                 )}
                             />
                         </div>
@@ -183,7 +154,7 @@ export default function RescheduleRequestDetail({
                         />
                         <DetailItem
                             label="Reviewed at"
-                            value={formatDateTime(request.reviewedAt)}
+                            value={request.reviewedAt ? formatDateTime(request.reviewedAt, timezone) : null}
                         />
                         <DetailItem
                             label="Reviewed by"

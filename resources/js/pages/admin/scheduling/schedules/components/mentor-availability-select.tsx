@@ -16,6 +16,8 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { Spinner } from '@/components/ui/spinner';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
+import { formatTimeRange } from '@/lib/date-time';
 
 type MentorOption = {
     available: boolean;
@@ -23,7 +25,6 @@ type MentorOption = {
         code: string;
         endAt: string;
         startAt: string;
-        time: string;
     } | null;
     hourlyRate: string | null;
     id: string;
@@ -44,6 +45,7 @@ export function MentorAvailabilitySelect({
     onValueChange,
     value,
 }: MentorAvailabilitySelectProps) {
+    const timezone = useUserTimezone();
     const [open, setOpen] = useState(false);
     const [mentors, setMentors] = useState<MentorOption[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -182,7 +184,11 @@ export function MentorAvailabilitySelect({
                                                 className={`truncate text-xs ${mentor.available ? 'text-muted-foreground' : 'text-destructive'}`}
                                             >
                                                 {mentor.conflict
-                                                    ? `Bentrok · ${mentor.conflict.time}`
+                                                    ? `Bentrok · ${formatTimeRange(
+                                                          mentor.conflict.startAt,
+                                                          mentor.conflict.endAt,
+                                                          timezone,
+                                                      )}`
                                                     : (mentor.level ?? '-')}
                                             </p>
                                         </div>

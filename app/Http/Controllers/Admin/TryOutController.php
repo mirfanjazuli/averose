@@ -577,7 +577,7 @@ class TryOutController extends Controller
                     'email' => $attempt->user?->email ?? '-',
                     'name' => $attempt->user?->name ?? 'Unknown Student',
                 ],
-                'submittedAt' => $attempt->submitted_at?->format('d M Y, H:i'),
+                'submittedAt' => $attempt->submitted_at?->toJSON(),
             ])
             ->all();
     }
@@ -684,7 +684,7 @@ class TryOutController extends Controller
                 'email' => $attempt->user?->email ?? '-',
                 'name' => $attempt->user?->name ?? 'Unknown Student',
             ],
-            'submittedAt' => $attempt->submitted_at?->format('d M Y, H:i'),
+            'submittedAt' => $attempt->submitted_at?->toJSON(),
         ];
     }
 

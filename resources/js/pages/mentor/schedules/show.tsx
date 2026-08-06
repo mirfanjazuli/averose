@@ -3,7 +3,9 @@ import { ExternalLink } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { StatusBadge } from '@/components/admin/status-badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import { formatBadgeLabel } from '@/lib/badge';
+import { formatDate, formatDateTime, formatTimeRange } from '@/lib/date-time';
 
 type ScheduleHistory = {
     action: string;
@@ -52,29 +54,6 @@ type ScheduleDetail = {
     zoomMeetingId: string | null;
 };
 
-const dateFormatter = new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-});
-
-const timeFormatter = new Intl.DateTimeFormat('id-ID', {
-    hour: '2-digit',
-    minute: '2-digit',
-});
-
-function formatDate(value: string) {
-    return dateFormatter.format(new Date(value));
-}
-
-function formatTime(value: string) {
-    return timeFormatter.format(new Date(value));
-}
-
-function formatDateTime(value: string) {
-    return `${formatDate(value)}, ${formatTime(value)} WIB`;
-}
-
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
     return (
         <div className="grid min-h-10 gap-2 md:grid-cols-[11rem_1fr] md:items-center">
@@ -89,6 +68,8 @@ export default function MentorScheduleDetail({
 }: {
     schedule: ScheduleDetail;
 }) {
+    const timezone = useUserTimezone();
+
     return (
         <>
             <Head title={schedule.code} />
@@ -118,11 +99,11 @@ export default function MentorScheduleDetail({
                                 />
                                 <DetailRow
                                     label="Date"
-                                    value={formatDate(schedule.startAt)}
+                                    value={formatDate(schedule.startAt, timezone)}
                                 />
                                 <DetailRow
                                     label="Time"
-                                    value={`${formatTime(schedule.startAt)} - ${formatTime(schedule.endAt)} WIB`}
+                                    value={formatTimeRange(schedule.startAt, schedule.endAt, timezone)}
                                 />
                                 <DetailRow
                                     label="Duration"
@@ -152,6 +133,7 @@ export default function MentorScheduleDetail({
                                                 schedule
                                                     .pendingRescheduleRequest
                                                     .requestedAt,
+                                                timezone,
                                             )}
                                         />
                                         <DetailRow
@@ -223,6 +205,7 @@ export default function MentorScheduleDetail({
                                                 <p className="text-xs text-muted-foreground">
                                                     {formatDateTime(
                                                         history.createdAt,
+                                                        timezone,
                                                     )}
                                                 </p>
                                             </div>

@@ -13,6 +13,12 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { useClientPagination } from '@/hooks/use-client-pagination';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
+import {
+    formatDate,
+    formatDateTime,
+    formatTimezoneName,
+} from '@/lib/date-time';
 
 type MentorJournal = {
     completedAt: string;
@@ -25,30 +31,12 @@ type MentorJournal = {
     subject: string;
 };
 
-const dateFormatter = new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-});
-
-const timeFormatter = new Intl.DateTimeFormat('id-ID', {
-    hour: '2-digit',
-    minute: '2-digit',
-});
-
-function formatDate(value: string) {
-    return dateFormatter.format(new Date(value));
-}
-
-function formatDateTime(value: string) {
-    return `${formatDate(value)}, ${timeFormatter.format(new Date(value))} WIB`;
-}
-
 export default function MentorJournals({
     journals,
 }: {
     journals: MentorJournal[];
 }) {
+    const timezone = useUserTimezone();
     const [searchQuery, setSearchQuery] = useState('');
     const filteredJournals = useMemo(() => {
         const normalizedSearch = searchQuery.trim().toLowerCase();
@@ -59,15 +47,15 @@ export default function MentorJournals({
 
         return journals.filter((journal) =>
             [
-                formatDate(journal.sessionStartAt),
-                formatDateTime(journal.completedAt),
+                formatDate(journal.sessionStartAt, timezone),
+                formatDateTime(journal.completedAt, timezone),
                 journal.student,
                 journal.subject,
                 journal.program,
                 journal.nextImprovementPlan,
             ].some((value) => value.toLowerCase().includes(normalizedSearch)),
         );
-    }, [journals, searchQuery]);
+    }, [journals, searchQuery, timezone]);
     const {
         changeRowsPerPage,
         firstItemIndex,
@@ -117,9 +105,12 @@ export default function MentorJournals({
                             <TableRow>
                                 <TableHead>Date</TableHead>
                                 <TableHead>Student</TableHead>
-                                <TableHead>Program</TableHead>
                                 <TableHead>Subject</TableHead>
-                                <TableHead>Completed at</TableHead>
+                                <TableHead>Program</TableHead>
+                                <TableHead>
+                                    Completed at (
+                                    {formatTimezoneName(new Date(), timezone)})
+                                </TableHead>
                                 <TableHead className="w-12 text-right" />
                             </TableRow>
                         </TableHeader>
@@ -127,7 +118,10 @@ export default function MentorJournals({
                             {visibleJournals.map((journal) => (
                                 <TableRow key={journal.id}>
                                     <TableCell className="whitespace-nowrap">
-                                        {formatDate(journal.sessionStartAt)}
+                                        {formatDate(
+                                            journal.sessionStartAt,
+                                            timezone,
+                                        )}
                                     </TableCell>
                                     <TableCell className="font-medium">
                                         {journal.student}
@@ -135,7 +129,17 @@ export default function MentorJournals({
                                     <TableCell>{journal.subject}</TableCell>
                                     <TableCell>{journal.program}</TableCell>
                                     <TableCell className="whitespace-nowrap">
-                                        {formatDateTime(journal.completedAt)}
+                                        {formatDateTime(
+                                            journal.completedAt,
+                                            timezone,
+                                            {
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                                month: 'short',
+                                                year: 'numeric',
+                                            },
+                                        )}
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <ActionMenu label="Open journal actions">

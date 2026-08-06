@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Settings;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileDeleteRequest;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
+use App\Services\DateTime\UserTimezoneSynchronizer;
+use App\Services\UserAccountAnonymizer;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,11 +19,17 @@ class ProfileController extends Controller
     /**
      * Show the user's profile settings page.
      */
-    public function edit(Request $request): Response
+    public function edit(Request $request, UserTimezoneSynchronizer $timezones): Response
     {
         return Inertia::render('settings/profile', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
+            'timezones' => collect($timezones->timezones())
+                ->map(fn (string $timezone): array => [
+                    'label' => str_replace('_', ' ', $timezone),
+                    'value' => $timezone,
+                ])
+                ->all(),
         ]);
     }
 
@@ -46,13 +54,15 @@ class ProfileController extends Controller
     /**
      * Delete the user's profile.
      */
-    public function destroy(ProfileDeleteRequest $request): RedirectResponse
-    {
+    public function destroy(
+        ProfileDeleteRequest $request,
+        UserAccountAnonymizer $anonymizer,
+    ): RedirectResponse {
         $user = $request->user();
 
         Auth::logout();
 
-        $user->delete();
+        $anonymizer->anonymize($user);
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

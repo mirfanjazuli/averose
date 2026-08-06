@@ -28,6 +28,7 @@ class ScheduleFactory extends Factory
             'program_enrollment_id' => ProgramEnrollment::factory(),
             'subject_id' => Subject::factory(),
             'scheduled_at' => fake()->dateTimeBetween('+1 week', '+2 months'),
+            'timezone' => 'Asia/Jakarta',
             'duration' => fake()->randomElement([60, 90, 120]),
             'delivery_mode' => ScheduleDeliveryMode::Online,
             'zoom_link' => null,

@@ -33,7 +33,7 @@ class MentorLevelController extends Controller
             ->orderBy('name')
             ->get(['users.id', 'users.name', 'users.nickname', 'users.slug', 'users.email', 'users.status', 'users.created_at'])
             ->map(fn ($mentor): array => [
-                'createdAt' => $mentor->created_at?->format('M d, Y'),
+                'createdAt' => $mentor->created_at?->toJSON(),
                 'email' => $mentor->email,
                 'id' => $mentor->id,
                 'name' => $mentor->name,

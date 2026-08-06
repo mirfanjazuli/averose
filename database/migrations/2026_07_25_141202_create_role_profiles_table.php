@@ -20,7 +20,6 @@ return new class extends Migration
             $table->string('school')->nullable();
             $table->string('education_level')->nullable();
             $table->string('grade')->nullable();
-            $table->string('timezone')->default('Asia/Jakarta');
             $table->timestamps();
         });
 

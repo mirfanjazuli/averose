@@ -33,6 +33,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
+import { formatDateTime } from '@/lib/date-time';
 
 type TryOutDetail = {
     correctPoints: number | null;
@@ -125,6 +127,7 @@ export default function AdminTryOutDetail({
 }: {
     tryOut: TryOutDetail;
 }) {
+    const timezone = useUserTimezone();
     const page = usePage<{
         flash?: {
             success?: string;
@@ -557,7 +560,12 @@ export default function AdminTryOutDetail({
                                                 {attempt.questionCount}
                                             </TableCell>
                                             <TableCell>
-                                                {attempt.submittedAt ?? '-'}
+                                                {attempt.submittedAt
+                                                    ? formatDateTime(
+                                                          attempt.submittedAt,
+                                                          timezone,
+                                                      )
+                                                    : '-'}
                                             </TableCell>
                                         </TableRow>
                                     ))}

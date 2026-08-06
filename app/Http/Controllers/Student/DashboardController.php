@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\ProgramEnrollment;
 use App\Models\Recording;
 use App\Models\Schedule;
+use App\Services\DateTime\UserDateTimeService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +17,8 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
+    public function __construct(private readonly UserDateTimeService $dateTimes) {}
+
     public function __invoke(Request $request): Response
     {
         return Inertia::render('student/dashboard/index', [
@@ -28,10 +32,14 @@ class DashboardController extends Controller
 
     private function sessions(Request $request, int $limit): array
     {
+        $timezone = $this->dateTimes->timezoneFor($request->user());
+        $today = CarbonImmutable::now($timezone)->toDateString();
+        $range = $this->dateTimes->utcDateRange($today, $today, $timezone);
+
         return Schedule::query()
             ->with(['mentor:id,name', 'subject:id,name,icon', 'zoomAccount:id,name', 'enrollment.program:id,name'])
             ->where('user_id', $request->user()->id)
-            ->where('scheduled_at', '>=', now()->startOfDay())
+            ->where('scheduled_at', '>=', $range->startInclusive)
             ->orderBy('scheduled_at')
             ->limit($limit)
             ->get()
@@ -168,7 +176,6 @@ class DashboardController extends Controller
             'startAt' => $startAt->toJSON(),
             'status' => Str::headline($booking->status),
             'subjectIcon' => $booking->subject?->icon,
-            'time' => "{$startAt->format('D, M j, H:i')} - {$endAt->format('H:i')}",
             'title' => $booking->subject?->name ?? 'Session',
             'zoomAccount' => $booking->zoomAccount?->name,
             'zoomLink' => $booking->zoom_link,

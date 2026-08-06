@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\RescheduleRequest;
+use App\NotificationEvent;
 use App\Notifications\ScheduleNotification;
+use App\Services\DateTime\UserDateTimeService;
+use App\Services\Scheduling\BusinessCalendarService;
 use App\Services\Scheduling\MentorAvailabilityService;
 use App\Services\Zoom\ZoomMeetingService;
 use Carbon\CarbonInterface;
@@ -19,6 +22,8 @@ use Inertia\Response;
 class RescheduleRequestController extends Controller
 {
     public function __construct(
+        private readonly BusinessCalendarService $businessCalendar,
+        private readonly UserDateTimeService $dateTimes,
         private readonly MentorAvailabilityService $mentorAvailability,
         private readonly ZoomMeetingService $zoomMeetings,
     ) {}
@@ -93,22 +98,29 @@ class RescheduleRequestController extends Controller
                 ? $this->mentorAvailability->lockActiveMentor($booking->mentor_id)
                 : null;
 
-            if (! $mentor || $this->mentorAvailability->findConflict(
-                $mentor->id,
-                $rescheduleRequest->requested_scheduled_at,
-                $rescheduleRequest->duration,
-                $booking->id,
-            )) {
+            if (! $mentor
+                || $this->businessCalendar->unavailabilityReason(
+                    $rescheduleRequest->requested_scheduled_at,
+                    $rescheduleRequest->duration,
+                )
+                || $this->mentorAvailability->findConflict(
+                    $mentor->id,
+                    $rescheduleRequest->requested_scheduled_at,
+                    $rescheduleRequest->duration,
+                    $booking->id,
+                )) {
                 throw ValidationException::withMessages([
                     'requested_scheduled_at' => 'The requested slot is no longer available.',
                 ]);
             }
 
             $previousScheduledAt = $booking->scheduled_at->copy();
+            $previousTimezone = $booking->timezone;
             $previousDuration = $booking->duration;
             $previousStatus = $booking->status;
 
             $booking->scheduled_at = $rescheduleRequest->requested_scheduled_at;
+            $booking->timezone = $rescheduleRequest->requested_timezone;
             $booking->duration = $rescheduleRequest->duration;
             $booking->status = 'rescheduled';
 
@@ -125,8 +137,8 @@ class RescheduleRequestController extends Controller
             $booking->recordHistory('rescheduled', sprintf(
                 'Waktu schedule diubah oleh %s dari %s menjadi %s.',
                 $request->user()->name,
-                $this->formatHistoryScheduleTime($previousScheduledAt),
-                $this->formatHistoryScheduleTime($booking->scheduled_at),
+                $this->formatHistoryScheduleTime($previousScheduledAt, $this->dateTimes->timezoneFor($request->user())),
+                $this->formatHistoryScheduleTime($booking->scheduled_at, $this->dateTimes->timezoneFor($request->user())),
             ), $request->user(), [
                 'duration' => [
                     'from' => $previousDuration,
@@ -140,6 +152,10 @@ class RescheduleRequestController extends Controller
                     'from' => $previousStatus,
                     'to' => $booking->status,
                 ],
+                'timezone' => [
+                    'from' => $previousTimezone,
+                    'to' => $booking->timezone,
+                ],
             ], $request->ip());
 
             $rescheduleRequest->update([
@@ -151,20 +167,19 @@ class RescheduleRequestController extends Controller
             $mentor = $booking->mentor;
             $student = $booking->user;
             $scheduleCode = $booking->code ?? "Schedule #{$booking->id}";
-            $scheduleTime = $this->formatHistoryScheduleTime($booking->scheduled_at);
 
-            DB::afterCommit(function () use ($mentor, $student, $scheduleCode, $scheduleTime, $booking): void {
+            DB::afterCommit(function () use ($mentor, $student, $scheduleCode, $booking): void {
                 $mentor?->notify(new ScheduleNotification(
-                    event: 'reschedule_approved',
+                    event: NotificationEvent::RescheduleApproved,
                     title: 'Reschedule approved',
-                    message: "{$scheduleCode} has been moved to {$scheduleTime}.",
+                    message: "{$scheduleCode} has been rescheduled.",
                     scheduleCode: $scheduleCode,
                     url: "/schedules/{$booking->id}",
                 ));
                 $student?->notify(new ScheduleNotification(
-                    event: 'reschedule_approved',
+                    event: NotificationEvent::RescheduleApproved,
                     title: 'Perubahan jadwal disetujui',
-                    message: "{$scheduleCode} dipindahkan ke {$scheduleTime}.",
+                    message: "{$scheduleCode} telah dijadwalkan ulang.",
                     scheduleCode: $scheduleCode,
                     url: '/schedules',
                 ));
@@ -215,14 +230,14 @@ class RescheduleRequestController extends Controller
 
             DB::afterCommit(function () use ($mentor, $student, $scheduleCode, $rejectionReason, $schedule): void {
                 $mentor?->notify(new ScheduleNotification(
-                    event: 'reschedule_rejected',
+                    event: NotificationEvent::RescheduleRejected,
                     title: 'Reschedule rejected',
                     message: "The reschedule request for {$scheduleCode} was rejected. The original schedule remains unchanged.",
                     scheduleCode: $scheduleCode,
                     url: "/schedules/{$schedule->id}",
                 ));
                 $student?->notify(new ScheduleNotification(
-                    event: 'reschedule_rejected',
+                    event: NotificationEvent::RescheduleRejected,
                     title: 'Perubahan jadwal ditolak',
                     message: "Permintaan perubahan {$scheduleCode} ditolak. Alasan: {$rejectionReason}",
                     scheduleCode: $scheduleCode,
@@ -241,7 +256,6 @@ class RescheduleRequestController extends Controller
 
         return [
             'adminNote' => $request->admin_note,
-            'current' => "{$request->current_scheduled_at->format('D, M j, H:i')} - {$currentEndAt->format('H:i')}",
             'currentEndAt' => $currentEndAt->toJSON(),
             'currentStartAt' => $request->current_scheduled_at->toJSON(),
             'id' => (string) $request->id,
@@ -249,7 +263,6 @@ class RescheduleRequestController extends Controller
             'notes' => $request->notes,
             'program' => $request->schedule?->enrollment?->program?->name ?? '-',
             'reason' => $request->reason,
-            'requested' => "{$request->requested_scheduled_at->format('D, M j, H:i')} - {$requestedEndAt->format('H:i')}",
             'requestedEndAt' => $requestedEndAt->toJSON(),
             'requestedStartAt' => $request->requested_scheduled_at->toJSON(),
             'reviewedAt' => $request->reviewed_at?->toJSON(),
@@ -261,8 +274,10 @@ class RescheduleRequestController extends Controller
         ];
     }
 
-    private function formatHistoryScheduleTime(CarbonInterface $date): string
+    private function formatHistoryScheduleTime(CarbonInterface $date, string $timezone): string
     {
-        return $date->copy()->locale('id')->translatedFormat('d M Y, H:i').' WIB';
+        $localDate = $this->dateTimes->toLocal($date, $timezone)->locale('id');
+
+        return $localDate->translatedFormat('d M Y, H:i').' '.$localDate->format('T');
     }
 }

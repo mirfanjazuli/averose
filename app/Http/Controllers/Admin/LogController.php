@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
-use Carbon\CarbonInterface;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -20,7 +19,7 @@ class LogController extends Controller
         return Inertia::render('admin/logs/index', [
             'logs' => $logs->map(fn (ActivityLog $log): array => [
                 'action' => $log->action,
-                'createdAt' => $log->created_at ? $this->formatTimestamp($log->created_at) : null,
+                'createdAt' => $log->created_at?->toJSON(),
                 'description' => $log->description,
                 'id' => $log->id,
                 'ipAddress' => $log->ip_address,
@@ -42,10 +41,5 @@ class LogController extends Controller
                 'updated' => $logs->where('action', 'Update')->count(),
             ],
         ]);
-    }
-
-    private function formatTimestamp(CarbonInterface $timestamp): string
-    {
-        return $timestamp->format('d M Y, H:i:s');
     }
 }

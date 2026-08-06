@@ -18,7 +18,9 @@ return new class extends Migration
             $table->foreignId('mentor_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('reviewed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->dateTime('current_scheduled_at');
+            $table->string('current_timezone', 64)->default('Asia/Jakarta');
             $table->dateTime('requested_scheduled_at');
+            $table->string('requested_timezone', 64)->default('Asia/Jakarta');
             $table->unsignedSmallInteger('duration');
             $table->string('reason');
             $table->text('notes')->nullable();

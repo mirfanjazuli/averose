@@ -136,6 +136,7 @@ export function StudentNavbar() {
                     <NotificationMenu
                         initialFeed={notificationFeed}
                         locale="id"
+                        userId={auth.user.id}
                         buttonClassName="size-10 text-[#102a3a] transition-colors hover:bg-[#edf7f4] hover:text-[#0f8f7a]"
                     />
 

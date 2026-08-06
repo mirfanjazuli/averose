@@ -77,7 +77,7 @@ export default function Login({
 
     return (
         <>
-            <Head title={isLogin ? 'Log in' : 'Register'} />
+            <Head title={isLogin ? 'Masuk' : 'Daftar'} />
 
             <div className="space-y-6 transition-all duration-300 ease-out">
                 <div
@@ -85,12 +85,12 @@ export default function Login({
                     className="animate-in space-y-2 text-center duration-300 fade-in-0 slide-in-from-bottom-1"
                 >
                     <h1 className="font-heading text-3xl font-medium">
-                        {isLogin ? 'Welcome Back' : 'Create Account'}
+                        {isLogin ? 'Selamat Datang Kembali' : 'Buat Akun'}
                     </h1>
                     <p className="text-sm text-muted-foreground">
                         {isLogin
-                            ? 'Welcome Back, Please enter Your details'
-                            : 'Enter your details to get started'}
+                            ? 'Masukkan detail akunmu untuk melanjutkan.'
+                            : 'Lengkapi data berikut untuk memulai.'}
                     </p>
                 </div>
 
@@ -112,7 +112,7 @@ export default function Login({
                         )}
                         onClick={() => setAuthMode('login')}
                     >
-                        Sign In
+                        Masuk
                     </Button>
                     <Button
                         type="button"
@@ -125,7 +125,7 @@ export default function Login({
                         )}
                         onClick={() => setAuthMode('signup')}
                     >
-                        Signup
+                        Daftar
                     </Button>
                 </div>
 
@@ -156,8 +156,8 @@ export default function Login({
 }
 
 Login.layout = {
-    title: 'Log in to your account',
-    description: 'Enter your email and password below to log in',
+    title: 'Masuk ke akunmu',
+    description: 'Masukkan email dan kata sandi untuk melanjutkan',
     variant: 'login',
 };
 
@@ -176,7 +176,7 @@ function LoginForm({ canResetPassword }: { canResetPassword: boolean }) {
                     <div className="space-y-3">
                         <div className="space-y-2">
                             <Label htmlFor="email" className="sr-only">
-                                Email address
+                                Alamat email
                             </Label>
                             <div className="relative">
                                 <Mail className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -188,7 +188,7 @@ function LoginForm({ canResetPassword }: { canResetPassword: boolean }) {
                                     autoFocus
                                     tabIndex={1}
                                     autoComplete="email"
-                                    placeholder="Email Address"
+                                    placeholder="Alamat email"
                                     className="pr-12 pl-11"
                                     aria-invalid={!!errors.email}
                                     onChange={(event) =>
@@ -205,7 +205,7 @@ function LoginForm({ canResetPassword }: { canResetPassword: boolean }) {
 
                         <div className="space-y-2">
                             <Label htmlFor="password" className="sr-only">
-                                Password
+                                Kata sandi
                             </Label>
                             <div className="relative">
                                 <LockKeyhole className="pointer-events-none absolute top-1/2 left-4 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -215,7 +215,7 @@ function LoginForm({ canResetPassword }: { canResetPassword: boolean }) {
                                     required
                                     tabIndex={2}
                                     autoComplete="current-password"
-                                    placeholder="Password"
+                                    placeholder="Kata sandi"
                                     className="pl-11"
                                     aria-invalid={!!errors.password}
                                 />
@@ -234,7 +234,7 @@ function LoginForm({ canResetPassword }: { canResetPassword: boolean }) {
                                     htmlFor="remember"
                                     className="text-sm text-muted-foreground"
                                 >
-                                    Remember me
+                                    Ingat saya
                                 </Label>
                             </div>
 
@@ -244,20 +244,20 @@ function LoginForm({ canResetPassword }: { canResetPassword: boolean }) {
                                     className="text-sm text-muted-foreground"
                                     tabIndex={5}
                                 >
-                                    Forgot?
+                                    Lupa kata sandi?
                                 </TextLink>
                             )}
                         </div>
 
                         <Button
                             type="submit"
-                            className="w-full"
+                            className="w-full bg-[#d9a441] text-[#102a3a] hover:bg-[#c89532]"
                             tabIndex={4}
                             disabled={processing}
                             data-test="login-button"
                         >
                             {processing && <Spinner />}
-                            Continue
+                            Masuk
                         </Button>
                     </div>
                 </>
@@ -282,7 +282,7 @@ function SignupForm({ passwordRules }: { passwordRules?: string }) {
                     <div className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="name" className="sr-only">
-                                Name
+                                Nama lengkap
                             </Label>
                             <div className="relative">
                                 <UserRound className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -294,7 +294,7 @@ function SignupForm({ passwordRules }: { passwordRules?: string }) {
                                     tabIndex={1}
                                     autoComplete="name"
                                     name="name"
-                                    placeholder="Full Name"
+                                    placeholder="Nama lengkap"
                                     className="h-12 rounded-xl pl-11"
                                     aria-invalid={!!errors.name}
                                 />
@@ -304,7 +304,7 @@ function SignupForm({ passwordRules }: { passwordRules?: string }) {
 
                         <div className="space-y-2">
                             <Label htmlFor="signup-email" className="sr-only">
-                                Email address
+                                Alamat email
                             </Label>
                             <div className="relative">
                                 <Mail className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -315,7 +315,7 @@ function SignupForm({ passwordRules }: { passwordRules?: string }) {
                                     tabIndex={2}
                                     autoComplete="email"
                                     name="email"
-                                    placeholder="Email Address"
+                                    placeholder="Alamat email"
                                     className="h-12 rounded-xl pr-12 pl-11"
                                     aria-invalid={!!errors.email}
                                     onChange={(event) =>
@@ -335,7 +335,7 @@ function SignupForm({ passwordRules }: { passwordRules?: string }) {
                                 htmlFor="signup-password"
                                 className="sr-only"
                             >
-                                Password
+                                Kata sandi
                             </Label>
                             <div className="relative">
                                 <LockKeyhole className="pointer-events-none absolute top-1/2 left-4 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -345,7 +345,7 @@ function SignupForm({ passwordRules }: { passwordRules?: string }) {
                                     tabIndex={3}
                                     autoComplete="new-password"
                                     name="password"
-                                    placeholder="Password"
+                                    placeholder="Kata sandi"
                                     passwordrules={passwordRules}
                                     className="h-12 rounded-xl pl-11"
                                     aria-invalid={!!errors.password}
@@ -359,7 +359,7 @@ function SignupForm({ passwordRules }: { passwordRules?: string }) {
                                 htmlFor="password_confirmation"
                                 className="sr-only"
                             >
-                                Confirm password
+                                Konfirmasi kata sandi
                             </Label>
                             <div className="relative">
                                 <LockKeyhole className="pointer-events-none absolute top-1/2 left-4 z-10 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -369,7 +369,7 @@ function SignupForm({ passwordRules }: { passwordRules?: string }) {
                                     tabIndex={4}
                                     autoComplete="new-password"
                                     name="password_confirmation"
-                                    placeholder="Confirm Password"
+                                    placeholder="Konfirmasi kata sandi"
                                     passwordrules={passwordRules}
                                     className="h-12 rounded-xl pl-11"
                                     aria-invalid={
@@ -384,13 +384,13 @@ function SignupForm({ passwordRules }: { passwordRules?: string }) {
 
                         <Button
                             type="submit"
-                            className="w-full"
+                            className="w-full bg-[#d9a441] text-[#102a3a] hover:bg-[#c89532]"
                             tabIndex={5}
                             data-test="register-user-button"
                             disabled={processing}
                         >
                             {processing && <Spinner />}
-                            Create account
+                            Buat akun
                         </Button>
                     </div>
                 </>

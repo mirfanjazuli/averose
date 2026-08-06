@@ -24,6 +24,8 @@ return new class extends Migration
             $table->timestamp('two_factor_confirmed_at')->nullable();
             $table->string('role')->default('student');
             $table->string('status')->default('active');
+            $table->string('timezone', 64)->default('Asia/Jakarta');
+            $table->string('timezone_mode', 16)->default('auto');
             $table->rememberToken();
             $table->timestamps();
         });

@@ -1,5 +1,12 @@
 import { Form, Head, Link } from '@inertiajs/react';
-import { Eye, Pencil, PowerOff, UserCheck, UsersRound } from 'lucide-react';
+import {
+    Eye,
+    GraduationCap,
+    Pencil,
+    PowerOff,
+    UserCheck,
+    UsersRound,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ActionMenu } from '@/components/admin/action-menu';
@@ -18,6 +25,13 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
     DropdownMenuItem,
     DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
@@ -30,9 +44,13 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { useClientPagination } from '@/hooks/use-client-pagination';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
+import { formatDate } from '@/lib/date-time';
 import { CreateDialogStudent } from '@/pages/admin/users/students/components/create-dialog-student';
 import type { StudentFormUser } from '@/pages/admin/users/students/components/form-student';
+import { ProgramEnrollmentForm } from '@/pages/admin/users/students/components/program-enrollment-form';
+import type { ProgramEnrollmentOption } from '@/pages/admin/users/students/components/program-enrollment-form';
 import { UpdateDialogStudent } from '@/pages/admin/users/students/components/update-dialog-student';
 
 type User = StudentFormUser & {
@@ -44,12 +62,16 @@ type User = StudentFormUser & {
 };
 
 export default function Students({
+    programOptions,
     users,
 }: {
+    programOptions: ProgramEnrollmentOption[];
     users: User[];
 }) {
+    const timezone = useUserTimezone();
     const [addDialogOpen, setAddDialogOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [enrollingUser, setEnrollingUser] = useState<User | null>(null);
     const [deletingUser, setDeletingUser] = useState<User | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
@@ -122,6 +144,29 @@ export default function Students({
                         toast.error('Please check the student form.')
                     }
                 />
+
+                <Dialog
+                    open={!!enrollingUser}
+                    onOpenChange={(open) => !open && setEnrollingUser(null)}
+                >
+                    <DialogContent className="sm:max-w-xl">
+                        <DialogHeader>
+                            <DialogTitle>Enroll student</DialogTitle>
+                            <DialogDescription>
+                                Assign a program enrollment to{' '}
+                                {enrollingUser?.name}.
+                            </DialogDescription>
+                        </DialogHeader>
+                        {enrollingUser && (
+                            <ProgramEnrollmentForm
+                                key={enrollingUser.id}
+                                studentSlug={enrollingUser.slug}
+                                programOptions={programOptions}
+                                onSuccess={() => setEnrollingUser(null)}
+                            />
+                        )}
+                    </DialogContent>
+                </Dialog>
 
                 <AlertDialog
                     open={!!deletingUser}
@@ -245,7 +290,11 @@ export default function Students({
                                     </TableCell>
                                     <TableCell>{user.nickname}</TableCell>
                                     <TableCell>{user.email}</TableCell>
-                                    <TableCell>{user.createdAt}</TableCell>
+                                    <TableCell>
+                                        {user.createdAt
+                                            ? formatDate(user.createdAt, timezone)
+                                            : '-'}
+                                    </TableCell>
                                     <TableCell>
                                         <Badge
                                             {...getBadgeProps(
@@ -259,6 +308,14 @@ export default function Students({
                                     </TableCell>
                                     <TableCell className="text-right">
                                         <ActionMenu label="Open student actions">
+                                            <DropdownMenuItem
+                                                onClick={() =>
+                                                    setEnrollingUser(user)
+                                                }
+                                            >
+                                                <GraduationCap className="size-4" />
+                                                Enroll
+                                            </DropdownMenuItem>
                                             <DropdownMenuItem asChild>
                                                 <Link
                                                     href={`/users/students/${user.slug}`}

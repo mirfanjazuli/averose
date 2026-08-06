@@ -25,7 +25,13 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useClientPagination } from '@/hooks/use-client-pagination';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import { formatBadgeLabel } from '@/lib/badge';
+import {
+    formatDate,
+    formatTimeRange,
+    formatTimezoneName,
+} from '@/lib/date-time';
 
 type MentorSession = {
     code: string;
@@ -37,13 +43,13 @@ type MentorSession = {
     rescheduleRequest: {
         id: string;
         reason: string;
-        requested: string;
+        requestedEndAt: string;
+        requestedStartAt: string;
         status: string;
     } | null;
     startAt: string;
     status: string;
     student: string;
-    time: string;
     title: string;
     zoomAccount: string | null;
     zoomAccountSlug: string | null;
@@ -54,23 +60,6 @@ type MentorSession = {
 };
 
 const completableStatuses = new Set(['assigned', 'rescheduled']);
-
-function formatScheduleDate(value: string) {
-    return new Intl.DateTimeFormat('id-ID', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    }).format(new Date(value));
-}
-
-function formatScheduleTime(startAt: string, endAt: string) {
-    const formatter = new Intl.DateTimeFormat('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-
-    return `${formatter.format(new Date(startAt))} - ${formatter.format(new Date(endAt))} WIB`;
-}
 
 function useCurrentServerTime(serverNow: string) {
     const [currentTime, setCurrentTime] = useState(() =>
@@ -100,6 +89,7 @@ export default function MentorSchedules({
     serverNow: string;
     sessions: MentorSession[];
 }) {
+    const timezone = useUserTimezone();
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [completionDialogOpen, setCompletionDialogOpen] = useState(false);
@@ -122,7 +112,10 @@ export default function MentorSchedules({
                     session.student,
                     session.program,
                     session.status,
-                    session.time,
+                    formatDate(session.startAt, timezone),
+                    formatTimeRange(session.startAt, session.endAt, timezone, {
+                        includeTimezone: false,
+                    }),
                     session.zoomAccount ?? '',
                 ].some((value) =>
                     value.toLowerCase().includes(normalizedSearch),
@@ -130,7 +123,7 @@ export default function MentorSchedules({
 
             return matchesStatus && matchesSearch;
         });
-    }, [searchQuery, sessions, statusFilter]);
+    }, [searchQuery, sessions, statusFilter, timezone]);
     const {
         changeRowsPerPage,
         firstItemIndex,
@@ -232,7 +225,10 @@ export default function MentorSchedules({
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Date</TableHead>
-                                <TableHead>Time</TableHead>
+                                <TableHead>
+                                    Time (
+                                    {formatTimezoneName(new Date(), timezone)})
+                                </TableHead>
                                 <TableHead>Student</TableHead>
                                 <TableHead>Subject</TableHead>
                                 <TableHead>Program</TableHead>
@@ -267,14 +263,17 @@ export default function MentorSchedules({
                                 return (
                                     <TableRow key={session.id}>
                                         <TableCell className="whitespace-nowrap">
-                                            {formatScheduleDate(
+                                            {formatDate(
                                                 session.startAt,
+                                                timezone,
                                             )}
                                         </TableCell>
                                         <TableCell className="whitespace-nowrap">
-                                            {formatScheduleTime(
+                                            {formatTimeRange(
                                                 session.startAt,
                                                 session.endAt,
+                                                timezone,
+                                                { includeTimezone: false },
                                             )}
                                         </TableCell>
                                         <TableCell className="font-medium">
@@ -314,11 +313,15 @@ export default function MentorSchedules({
                                                                 schedule
                                                             </p>
                                                             <p>
-                                                                {
+                                                                {formatTimeRange(
                                                                     session
                                                                         .rescheduleRequest
-                                                                        .requested
-                                                                }
+                                                                        .requestedStartAt,
+                                                                    session
+                                                                        .rescheduleRequest
+                                                                        .requestedEndAt,
+                                                                    timezone,
+                                                                )}
                                                             </p>
                                                             <p className="mt-2 font-medium">
                                                                 Reason

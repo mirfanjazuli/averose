@@ -10,6 +10,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
+import { formatDateTime } from '@/lib/date-time';
 import { StudentTryOutLayout } from '@/pages/student/try-outs/components/student-try-out-layout';
 
 type Attempt = {
@@ -31,6 +33,7 @@ export default function StudentTryOutResults({
 }: {
     attempts: Attempt[];
 }) {
+    const timezone = useUserTimezone();
     const bestScore =
         attempts.length > 0
             ? Math.max(...attempts.map((attempt) => attempt.percentageScore))
@@ -100,7 +103,12 @@ export default function StudentTryOutResults({
                                     {latestAttempt.tryOut.title}
                                 </p>
                                 <p className="mt-1 text-xs text-[#526b7b]">
-                                    {latestAttempt.submittedAt ?? '-'}
+                                    {latestAttempt.submittedAt
+                                        ? formatDateTime(
+                                              latestAttempt.submittedAt,
+                                              timezone,
+                                          )
+                                        : '-'}
                                 </p>
                             </div>
                         ) : null}
@@ -129,7 +137,12 @@ export default function StudentTryOutResults({
                                                 {attempt.tryOut.title}
                                             </TableCell>
                                             <TableCell className="text-[#526b7b]">
-                                                {attempt.submittedAt ?? '-'}
+                                                {attempt.submittedAt
+                                                    ? formatDateTime(
+                                                          attempt.submittedAt,
+                                                          timezone,
+                                                      )
+                                                    : '-'}
                                             </TableCell>
                                             <TableCell>
                                                 <Badge className="bg-[#edf7f4] text-[#0f8f7a]">

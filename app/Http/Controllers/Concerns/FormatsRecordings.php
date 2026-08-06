@@ -14,7 +14,6 @@ trait FormatsRecordings
             'mentor' => $recording->schedule?->mentor?->name ?? '-',
             'program' => $recording->schedule?->enrollment?->program?->name ?? '-',
             'recordedAt' => $recording->recorded_at?->toJSON(),
-            'recordedDate' => $recording->recorded_at?->format('M d, Y') ?? '-',
             'source' => Str::headline((string) data_get($recording->metadata, 'source', 'n8n')),
             'status' => Str::headline($recording->status),
             'student' => $recording->user?->name ?? '-',

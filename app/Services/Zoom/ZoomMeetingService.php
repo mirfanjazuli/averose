@@ -30,9 +30,9 @@ class ZoomMeetingService
                 ],
                 'start_time' => $booking->scheduled_at
                     ->copy()
-                    ->timezone(config('app.timezone'))
-                    ->format('Y-m-d\TH:i:s'),
-                'timezone' => config('app.timezone'),
+                    ->utc()
+                    ->format('Y-m-d\TH:i:s\Z'),
+                'timezone' => 'UTC',
                 'topic' => $this->topic($booking),
                 'type' => 2,
             ])

@@ -169,7 +169,7 @@
                         </div>
                         <div class="meta-row">
                             <span class="meta-label">Dibuat</span>
-                            <span>{{ $generatedAt->format('d M Y H:i') }}</span>
+                            <span>{{ $generatedAt->format('d M Y H:i T') }} ({{ $timezone }})</span>
                         </div>
                     </td>
                 </tr>

@@ -1,6 +1,8 @@
 import { Head, Link } from '@inertiajs/react';
 import { X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
+import { formatDateTime } from '@/lib/date-time';
 import { clearTypesetMath, hasMathSource, typesetMath } from '@/lib/mathjax';
 import { normalizeTryOutContentHtml } from '@/lib/try-out-content';
 import { cn } from '@/lib/utils';
@@ -111,6 +113,7 @@ export default function StudentTryOutResultDetail({
     attempt: Attempt;
     tryOut: TryOut;
 }) {
+    const timezone = useUserTimezone();
     const answerReviewRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         const element = answerReviewRef.current;
@@ -151,7 +154,9 @@ export default function StudentTryOutResultDetail({
                             <span className="font-semibold text-foreground">
                                 Tanggal Ujian:
                             </span>{' '}
-                            {attempt.submittedAt ?? '-'}
+                            {attempt.submittedAt
+                                ? formatDateTime(attempt.submittedAt, timezone)
+                                : '-'}
                         </p>
 
                         <div className="mt-12 grid grid-cols-2 gap-8 text-center">

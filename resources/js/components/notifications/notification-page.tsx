@@ -2,17 +2,14 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { Bell, CheckCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 import { EmptyState } from '@/components/admin/empty-state';
 import { Button } from '@/components/ui/button';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
+import { formatDateTime } from '@/lib/date-time';
 import { cn } from '@/lib/utils';
 import type {
     AppNotification,
     NotificationFeed,
     PaginatedNotifications,
 } from '@/types';
-
-const notificationTimeFormatter = new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-});
 
 const copy = {
     en: {
@@ -41,12 +38,6 @@ const copy = {
     },
 };
 
-function formatNotificationTime(value: string | null) {
-    return value
-        ? `${notificationTimeFormatter.format(new Date(value))} WIB`
-        : '';
-}
-
 export function NotificationPage({
     className,
     filter,
@@ -58,6 +49,7 @@ export function NotificationPage({
     locale?: keyof typeof copy;
     notifications: PaginatedNotifications;
 }) {
+    const timezone = useUserTimezone();
     const { notificationFeed } = usePage<{
         notificationFeed: NotificationFeed;
     }>().props;
@@ -162,9 +154,12 @@ export function NotificationPage({
                                         {notification.message}
                                     </span>
                                     <span className="mt-1.5 block text-xs text-muted-foreground">
-                                        {formatNotificationTime(
-                                            notification.createdAt,
-                                        )}
+                                        {notification.createdAt
+                                            ? formatDateTime(
+                                                  notification.createdAt,
+                                                  timezone,
+                                              )
+                                            : ''}
                                     </span>
                                 </span>
                             </button>

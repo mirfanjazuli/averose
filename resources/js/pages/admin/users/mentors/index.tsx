@@ -29,7 +29,9 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
+import { formatDate } from '@/lib/date-time';
 import { CreateDialogMentor } from '@/pages/admin/users/mentors/components/create-dialog-mentor';
 import type {
     MentorFormUser,
@@ -55,6 +57,7 @@ export default function Mentors({
     subjectOptions: SubjectOption[];
     users: User[];
 }) {
+    const timezone = useUserTimezone();
     const [addDialogOpen, setAddDialogOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [deletingUser, setDeletingUser] = useState<User | null>(null);
@@ -244,7 +247,11 @@ export default function Mentors({
                                         )}
                                     </TableCell>
                                     <TableCell>{user.email}</TableCell>
-                                    <TableCell>{user.createdAt}</TableCell>
+                                    <TableCell>
+                                        {user.createdAt
+                                            ? formatDate(user.createdAt, timezone)
+                                            : '-'}
+                                    </TableCell>
                                     <TableCell>
                                         <Badge
                                             {...getBadgeProps(

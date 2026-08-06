@@ -6,9 +6,11 @@ use App\Models\AcademicField;
 use App\Models\Program;
 use App\Models\ProgramEnrollment;
 use App\Models\ProgramVariant;
+use App\Models\PublicHoliday;
 use App\Models\Schedule;
 use App\Models\Subject;
 use App\Models\User;
+use App\Models\WorkingHour;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -28,6 +30,7 @@ class ScheduleTest extends TestCase
                 'subject_id' => $subject->id,
                 'date' => '2026-06-06',
                 'time' => '20:00',
+                'timezone' => 'Asia/Jakarta',
             ])
             ->assertRedirect();
 
@@ -37,8 +40,34 @@ class ScheduleTest extends TestCase
             'subject_id' => $subject->id,
             'duration' => 90,
             'status' => 'pending',
+            'timezone' => 'Asia/Jakarta',
         ]);
         $this->assertSame(3, $enrollment->refresh()->sessions_used);
+
+        CarbonImmutable::setTestNow();
+    }
+
+    public function test_booking_uses_the_explicit_iana_timezone_and_stores_utc(): void
+    {
+        CarbonImmutable::setTestNow('2026-06-06 00:00:00');
+        [$student, $enrollment, $subject] = $this->scheduleFixture();
+
+        $this->actingAs($student)
+            ->post(route('schedules.store'), [
+                'date' => '2026-06-07',
+                'program_enrollment_id' => $enrollment->id,
+                'subject_id' => $subject->id,
+                'time' => '10:00',
+                'timezone' => 'Asia/Makassar',
+            ])
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertDatabaseHas('schedules', [
+            'scheduled_at' => '2026-06-07 02:00:00',
+            'timezone' => 'Asia/Makassar',
+            'user_id' => $student->id,
+        ]);
 
         CarbonImmutable::setTestNow();
     }
@@ -54,6 +83,7 @@ class ScheduleTest extends TestCase
                 'subject_id' => $subject->id,
                 'date' => '2026-06-06',
                 'time' => '19:59',
+                'timezone' => 'Asia/Jakarta',
             ])
             ->assertRedirect();
 
@@ -83,6 +113,7 @@ class ScheduleTest extends TestCase
                     '2026-06-09',
                 ],
                 'time' => '20:00',
+                'timezone' => 'Asia/Jakarta',
             ])
             ->assertRedirect();
 
@@ -90,7 +121,7 @@ class ScheduleTest extends TestCase
             'user_id' => $student->id,
             'program_enrollment_id' => $enrollment->id,
             'subject_id' => $subject->id,
-            'scheduled_at' => '2026-06-07 20:00:00',
+            'scheduled_at' => '2026-06-07 13:00:00',
             'duration' => 90,
             'status' => 'pending',
         ]);
@@ -98,13 +129,13 @@ class ScheduleTest extends TestCase
             'user_id' => $student->id,
             'program_enrollment_id' => $enrollment->id,
             'subject_id' => $subject->id,
-            'scheduled_at' => '2026-06-08 20:00:00',
+            'scheduled_at' => '2026-06-08 13:00:00',
         ]);
         $this->assertDatabaseHas('schedules', [
             'user_id' => $student->id,
             'program_enrollment_id' => $enrollment->id,
             'subject_id' => $subject->id,
-            'scheduled_at' => '2026-06-09 20:00:00',
+            'scheduled_at' => '2026-06-09 13:00:00',
         ]);
         $this->assertSame(5, $enrollment->refresh()->sessions_used);
 
@@ -132,6 +163,7 @@ class ScheduleTest extends TestCase
                         'time' => '20:00',
                     ],
                 ],
+                'timezone' => 'Asia/Jakarta',
             ])
             ->assertRedirect();
 
@@ -139,7 +171,7 @@ class ScheduleTest extends TestCase
             'user_id' => $student->id,
             'program_enrollment_id' => $enrollment->id,
             'subject_id' => $subject->id,
-            'scheduled_at' => '2026-06-07 18:00:00',
+            'scheduled_at' => '2026-06-07 11:00:00',
             'duration' => 90,
             'status' => 'pending',
         ]);
@@ -147,7 +179,7 @@ class ScheduleTest extends TestCase
             'user_id' => $student->id,
             'program_enrollment_id' => $enrollment->id,
             'subject_id' => $subject->id,
-            'scheduled_at' => '2026-06-08 20:00:00',
+            'scheduled_at' => '2026-06-08 13:00:00',
             'duration' => 90,
             'status' => 'pending',
         ]);
@@ -171,14 +203,15 @@ class ScheduleTest extends TestCase
             ->put(route('schedules.update', $booking), [
                 'date' => '2026-06-08',
                 'time' => '20:30',
+                'timezone' => 'Asia/Jakarta',
             ])
             ->assertRedirect();
 
-        $this->assertSame('2026-06-08 20:30:00', $booking->refresh()->scheduled_at->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-06-08 13:30:00', $booking->refresh()->scheduled_at->format('Y-m-d H:i:s'));
         $this->assertSame(1, $enrollment->refresh()->sessions_used);
         $this->assertDatabaseHas('schedule_histories', [
             'action' => 'updated',
-            'description' => "Waktu schedule diubah oleh {$student->name} dari 07 Jun 2026, 18:00 WIB menjadi 08 Jun 2026, 20:30 WIB.",
+            'description' => "Waktu schedule diubah oleh {$student->name} dari 08 Jun 2026, 01:00 WIB menjadi 08 Jun 2026, 20:30 WIB.",
             'schedule_id' => $booking->id,
             'user_id' => $student->id,
         ]);
@@ -199,6 +232,7 @@ class ScheduleTest extends TestCase
             ->put(route('schedules.update', $booking), [
                 'date' => '2026-06-08',
                 'time' => '20:30',
+                'timezone' => 'Asia/Jakarta',
             ])
             ->assertSessionHasErrors('date');
 
@@ -216,12 +250,102 @@ class ScheduleTest extends TestCase
                 'subject_id' => $subject->id,
                 'date' => '2026-06-07',
                 'time' => '09:30',
+                'timezone' => 'Asia/Jakarta',
             ])
             ->assertSessionHasErrors('subject_id');
 
         $this->assertDatabaseCount('schedules', 0);
         $this->assertSame(2, $enrollment->refresh()->sessions_used);
 
+        CarbonImmutable::setTestNow();
+    }
+
+    public function test_booking_returns_an_indexed_error_for_a_session_outside_working_hours(): void
+    {
+        CarbonImmutable::setTestNow('2026-06-06 00:00:00');
+        [$student, $enrollment, $subject] = $this->scheduleFixture();
+        WorkingHour::factory()->create([
+            'day_of_week' => 1,
+            'end_time' => '20:00',
+            'is_active' => true,
+            'start_time' => '09:00',
+        ]);
+
+        $this->actingAs($student)
+            ->post(route('schedules.store'), [
+                'sessions' => [[
+                    'date' => '2026-06-08',
+                    'program_enrollment_id' => $enrollment->id,
+                    'subject_id' => $subject->id,
+                    'time' => '08:00',
+                ]],
+                'timezone' => 'Asia/Jakarta',
+            ])
+            ->assertSessionHasErrors([
+                'sessions.0.date' => 'Jadwal harus berada dalam jam operasional 09.00–20.00 WIB.',
+            ]);
+
+        $this->assertDatabaseCount('schedules', 0);
+        CarbonImmutable::setTestNow();
+    }
+
+    public function test_booking_returns_an_indexed_error_for_a_public_holiday(): void
+    {
+        CarbonImmutable::setTestNow('2026-06-06 00:00:00');
+        [$student, $enrollment, $subject] = $this->scheduleFixture();
+        PublicHoliday::factory()->create([
+            'date' => '2026-06-08',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($student)
+            ->post(route('schedules.store'), [
+                'sessions' => [[
+                    'date' => '2026-06-08',
+                    'program_enrollment_id' => $enrollment->id,
+                    'subject_id' => $subject->id,
+                    'time' => '10:00',
+                ]],
+                'timezone' => 'Asia/Jakarta',
+            ])
+            ->assertSessionHasErrors([
+                'sessions.0.date' => 'Tanggal yang dipilih merupakan hari libur.',
+            ]);
+
+        $this->assertDatabaseCount('schedules', 0);
+        CarbonImmutable::setTestNow();
+    }
+
+    public function test_booking_returns_indexed_errors_when_multiple_sessions_exceed_the_remaining_quota(): void
+    {
+        CarbonImmutable::setTestNow('2026-06-06 00:00:00');
+        [$student, $enrollment, $subject] = $this->scheduleFixture(sessionCount: 1);
+
+        $this->actingAs($student)
+            ->post(route('schedules.store'), [
+                'sessions' => [
+                    [
+                        'date' => '2026-06-08',
+                        'program_enrollment_id' => $enrollment->id,
+                        'subject_id' => $subject->id,
+                        'time' => '10:00',
+                    ],
+                    [
+                        'date' => '2026-06-09',
+                        'program_enrollment_id' => $enrollment->id,
+                        'subject_id' => $subject->id,
+                        'time' => '10:00',
+                    ],
+                ],
+                'timezone' => 'Asia/Jakarta',
+            ])
+            ->assertSessionHasErrors([
+                'sessions.0.program_enrollment_id' => 'Sisa sesi untuk enrollment ini tidak mencukupi.',
+                'sessions.1.program_enrollment_id' => 'Sisa sesi untuk enrollment ini tidak mencukupi.',
+            ]);
+
+        $this->assertDatabaseCount('schedules', 0);
+        $this->assertSame(0, $enrollment->refresh()->sessions_used);
         CarbonImmutable::setTestNow();
     }
 

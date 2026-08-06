@@ -11,3 +11,7 @@ Artisan::command('inspire', function () {
 Schedule::command('try-outs:cleanup-preview-assets')
     ->hourly()
     ->withoutOverlapping();
+
+Schedule::command('notifications:prune')
+    ->dailyAt('02:00')
+    ->withoutOverlapping();

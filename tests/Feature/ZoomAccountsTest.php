@@ -85,7 +85,7 @@ class ZoomAccountsTest extends TestCase
                 ->component('admin/zoom-accounts/index')
                 ->where('capacity.fullAccounts', 2)
                 ->where('capacity.nearestRelease.name', 'First Full Zoom')
-                ->where('capacity.nearestRelease.releaseAt', 'Jul 10, 2026 10:00')
+                ->where('capacity.nearestRelease.releaseAt', '2026-07-10T10:00:00.000000Z')
             );
     }
 

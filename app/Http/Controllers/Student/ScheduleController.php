@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Student;
 use App\Http\Controllers\Concerns\FormatsScheduleSessions;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreScheduleRequest;
+use App\Http\Requests\UpdateStudentScheduleRequest;
 use App\Models\ProgramEnrollment;
 use App\Models\Schedule;
-use Carbon\CarbonImmutable;
+use App\Services\DateTime\UserDateTimeService;
+use App\Services\Scheduling\BusinessCalendarService;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -36,7 +38,7 @@ class ScheduleController extends Controller
         DB::transaction(function () use ($data, $request): void {
             $this->normalizedSessions($data)
                 ->groupBy('program_enrollment_id')
-                ->each(function ($sessions, int|string $enrollmentId) use ($request): void {
+                ->each(function ($sessions, int|string $enrollmentId) use ($data, $request): void {
                     $enrollment = ProgramEnrollment::query()
                         ->with(['program.subjects:id', 'variant:id,session,duration'])
                         ->whereKey($enrollmentId)
@@ -45,27 +47,31 @@ class ScheduleController extends Controller
                         ->firstOrFail();
 
                     if ($enrollment->sessionsRemaining() < $sessions->count()) {
+                        $messages = isset($data['sessions'])
+                            ? $sessions->keys()->mapWithKeys(fn (int|string $index): array => [
+                                "sessions.{$index}.program_enrollment_id" => 'Sisa sesi untuk enrollment ini tidak mencukupi.',
+                            ])->all()
+                            : ['subject_id' => 'Sisa sesi untuk enrollment ini tidak mencukupi.'];
+
                         throw ValidationException::withMessages([
-                            'subject_id' => 'There are no remaining sessions for this enrollment.',
+                            ...$messages,
                         ]);
                     }
 
-                    $sessions->each(function (array $session) use ($enrollment, $request): void {
+                    $sessions->each(function (array $session, int|string $index) use ($data, $enrollment, $request): void {
                         if (! $enrollment->program?->subjects->contains('id', (int) $session['subject_id'])) {
                             throw ValidationException::withMessages([
-                                'subject_id' => 'The selected subject is not available for this enrollment.',
+                                isset($data['sessions']) ? "sessions.{$index}.subject_id" : 'subject_id' => 'Mata pelajaran tidak tersedia untuk enrollment ini.',
                             ]);
                         }
 
-                        $scheduledAt = CarbonImmutable::parse(
-                            "{$session['date']} {$session['time']}",
-                            config('app.timezone'),
-                        );
+                        $scheduledAt = $request->scheduledAtUtc($session);
 
                         $schedule = Schedule::query()->create([
                             'duration' => $enrollment->variant?->duration ?? 60,
                             'program_enrollment_id' => $enrollment->id,
                             'scheduled_at' => $scheduledAt,
+                            'timezone' => $request->timezone(),
                             'status' => 'pending',
                             'subject_id' => $session['subject_id'],
                             'user_id' => $request->user()->id,
@@ -73,6 +79,7 @@ class ScheduleController extends Controller
                         $schedule->recordHistory('created', "Booking schedule dibuat oleh {$request->user()->name}.", $request->user(), [
                             'scheduled_at' => $scheduledAt->toDateTimeString(),
                             'status' => 'pending',
+                            'timezone' => $request->timezone(),
                         ], $request->ip());
                     });
 
@@ -83,8 +90,11 @@ class ScheduleController extends Controller
         return back()->with('success', 'Session booked.');
     }
 
-    public function update(Request $request, Schedule $schedule): RedirectResponse
-    {
+    public function update(
+        UpdateStudentScheduleRequest $request,
+        Schedule $schedule,
+        BusinessCalendarService $businessCalendar,
+    ): RedirectResponse {
         abort_unless($schedule->user_id === $request->user()->id, 403);
 
         if ($schedule->status !== 'pending') {
@@ -93,29 +103,31 @@ class ScheduleController extends Controller
             ]);
         }
 
-        $data = $request->validate([
-            'date' => ['required', 'date_format:Y-m-d'],
-            'time' => ['required', 'date_format:H:i'],
-        ]);
-
         $previousScheduledAt = $schedule->scheduled_at->copy();
-        $scheduledAt = CarbonImmutable::parse(
-            "{$data['date']} {$data['time']}",
-            config('app.timezone'),
-        );
+        $previousTimezone = $schedule->timezone;
+        $scheduledAt = $request->scheduledAtUtc();
+
+        if ($reason = $businessCalendar->unavailabilityReason($scheduledAt, $schedule->duration)) {
+            throw ValidationException::withMessages(['date' => $reason]);
+        }
 
         $schedule->update([
             'scheduled_at' => $scheduledAt,
+            'timezone' => $request->timezone(),
         ]);
         $schedule->recordHistory('updated', sprintf(
             'Waktu schedule diubah oleh %s dari %s menjadi %s.',
             $request->user()->name,
-            $this->formatHistoryScheduleTime($previousScheduledAt),
-            $this->formatHistoryScheduleTime($scheduledAt),
+            $this->formatHistoryScheduleTime($previousScheduledAt, $request->timezone()),
+            $this->formatHistoryScheduleTime($scheduledAt, $request->timezone()),
         ), $request->user(), [
             'scheduled_at' => [
                 'from' => $previousScheduledAt->toDateTimeString(),
                 'to' => $scheduledAt->toDateTimeString(),
+            ],
+            'timezone' => [
+                'from' => $previousTimezone,
+                'to' => $request->timezone(),
             ],
         ], $request->ip());
 
@@ -206,8 +218,10 @@ class ScheduleController extends Controller
             ]);
     }
 
-    private function formatHistoryScheduleTime(CarbonInterface $date): string
+    private function formatHistoryScheduleTime(CarbonInterface $date, string $timezone): string
     {
-        return $date->copy()->locale('id')->translatedFormat('d M Y, H:i').' WIB';
+        $localDate = app(UserDateTimeService::class)->toLocal($date, $timezone)->locale('id');
+
+        return $localDate->translatedFormat('d M Y, H:i').' '.$localDate->format('T');
     }
 }

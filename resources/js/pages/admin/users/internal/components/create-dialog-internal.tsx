@@ -37,7 +37,7 @@ export function CreateDialogInternal({
                     Add internal
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
+            <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Add internal user</DialogTitle>
                     <DialogDescription>

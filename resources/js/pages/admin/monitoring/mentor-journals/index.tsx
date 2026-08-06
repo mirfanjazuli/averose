@@ -20,32 +20,21 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { useClientPagination } from '@/hooks/use-client-pagination';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
+import {
+    formatDate,
+    formatDateInput,
+    formatDateTime,
+    formatTimezoneName,
+} from '@/lib/date-time';
 import type { MentorJournal } from './data';
-
-const dateFormatter = new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-});
-
-const timeFormatter = new Intl.DateTimeFormat('id-ID', {
-    hour: '2-digit',
-    minute: '2-digit',
-});
-
-function formatDate(value: string) {
-    return dateFormatter.format(new Date(value));
-}
-
-function formatDateTime(value: string) {
-    return `${formatDate(value)}, ${timeFormatter.format(new Date(value))} WIB`;
-}
 
 export default function MentorJournals({
     journals,
 }: {
     journals: MentorJournal[];
 }) {
+    const timezone = useUserTimezone();
     const [searchQuery, setSearchQuery] = useState('');
     const [dateRange, setDateRange] = useState<DateRange | undefined>(
         getThisMonthDateRange,
@@ -60,8 +49,9 @@ export default function MentorJournals({
             : null;
 
         return journals.filter((journal) => {
-            const sessionDate = formatDateForRangeQuery(
-                new Date(journal.sessionStartAt),
+            const sessionDate = formatDateInput(
+                journal.sessionStartAt,
+                timezone,
             );
 
             if (dateFrom && sessionDate < dateFrom) {
@@ -77,15 +67,15 @@ export default function MentorJournals({
             }
 
             return [
-                formatDate(journal.sessionStartAt),
-                formatDateTime(journal.completedAt),
+                formatDate(journal.sessionStartAt, timezone),
+                formatDateTime(journal.completedAt, timezone),
                 journal.mentor,
                 journal.student,
                 journal.subject,
                 journal.program,
             ].some((value) => value.toLowerCase().includes(normalizedSearch));
         });
-    }, [dateRange, journals, searchQuery]);
+    }, [dateRange, journals, searchQuery, timezone]);
     const uniqueMentors = new Set(
         filteredJournals.map((journal) => journal.mentorId),
     ).size;
@@ -170,7 +160,10 @@ export default function MentorJournals({
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Date</TableHead>
-                                <TableHead>Completed at</TableHead>
+                                <TableHead>
+                                    Completed at (
+                                    {formatTimezoneName(new Date(), timezone)})
+                                </TableHead>
                                 <TableHead>Mentor</TableHead>
                                 <TableHead>Student</TableHead>
                                 <TableHead>Subject</TableHead>
@@ -182,10 +175,23 @@ export default function MentorJournals({
                             {visibleJournals.map((journal) => (
                                 <TableRow key={journal.id}>
                                     <TableCell className="whitespace-nowrap">
-                                        {formatDate(journal.sessionStartAt)}
+                                        {formatDate(
+                                            journal.sessionStartAt,
+                                            timezone,
+                                        )}
                                     </TableCell>
                                     <TableCell className="whitespace-nowrap">
-                                        {formatDateTime(journal.completedAt)}
+                                        {formatDateTime(
+                                            journal.completedAt,
+                                            timezone,
+                                            {
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit',
+                                                month: 'short',
+                                                year: 'numeric',
+                                            },
+                                        )}
                                     </TableCell>
                                     <TableCell className="font-medium">
                                         {journal.mentor}

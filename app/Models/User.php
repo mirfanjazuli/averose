@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\UserRole;
+use App\UserTimezoneMode;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -18,7 +19,7 @@ use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
-#[Fillable(['name', 'nickname', 'slug', 'email', 'password', 'role', 'role_id', 'status'])]
+#[Fillable(['name', 'nickname', 'slug', 'email', 'password', 'role', 'role_id', 'status', 'timezone', 'timezone_mode'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements PasskeyUser
 {
@@ -33,6 +34,8 @@ class User extends Authenticatable implements PasskeyUser
     protected $attributes = [
         'role' => UserRole::Student->value,
         'status' => 'active',
+        'timezone' => 'Asia/Jakarta',
+        'timezone_mode' => UserTimezoneMode::Auto->value,
     ];
 
     /**
@@ -46,6 +49,7 @@ class User extends Authenticatable implements PasskeyUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'role' => UserRole::class,
+            'timezone_mode' => UserTimezoneMode::class,
             'two_factor_confirmed_at' => 'datetime',
         ];
     }

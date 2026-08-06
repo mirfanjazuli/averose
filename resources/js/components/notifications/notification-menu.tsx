@@ -1,6 +1,7 @@
 import { Link, router } from '@inertiajs/react';
+import { useConnectionStatus, useEchoNotification } from '@laravel/echo-react';
 import { Bell } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -9,15 +10,20 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
+import { formatDateTime } from '@/lib/date-time';
 import { cn } from '@/lib/utils';
 import type { AppNotification, NotificationFeed } from '@/types';
 
-const notificationTimeFormatter = new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    month: 'short',
-});
+type RealtimeNotificationPayload = {
+    event: AppNotification['event'];
+    message: string;
+    occurred_at: string;
+    schedule_code: string | null;
+    title: string;
+    url: string;
+    version: number;
+};
 
 const copy = {
     en: {
@@ -38,41 +44,137 @@ const copy = {
     },
 };
 
-function formatNotificationTime(value: string | null) {
-    return value ? notificationTimeFormatter.format(new Date(value)) : '';
-}
-
 export function NotificationMenu({
     buttonClassName,
     initialFeed,
     locale = 'en',
+    userId,
 }: {
     buttonClassName?: string;
     initialFeed: NotificationFeed;
     locale?: keyof typeof copy;
+    userId: number;
 }) {
+    const timezone = useUserTimezone();
     const [feed, setFeed] = useState(initialFeed);
+    const connectionStatus = useConnectionStatus();
+    const previousConnectionStatus = useRef(connectionStatus);
+    const refreshPromise = useRef<Promise<void> | null>(null);
+    const seenNotificationIds = useRef(
+        new Set(initialFeed.items.map((notification) => notification.id)),
+    );
     const labels = copy[locale];
 
-    const refreshFeed = useCallback(async () => {
-        try {
-            const response = await fetch('/notifications/feed', {
-                headers: { Accept: 'application/json' },
-            });
-
-            if (response.ok) {
-                setFeed((await response.json()) as NotificationFeed);
-            }
-        } catch {
-            // Keep the last successful feed when the network is unavailable.
+    const refreshFeed = useCallback((): Promise<void> => {
+        if (refreshPromise.current) {
+            return refreshPromise.current;
         }
+
+        const request = (async () => {
+            try {
+                const response = await fetch('/notifications/feed', {
+                    headers: { Accept: 'application/json' },
+                });
+
+                if (response.ok) {
+                    const refreshedFeed =
+                        (await response.json()) as NotificationFeed;
+
+                    refreshedFeed.items.forEach((notification) => {
+                        seenNotificationIds.current.add(notification.id);
+                    });
+                    setFeed(refreshedFeed);
+                }
+            } catch {
+                // Keep the last successful feed when the network is unavailable.
+            } finally {
+                refreshPromise.current = null;
+            }
+        })();
+
+        refreshPromise.current = request;
+
+        return request;
     }, []);
 
-    useEffect(() => {
-        const interval = window.setInterval(refreshFeed, 30_000);
+    const receiveNotification = useCallback(
+        (
+            notification: RealtimeNotificationPayload & {
+                id: string;
+                type: string;
+            },
+        ) => {
+            const isNewNotification = !seenNotificationIds.current.has(
+                notification.id,
+            );
 
-        return () => window.clearInterval(interval);
+            seenNotificationIds.current.add(notification.id);
+            setFeed((currentFeed) => {
+                const existingNotification = currentFeed.items.find(
+                    (item) => item.id === notification.id,
+                );
+                const item: AppNotification = {
+                    createdAt: notification.occurred_at,
+                    event: notification.event,
+                    id: notification.id,
+                    isRead: existingNotification?.isRead ?? false,
+                    message: notification.message,
+                    scheduleCode: notification.schedule_code,
+                    title: notification.title,
+                    url: notification.url,
+                };
+
+                return {
+                    items: [
+                        item,
+                        ...currentFeed.items.filter(
+                            (currentItem) => currentItem.id !== item.id,
+                        ),
+                    ].slice(0, 5),
+                    unreadCount: isNewNotification
+                        ? currentFeed.unreadCount + 1
+                        : currentFeed.unreadCount,
+                };
+            });
+        },
+        [],
+    );
+
+    useEchoNotification<RealtimeNotificationPayload>(
+        `App.Models.User.${userId}`,
+        receiveNotification,
+        [],
+        [receiveNotification],
+    );
+
+    useEffect(() => {
+        const refreshWhenVisible = () => {
+            if (document.visibilityState === 'visible') {
+                void refreshFeed();
+            }
+        };
+        document.addEventListener('visibilitychange', refreshWhenVisible);
+
+        return () => {
+            document.removeEventListener(
+                'visibilitychange',
+                refreshWhenVisible,
+            );
+        };
     }, [refreshFeed]);
+
+    useEffect(() => {
+        const previousStatus = previousConnectionStatus.current;
+
+        previousConnectionStatus.current = connectionStatus;
+
+        if (
+            connectionStatus === 'connected' &&
+            previousStatus !== 'connected'
+        ) {
+            void refreshFeed();
+        }
+    }, [connectionStatus, refreshFeed]);
 
     const openNotification = (notification: AppNotification) => {
         if (!notification.isRead) {
@@ -166,9 +268,12 @@ export function NotificationMenu({
                                         {notification.message}
                                     </span>
                                     <span className="mt-1 block text-[11px] text-muted-foreground">
-                                        {formatNotificationTime(
-                                            notification.createdAt,
-                                        )}
+                                        {notification.createdAt
+                                            ? formatDateTime(
+                                                  notification.createdAt,
+                                                  timezone,
+                                              )
+                                            : ''}
                                     </span>
                                 </span>
                             </DropdownMenuItem>

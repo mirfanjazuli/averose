@@ -10,6 +10,13 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
+import {
+    formatDate,
+    formatDateTime,
+    formatTimeRange,
+    formatTimezoneName,
+} from '@/lib/date-time';
 type User = {
     createdAt: string | null;
     email: string;
@@ -33,14 +40,14 @@ type ExpertiseSubject = {
 };
 
 type TeachingJournal = {
-    date: string;
     duration: string;
+    endAt: string;
     id: string;
     program: string;
     status: string;
+    startAt: string;
     student: string;
     subject: string;
-    time: string;
 };
 
 export default function MentorDetail({
@@ -54,6 +61,8 @@ export default function MentorDetail({
     teachingJournals: TeachingJournal[];
     user: User;
 }) {
+    const timezone = useUserTimezone();
+
     return (
         <>
             <Head title={user.name} />
@@ -115,13 +124,21 @@ export default function MentorDetail({
                             <p className="text-sm text-muted-foreground">
                                 Created
                             </p>
-                            <p className="text-sm">{user.createdAt ?? '-'}</p>
+                            <p className="text-sm">
+                                {user.createdAt
+                                    ? formatDateTime(user.createdAt, timezone)
+                                    : '-'}
+                            </p>
                         </div>
                         <div className="grid min-h-10 gap-2 md:grid-cols-[14rem_1fr] md:items-center">
                             <p className="text-sm text-muted-foreground">
                                 Last updated
                             </p>
-                            <p className="text-sm">{user.updatedAt ?? '-'}</p>
+                            <p className="text-sm">
+                                {user.updatedAt
+                                    ? formatDateTime(user.updatedAt, timezone)
+                                    : '-'}
+                            </p>
                         </div>
                     </div>
                 </section>
@@ -140,7 +157,14 @@ export default function MentorDetail({
                                         <TableHead>Session</TableHead>
                                         <TableHead>Student</TableHead>
                                         <TableHead>Date</TableHead>
-                                        <TableHead>Time</TableHead>
+                                        <TableHead>
+                                            Time (
+                                            {formatTimezoneName(
+                                                new Date(),
+                                                timezone,
+                                            )}
+                                            )
+                                        </TableHead>
                                         <TableHead>Duration</TableHead>
                                         <TableHead>Status</TableHead>
                                     </TableRow>
@@ -160,10 +184,18 @@ export default function MentorDetail({
                                                 {journal.student}
                                             </TableCell>
                                             <TableCell>
-                                                {journal.date}
+                                                {formatDate(
+                                                    journal.startAt,
+                                                    timezone,
+                                                )}
                                             </TableCell>
                                             <TableCell>
-                                                {journal.time}
+                                                {formatTimeRange(
+                                                    journal.startAt,
+                                                    journal.endAt,
+                                                    timezone,
+                                                    { includeTimezone: false },
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 {journal.duration}

@@ -7,7 +7,7 @@ export default function LoginLayout({ children }: PropsWithChildren) {
     const { name } = usePage().props;
 
     return (
-        <main className="min-h-svh bg-background text-foreground">
+        <main className="auth-light-theme min-h-svh bg-background text-foreground">
             <div className="grid min-h-svh bg-background lg:grid-cols-[minmax(0,1fr)_minmax(0,0.98fr)]">
                 <section className="flex min-h-svh flex-col bg-background px-6 py-8 sm:px-10 lg:px-16 xl:px-24">
                     <Link

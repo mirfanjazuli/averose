@@ -7,6 +7,7 @@ use App\Models\Schedule;
 use App\Support\NotificationFeed;
 use App\Support\PermissionRegistry;
 use App\UserRole;
+use App\UserTimezoneMode;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -55,6 +56,9 @@ class HandleInertiaRequests extends Middleware
                         'permissions' => $this->permissions($request),
                         'role' => $request->user()->role->value,
                         'roleName' => $request->user()->internalRole?->name,
+                        'timezone' => $request->user()->timezone,
+                        'timezoneMode' => $request->user()->timezone_mode?->value
+                            ?? UserTimezoneMode::Auto->value,
                     ]
                     : null,
             ],

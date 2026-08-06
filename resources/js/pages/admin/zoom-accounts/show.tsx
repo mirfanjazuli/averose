@@ -13,7 +13,13 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import { formatBadgeLabel, getBadgeProps } from '@/lib/badge';
+import {
+    formatDateTime,
+    formatTimeRange,
+    formatTimezoneName,
+} from '@/lib/date-time';
 import { UpdateDialogZoomAccount } from '@/pages/admin/zoom-accounts/components/update-dialog-zoom-account';
 
 type ZoomAccount = {
@@ -29,14 +35,15 @@ type ZoomAccount = {
 };
 
 type ScheduledMeeting = {
+    endAt: string;
     id: string;
     meetingId: string | null;
     mentor: string;
     program: string;
     status: string;
+    startAt: string;
     student: string;
     timingGroup: 'active' | 'today' | 'upcoming';
-    time: string;
     title: string;
     zoomLink: string | null;
 };
@@ -82,6 +89,7 @@ export default function ZoomAccountDetail({
     account: ZoomAccount;
     meetings: ScheduledMeeting[];
 }) {
+    const timezone = useUserTimezone();
     const [editAccountDialogOpen, setEditAccountDialogOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<MeetingTab>('active');
     const meetingCounts = useMemo(
@@ -105,7 +113,7 @@ export default function ZoomAccountDetail({
     return (
         <>
             <Head title={account.name} />
-            <div className="flex h-full min-w-0 max-w-full flex-1 flex-col gap-6 overflow-hidden p-4">
+            <div className="flex h-full max-w-full min-w-0 flex-1 flex-col gap-6 overflow-hidden p-4">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
                         <h1 className="font-heading text-2xl font-semibold">
@@ -167,7 +175,12 @@ export default function ZoomAccountDetail({
                                 Created
                             </p>
                             <p className="text-sm">
-                                {account.createdAt ?? '-'}
+                                {account.createdAt
+                                    ? formatDateTime(
+                                          account.createdAt,
+                                          timezone,
+                                      )
+                                    : '-'}
                             </p>
                         </div>
                     </div>
@@ -210,7 +223,14 @@ export default function ZoomAccountDetail({
                                     <TableHead>Session</TableHead>
                                     <TableHead>Student</TableHead>
                                     <TableHead>Mentor</TableHead>
-                                    <TableHead>Time</TableHead>
+                                    <TableHead>
+                                        Time (
+                                        {formatTimezoneName(
+                                            new Date(),
+                                            timezone,
+                                        )}
+                                        )
+                                    </TableHead>
                                     <TableHead>Meeting ID</TableHead>
                                     <TableHead>Status</TableHead>
                                 </TableRow>
@@ -234,7 +254,12 @@ export default function ZoomAccountDetail({
                                                 {meeting.mentor}
                                             </TableCell>
                                             <TableCell>
-                                                {meeting.time}
+                                                {formatTimeRange(
+                                                    meeting.startAt,
+                                                    meeting.endAt,
+                                                    timezone,
+                                                    { includeTimezone: false },
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 {meeting.meetingId ?? '-'}

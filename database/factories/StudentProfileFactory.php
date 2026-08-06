@@ -23,7 +23,6 @@ class StudentProfileFactory extends Factory
             'grade' => fake()->randomElement(['10', '11', '12']),
             'parent_phone' => fake()->phoneNumber(),
             'school' => fake()->company().' School',
-            'timezone' => 'Asia/Jakarta',
             'user_id' => fn (): int => User::factory()->student()->createQuietly()->id,
         ];
     }

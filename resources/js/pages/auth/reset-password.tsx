@@ -16,7 +16,16 @@ type Props = {
 export default function ResetPassword({ token, email, passwordRules }: Props) {
     return (
         <>
-            <Head title="Reset password" />
+            <Head title="Atur ulang kata sandi" />
+
+            <div className="mb-6 space-y-2 text-center">
+                <h1 className="font-heading text-3xl font-medium">
+                    Atur Ulang Kata Sandi
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                    Buat kata sandi baru untuk akunmu.
+                </p>
+            </div>
 
             <Form
                 action={update().url}
@@ -44,14 +53,14 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="password">Password</Label>
+                            <Label htmlFor="password">Kata sandi baru</Label>
                             <PasswordInput
                                 id="password"
                                 name="password"
                                 autoComplete="new-password"
                                 className="mt-1 block w-full"
                                 autoFocus
-                                placeholder="Password"
+                                placeholder="Kata sandi baru"
                                 passwordrules={passwordRules}
                             />
                             <InputError message={errors.password} />
@@ -59,14 +68,14 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
 
                         <div className="grid gap-2">
                             <Label htmlFor="password_confirmation">
-                                Confirm password
+                                Konfirmasi kata sandi
                             </Label>
                             <PasswordInput
                                 id="password_confirmation"
                                 name="password_confirmation"
                                 autoComplete="new-password"
                                 className="mt-1 block w-full"
-                                placeholder="Confirm password"
+                                placeholder="Konfirmasi kata sandi"
                                 passwordrules={passwordRules}
                             />
                             <InputError
@@ -77,12 +86,12 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
 
                         <Button
                             type="submit"
-                            className="mt-4 w-full"
+                            className="mt-4 w-full bg-[#d9a441] text-[#102a3a] hover:bg-[#c89532]"
                             disabled={processing}
                             data-test="reset-password-button"
                         >
                             {processing && <Spinner />}
-                            Reset password
+                            Simpan kata sandi
                         </Button>
                     </div>
                 )}
@@ -92,6 +101,7 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
 }
 
 ResetPassword.layout = {
-    title: 'Reset password',
-    description: 'Please enter your new password below',
+    title: 'Atur ulang kata sandi',
+    description: 'Masukkan kata sandi baru untuk akunmu',
+    variant: 'login',
 };

@@ -20,6 +20,7 @@ return new class extends Migration
             $table->foreignId('program_enrollment_id')->constrained()->cascadeOnDelete();
             $table->foreignId('subject_id')->constrained()->cascadeOnDelete();
             $table->dateTime('scheduled_at');
+            $table->string('timezone', 64)->default('Asia/Jakarta');
             $table->unsignedSmallInteger('duration');
             $table->string('zoom_link')->nullable();
             $table->string('zoom_meeting_id')->nullable();

@@ -3,7 +3,13 @@ import { UserRoundCheck } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import { formatBadgeLabel, getBadgeProps, getStatusBadgeTone } from '@/lib/badge';
+import {
+    formatDate,
+    formatDateTime,
+    formatTimeRange,
+} from '@/lib/date-time';
 
 type ScheduleHistory = {
     action: string;
@@ -29,29 +35,6 @@ type ScheduleDetail = {
     zoomLink: string | null;
 };
 
-function formatDate(value: string) {
-    return new Intl.DateTimeFormat('id-ID', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    }).format(new Date(value));
-}
-
-function formatTime(value: string) {
-    return new Intl.DateTimeFormat('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-    }).format(new Date(value));
-}
-
-function formatDateTime(value: string) {
-    return `${formatDate(value)}, ${formatTime(value)} WIB`;
-}
-
-function formatTimeRange(startAt: string, endAt: string) {
-    return `${formatTime(startAt)} - ${formatTime(endAt)} WIB`;
-}
-
 function DetailItem({ label, value }: { label: string; value: string | null }) {
     return (
         <div className="grid min-h-9 gap-1 md:grid-cols-[9rem_1fr] md:items-start">
@@ -66,6 +49,8 @@ export default function ScheduleDetail({
 }: {
     schedule: ScheduleDetail;
 }) {
+    const timezone = useUserTimezone();
+
     return (
         <>
             <Head title={schedule.code} />
@@ -111,11 +96,11 @@ export default function ScheduleDetail({
                                 />
                                 <DetailItem
                                     label="Date"
-                                    value={formatDate(schedule.startAt)}
+                                    value={formatDate(schedule.startAt, timezone)}
                                 />
                                 <DetailItem
                                     label="Time"
-                                    value={formatTimeRange(schedule.startAt, schedule.endAt)}
+                                    value={formatTimeRange(schedule.startAt, schedule.endAt, timezone)}
                                 />
                                 <DetailItem
                                     label="Duration"
@@ -177,9 +162,14 @@ export default function ScheduleDetail({
                                                     )}
                                                 </p>
                                                 <p className="text-xs text-muted-foreground">
-                                                    {formatDateTime(
-                                                        history.createdAt,
-                                                    )}
+                                                    {formatDateTime(history.createdAt, timezone, {
+                                                        day: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                        month: 'short',
+                                                        timeZoneName: 'short',
+                                                        year: 'numeric',
+                                                    })}
                                                 </p>
                                             </div>
                                             <p className="mt-1 text-sm text-muted-foreground">

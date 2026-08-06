@@ -33,7 +33,7 @@ class UserSeeder extends Seeder
         ];
 
         foreach ($users as $user) {
-            User::query()->updateOrCreate(
+            $seededUser = User::query()->updateOrCreate(
                 ['email' => $user['email']],
                 [
                     'name' => $user['name'],
@@ -42,6 +42,8 @@ class UserSeeder extends Seeder
                     'role' => $user['role'],
                 ],
             );
+
+            $seededUser->ensureRoleProfile();
         }
     }
 }

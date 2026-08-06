@@ -5,13 +5,23 @@ import { AppSidebarHeader } from '@/components/app-sidebar-header';
 import { MentorSidebar } from '@/components/mentor/mentor-sidebar';
 import { NotificationMenu } from '@/components/notifications/notification-menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import type { AppLayoutProps, BreadcrumbItem, NotificationFeed } from '@/types';
+import type {
+    AppLayoutProps,
+    Auth,
+    BreadcrumbItem,
+    NotificationFeed,
+} from '@/types';
 
 export default function MentorLayout({
     children,
     breadcrumbs = [],
 }: AppLayoutProps) {
-    const { breadcrumbs: pageBreadcrumbs, notificationFeed } = usePage<{
+    const {
+        auth,
+        breadcrumbs: pageBreadcrumbs,
+        notificationFeed,
+    } = usePage<{
+        auth: Auth;
         breadcrumbs?: BreadcrumbItem[];
         notificationFeed: NotificationFeed;
     }>().props;
@@ -26,7 +36,10 @@ export default function MentorLayout({
                 <AppSidebarHeader
                     breadcrumbs={pageBreadcrumbs ?? breadcrumbs}
                     actions={
-                        <NotificationMenu initialFeed={notificationFeed} />
+                        <NotificationMenu
+                            initialFeed={notificationFeed}
+                            userId={auth.user.id}
+                        />
                     }
                 />
                 <ScrollArea className="min-h-0 w-full max-w-full min-w-0 flex-1">

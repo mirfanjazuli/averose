@@ -2,37 +2,18 @@ import { Head, Link } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 
 import { JournalAttachmentList } from '@/components/journal-attachment-list';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
+import { formatDate, formatDateTime, formatTimeRange } from '@/lib/date-time';
 
 import type { MentorJournal } from './data';
-
-const dateFormatter = new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-});
-
-const timeFormatter = new Intl.DateTimeFormat('id-ID', {
-    hour: '2-digit',
-    minute: '2-digit',
-});
-
-function formatDate(value: string) {
-    return dateFormatter.format(new Date(value));
-}
-
-function formatTime(value: string) {
-    return timeFormatter.format(new Date(value));
-}
-
-function formatDateTime(value: string) {
-    return `${formatDate(value)}, ${formatTime(value)} WIB`;
-}
 
 export default function MentorJournalDetail({
     journal,
 }: {
     journal: MentorJournal;
 }) {
+    const timezone = useUserTimezone();
+
     return (
         <>
             <Head title={journal.scheduleCode} />
@@ -62,19 +43,19 @@ export default function MentorJournalDetail({
                         <InfoItem label="Subject" value={journal.subject} />
                         <InfoItem
                             label="Date"
-                            value={formatDate(journal.sessionStartAt)}
+                            value={formatDate(journal.sessionStartAt, timezone)}
                         />
                         <InfoItem
                             label="Time"
                             value={
                                 journal.sessionEndAt
-                                    ? `${formatTime(journal.sessionStartAt)} - ${formatTime(journal.sessionEndAt)} WIB`
+                                    ? formatTimeRange(journal.sessionStartAt, journal.sessionEndAt, timezone)
                                     : '-'
                             }
                         />
                         <InfoItem
                             label="Completed at"
-                            value={formatDateTime(journal.completedAt)}
+                            value={formatDateTime(journal.completedAt, timezone)}
                         />
                     </div>
                 </section>

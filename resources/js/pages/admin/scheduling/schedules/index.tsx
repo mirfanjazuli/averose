@@ -28,11 +28,17 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { useClientPagination } from '@/hooks/use-client-pagination';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
 import {
     formatBadgeLabel,
     getBadgeProps,
     getStatusBadgeTone,
 } from '@/lib/badge';
+import {
+    formatDate,
+    formatTimeRange,
+    formatTimezoneName,
+} from '@/lib/date-time';
 import { AssignDialogSchedule } from '@/pages/admin/scheduling/schedules/components/assign-dialog-schedule';
 import { CreateDialogSchedule } from '@/pages/admin/scheduling/schedules/components/create-dialog-schedule';
 import type { EnrollmentOption } from '@/pages/admin/scheduling/schedules/components/create-dialog-schedule';
@@ -48,7 +54,6 @@ type AdminSession = {
     startAt: string;
     status: string;
     student: string;
-    time: string;
     title: string;
     zoomAccount: string | null;
     zoomAccountSlug: string | null;
@@ -58,23 +63,6 @@ type AdminSession = {
     zoomStartUrl: string | null;
 };
 
-function formatScheduleDate(value: string) {
-    return new Intl.DateTimeFormat('id-ID', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    }).format(new Date(value));
-}
-
-function formatScheduleTimeRange(startAt: string, endAt: string) {
-    const formatter = new Intl.DateTimeFormat('id-ID', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-
-    return `${formatter.format(new Date(startAt))} - ${formatter.format(new Date(endAt))} WIB`;
-}
-
 export default function Schedules({
     enrollments,
     sessions,
@@ -82,6 +70,7 @@ export default function Schedules({
     enrollments: EnrollmentOption[];
     sessions: AdminSession[];
 }) {
+    const timezone = useUserTimezone();
     const [assigningSession, setAssigningSession] =
         useState<AdminSession | null>(null);
     const [creatingSchedule, setCreatingSchedule] = useState(false);
@@ -133,7 +122,10 @@ export default function Schedules({
                     session.student,
                     session.mentor,
                     session.status,
-                    session.time,
+                    formatDate(session.startAt, timezone),
+                    formatTimeRange(session.startAt, session.endAt, timezone, {
+                        includeTimezone: false,
+                    }),
                     session.zoomAccount ?? '',
                 ].some((value) =>
                     value.toLowerCase().includes(normalizedSearch),
@@ -141,7 +133,7 @@ export default function Schedules({
 
             return matchesStatus && matchesSearch;
         });
-    }, [searchQuery, sessions, statusFilter]);
+    }, [searchQuery, sessions, statusFilter, timezone]);
     const {
         changeRowsPerPage,
         firstItemIndex,
@@ -283,7 +275,10 @@ export default function Schedules({
                         <TableHeader>
                             <TableRow>
                                 <TableHead>Date</TableHead>
-                                <TableHead>Time</TableHead>
+                                <TableHead>
+                                    Time (
+                                    {formatTimezoneName(new Date(), timezone)})
+                                </TableHead>
                                 <TableHead>Student</TableHead>
                                 <TableHead>Subject</TableHead>
                                 <TableHead>Delivery</TableHead>
@@ -310,14 +305,17 @@ export default function Schedules({
                                 return (
                                     <TableRow key={session.id}>
                                         <TableCell className="whitespace-nowrap">
-                                            {formatScheduleDate(
+                                            {formatDate(
                                                 session.startAt,
+                                                timezone,
                                             )}
                                         </TableCell>
                                         <TableCell className="whitespace-nowrap">
-                                            {formatScheduleTimeRange(
+                                            {formatTimeRange(
                                                 session.startAt,
                                                 session.endAt,
+                                                timezone,
+                                                { includeTimezone: false },
                                             )}
                                         </TableCell>
                                         <TableCell>{session.student}</TableCell>

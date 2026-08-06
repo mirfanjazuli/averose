@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 
 import { JournalAttachmentList } from '@/components/journal-attachment-list';
 import type { JournalAttachment } from '@/components/journal-attachment-list';
+import { useUserTimezone } from '@/hooks/use-user-timezone';
+import { formatDate, formatDateTime, formatTimeRange } from '@/lib/date-time';
 
 type MentorJournal = {
     achievement: string;
@@ -20,29 +22,6 @@ type MentorJournal = {
     student: string;
     subject: string;
 };
-
-const dateFormatter = new Intl.DateTimeFormat('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-});
-
-const timeFormatter = new Intl.DateTimeFormat('id-ID', {
-    hour: '2-digit',
-    minute: '2-digit',
-});
-
-function formatDate(value: string) {
-    return dateFormatter.format(new Date(value));
-}
-
-function formatTime(value: string) {
-    return timeFormatter.format(new Date(value));
-}
-
-function formatDateTime(value: string) {
-    return `${formatDate(value)}, ${formatTime(value)} WIB`;
-}
 
 function DetailRow({ label, value }: { label: string; value: ReactNode }) {
     return (
@@ -75,6 +54,8 @@ export default function MentorJournalDetail({
 }: {
     journal: MentorJournal;
 }) {
+    const timezone = useUserTimezone();
+
     return (
         <>
             <Head title={journal.scheduleCode} />
@@ -103,19 +84,19 @@ export default function MentorJournalDetail({
                         <DetailRow label="Subject" value={journal.subject} />
                         <DetailRow
                             label="Date"
-                            value={formatDate(journal.sessionStartAt)}
+                            value={formatDate(journal.sessionStartAt, timezone)}
                         />
                         <DetailRow
                             label="Time"
                             value={
                                 journal.sessionEndAt
-                                    ? `${formatTime(journal.sessionStartAt)} - ${formatTime(journal.sessionEndAt)} WIB`
+                                    ? formatTimeRange(journal.sessionStartAt, journal.sessionEndAt, timezone)
                                     : '-'
                             }
                         />
                         <DetailRow
                             label="Completed at"
-                            value={formatDateTime(journal.completedAt)}
+                            value={formatDateTime(journal.completedAt, timezone)}
                         />
                     </div>
                 </section>
